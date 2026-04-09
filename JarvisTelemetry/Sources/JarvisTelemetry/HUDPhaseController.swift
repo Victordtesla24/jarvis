@@ -16,6 +16,7 @@ final class HUDPhaseController: ObservableObject {
     @Published var bootProgress: Double = 0       // 0.0 → 1.0 during boot
     @Published var shutdownProgress: Double = 0   // 0.0 → 1.0 during shutdown
 
+    let lockScreenManager = LockScreenManager()
     private var timer: AnyCancellable?
 
     /// Duration of current boot sequence
@@ -65,6 +66,7 @@ final class HUDPhaseController: ObservableObject {
     }
 
     private func transitionToStandby() {
+        lockScreenManager.setStandbyWallpaper()
         phase = .standby
     }
 
