@@ -1,7 +1,3 @@
-  
-  
-
-
 ```
      ╔═══════════════════════════════════════════════════════════╗
      ║                                                           ║
@@ -406,7 +402,3 @@ This project's visual language is inspired by the JARVIS/F.R.I.D.A.Y. interfaces
 
 
 *"Will that be all, sir?"*
-
-  
-
-
