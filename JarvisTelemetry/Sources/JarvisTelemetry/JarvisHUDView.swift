@@ -326,7 +326,7 @@ struct TopBarView: View {
             HStack {
                 // Left: SHIELD / system label
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("S.H.I.E.L.D. OS")
+                    Text("macOS SILICON")
                         .font(.custom("Menlo", size: 8)).tracking(4)
                         .foregroundColor(cyan.opacity(0.4))
                     Text("JARVIS TELEMETRY v3.1")
