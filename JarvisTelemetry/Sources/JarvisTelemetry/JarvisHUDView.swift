@@ -42,16 +42,17 @@ struct JarvisHUDView: View {
                 HexGridCanvas(width: w, height: h, phase: phase, color: gridBlue)
 
                 // Subtle radial vignette centered on reactor
+                // Reactor ambient bloom — the reactor casts cyan light
                 RadialGradient(
                     gradient: Gradient(colors: [
-                        cyan.opacity(0.03),
-                        cyan.opacity(0.015),
-                        Color.clear,
-                        darkBlue.opacity(0.6)
+                        cyan.opacity(0.12),
+                        cyan.opacity(0.06),
+                        cyan.opacity(0.02),
+                        Color.clear
                     ]),
                     center: .center,
-                    startRadius: R * 0.2,
-                    endRadius: max(w, h) * 0.7
+                    startRadius: R * 0.1,
+                    endRadius: R * 1.2
                 )
                 .ignoresSafeArea()
 
@@ -239,7 +240,7 @@ struct CornerBracketsOverlay: View {
     var body: some View {
         Canvas { ctx, size in
             let bracketLen: CGFloat = 80
-            let inset: CGFloat = 16
+            let inset: CGFloat = 40  // Clear of menu bar and dock
             let corners: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
                 (inset, inset, 1, 1),                              // top-left
                 (width - inset, inset, -1, 1),                     // top-right
@@ -329,11 +330,11 @@ struct TopBarView: View {
                 // Left: SHIELD / system label
                 VStack(alignment: .leading, spacing: 2) {
                     Text("macOS SILICON")
-                        .font(.custom("Menlo", size: 8)).tracking(4)
-                        .foregroundColor(cyan.opacity(0.4))
+                        .font(.custom("Menlo", size: 10)).tracking(4)
+                        .foregroundColor(cyan.opacity(0.7))
                     Text("JARVIS TELEMETRY v3.1")
-                        .font(.custom("Menlo", size: 7)).tracking(3)
-                        .foregroundColor(cyan.opacity(0.25))
+                        .font(.custom("Menlo", size: 8)).tracking(3)
+                        .foregroundColor(cyan.opacity(0.45))
                 }
 
                 Spacer()
@@ -360,7 +361,7 @@ struct TopBarView: View {
                 }
             }
             .padding(.horizontal, 30)
-            .padding(.top, 12)
+            .padding(.top, 36)  // Below macOS menu bar
 
             Spacer()
         }
@@ -395,8 +396,8 @@ struct BottomBarView: View {
             HStack {
                 // Left: chip name
                 Text(store.chipName)
-                    .font(.custom("Menlo", size: 9)).tracking(3)
-                    .foregroundColor(cyan.opacity(0.35))
+                    .font(.custom("Menlo", size: 10)).tracking(3)
+                    .foregroundColor(cyan.opacity(0.6))
 
                 Spacer()
 
@@ -411,14 +412,14 @@ struct BottomBarView: View {
                 // Right: thermal + power summary
                 HStack(spacing: 12) {
                     Text(String(format: "%.0fW", store.totalPower))
-                        .font(.custom("Menlo", size: 11)).foregroundColor(cyan.opacity(0.5))
+                        .font(.custom("Menlo", size: 11)).foregroundColor(cyan.opacity(0.7))
                     Text(store.thermalState.uppercased())
                         .font(.custom("Menlo", size: 9)).tracking(2)
-                        .foregroundColor(cyan.opacity(0.35))
+                        .foregroundColor(cyan.opacity(0.6))
                 }
             }
             .padding(.horizontal, 30)
-            .padding(.bottom, 14)
+            .padding(.bottom, 90)  // Above macOS dock
         }
     }
 }
@@ -434,95 +435,116 @@ struct JarvisReactorCanvas: View {
     let amber: Color, crimson: Color, steel: Color
 
     var body: some View {
-        Canvas { ctx, size in
+        Canvas(opaque: false, colorMode: .linear, rendersAsynchronously: true) { ctx, size in
             let c = center
             let pi2 = Double.pi * 2.0
             let top = -Double.pi / 2.0
-            // Load-reactive speed: rings spin faster under load
             let cpuAvg = (store.eCoreUsages + store.pCoreUsages + store.sCoreUsages)
                 .reduce(0, +) / max(1, Double(store.eCoreUsages.count + store.pCoreUsages.count + store.sCoreUsages.count))
             let speedMul = 1.0 + cpuAvg * 0.5
             let ph = phase * speedMul
 
-            // ── HELPER: full circle ring ─────────────────────────────────
+            // ══════════════════════════════════════════════════════════════
+            //  IRON MAN JARVIS REACTOR — Cinema-grade, high-contrast
+            //  ~15-20 DISTINCT, THICK structural rings with deliberate gaps.
+            //  WIDE data arcs, BLAZING core, HIGH CONTRAST, visible bloom.
+            // ══════════════════════════════════════════════════════════════
+
+            // ═══════════════════════════════════════════════════════════
+            //  HELPERS — high-contrast JARVIS style
+            // ═══════════════════════════════════════════════════════════
+
             func ring(_ r: Double, _ col: Color, _ w: Double, dash: [CGFloat]? = nil) {
                 let p = Path { p in p.addArc(center: c, radius: r, startAngle: .zero, endAngle: .radians(pi2), clockwise: false) }
                 let s = dash != nil ? StrokeStyle(lineWidth: w, lineCap: .butt, dash: dash!) : StrokeStyle(lineWidth: w, lineCap: .butt)
                 ctx.stroke(p, with: .color(col), style: s)
             }
 
-            // ── HELPER: glow ring (ring + TIGHT bloom — not diffuse) ─────
-            func glowRing(_ r: Double, _ col: Color, _ w: Double, bloom: Double = 6) {
-                ring(r, col.opacity(0.10), w + bloom)
-                ring(r, col.opacity(0.30), w + bloom * 0.3)
-                ring(r, col, w)
-                ring(r, Color.white.opacity(0.20), w * 0.3)
+            // JARVIS glow — visible bloom halo around every bright element
+            func glowRing(_ r: Double, _ col: Color, _ w: Double, bloom: Double = 12) {
+                ring(r, col.opacity(0.15), w + bloom * 2)   // wide soft outer glow
+                ring(r, col.opacity(0.35), w + bloom)       // medium glow
+                ring(r, col.opacity(0.80), w)               // bright core ring
+                ring(r, Color.white.opacity(0.25), w * 0.5) // white-hot highlight
             }
 
-            // ── HELPER: tick marks with major/minor hierarchy + rotation ──
-            func ticks(_ r: Double, _ n: Int, _ len: Double, _ col: Color, _ w: Double, rot: Double = 0, majorEvery: Int = 5) {
-                let rotOff = rot * ph
-                for i in 0..<n {
-                    let isMajor = (i % majorEvery == 0)
-                    let tLen = isMajor ? len * 1.8 : len
-                    let tW = isMajor ? w * 2.0 : w
-                    let tCol = isMajor ? col.opacity(1.0) : col.opacity(0.5)
-                    let a = Double(i) / Double(n) * pi2 + rotOff
-                    let p = Path { p in
-                        p.move(to: CGPoint(x: c.x + cos(a) * (r - tLen/2), y: c.y + sin(a) * (r - tLen/2)))
-                        p.addLine(to: CGPoint(x: c.x + cos(a) * (r + tLen/2), y: c.y + sin(a) * (r + tLen/2)))
-                    }
-                    ctx.stroke(p, with: .color(tCol), style: StrokeStyle(lineWidth: tW, lineCap: .butt))
-                }
-            }
-
-            // ── HELPER: notch segments with rotation ─────────────────────
-            func notch(_ r: Double, _ n: Int, _ frac: Double, _ col: Color, _ w: Double, rot: Double = 0) {
+            // Segmented ring — N segments with gaps, rotating
+            func segRing(_ r: Double, _ n: Int, _ frac: Double, _ col: Color, _ w: Double, rot: Double = 0) {
                 let seg = pi2 / Double(n)
                 let rotOff = rot * ph
                 for i in 0..<n {
-                    let s = Double(i) / Double(n) * pi2 + top + rotOff
+                    let s = Double(i) * seg + rotOff
                     let p = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s), endAngle: .radians(s + seg * frac), clockwise: false) }
-                    ctx.stroke(p, with: .color(col), style: StrokeStyle(lineWidth: w, lineCap: .butt))
-                }
-            }
-
-            // ── HELPER: asymmetric rotating arc segments ─────────────────
-            func arcs(_ r: Double, _ segments: [(start: Double, sweep: Double)], _ col: Color, _ w: Double, rot: Double = 0) {
-                let rotOff = rot * ph
-                for seg in segments {
-                    let s = seg.start + rotOff
-                    let p = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s), endAngle: .radians(s + seg.sweep), clockwise: false) }
                     ctx.stroke(p, with: .color(col), style: StrokeStyle(lineWidth: w, lineCap: .round))
                 }
             }
 
-            // ── HELPER: glow arcs (arcs + TIGHT bloom) ────────────────────
-            func glowArcs(_ r: Double, _ segments: [(start: Double, sweep: Double)], _ col: Color, _ w: Double, rot: Double = 0, bloom: Double = 4) {
-                let rotOff = rot * ph
-                for seg in segments {
-                    let s = seg.start + rotOff
-                    let p = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s), endAngle: .radians(s + seg.sweep), clockwise: false) }
-                    ctx.stroke(p, with: .color(col.opacity(0.05)), style: StrokeStyle(lineWidth: w + bloom, lineCap: .round))
-                    ctx.stroke(p, with: .color(col.opacity(0.20)), style: StrokeStyle(lineWidth: w + 1, lineCap: .round))
-                    ctx.stroke(p, with: .color(col), style: StrokeStyle(lineWidth: w, lineCap: .round))
+            // Data arc — WIDE, BRIGHT, with visible bloom
+            func dataArc(_ usages: [Double], _ r: Double, _ w: Double, _ col: Color) {
+                guard !usages.isEmpty else { return }
+                let n = usages.count
+                let sw = pi2 / Double(n)
+                let gap = sw * 0.08
+                for (i, u) in usages.enumerated() {
+                    let s0 = top + sw * Double(i) + gap / 2
+                    let s1 = s0 + sw - gap
+                    // Track background — always visible
+                    let tp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s0), endAngle: .radians(s1), clockwise: false) }
+                    ctx.stroke(tp, with: .color(col.opacity(0.20)), style: StrokeStyle(lineWidth: w, lineCap: .round))
+                    guard u > 0 else { continue }
+                    let fe = s0 + (s1 - s0) * u
+                    let fp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s0), endAngle: .radians(fe), clockwise: false) }
+                    // 4-layer bloom — WIDE and BRIGHT
+                    ctx.stroke(fp, with: .color(col.opacity(0.12)), style: StrokeStyle(lineWidth: w + 10, lineCap: .round))
+                    ctx.stroke(fp, with: .color(col.opacity(0.40)), style: StrokeStyle(lineWidth: w + 4, lineCap: .round))
+                    ctx.stroke(fp, with: .color(col.opacity(0.90)), style: StrokeStyle(lineWidth: w, lineCap: .round))
+                    ctx.stroke(fp, with: .color(Color.white.opacity(0.30)), style: StrokeStyle(lineWidth: w * 0.3, lineCap: .round))
                 }
             }
 
-            // ── HELPER: chevron/arrow markers ────────────────────────────
+            // Chevron arrows
             func chevrons(_ r: Double, _ col: Color, _ sz: Double, _ count: Int = 4, rot: Double = 0) {
                 let rotOff = rot * ph
                 for i in 0..<count {
                     let a = Double(i) * pi2 / Double(count) + top + rotOff
-                    let tip = CGPoint(x: c.x + cos(a) * (r + sz), y: c.y + sin(a) * (r + sz))
-                    let l = CGPoint(x: c.x + cos(a - 0.08) * (r - sz * 0.2), y: c.y + sin(a - 0.08) * (r - sz * 0.2))
-                    let rr = CGPoint(x: c.x + cos(a + 0.08) * (r - sz * 0.2), y: c.y + sin(a + 0.08) * (r - sz * 0.2))
-                    let p = Path { p in p.move(to: l); p.addLine(to: tip); p.addLine(to: rr) }
-                    ctx.stroke(p, with: .color(col), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+                    let tipPt = CGPoint(x: c.x + cos(a) * (r + sz), y: c.y + sin(a) * (r + sz))
+                    let lPt = CGPoint(x: c.x + cos(a - 0.08) * (r - sz * 0.2), y: c.y + sin(a - 0.08) * (r - sz * 0.2))
+                    let rPt = CGPoint(x: c.x + cos(a + 0.08) * (r - sz * 0.2), y: c.y + sin(a + 0.08) * (r - sz * 0.2))
+                    let p = Path { p in p.move(to: lPt); p.addLine(to: tipPt); p.addLine(to: rPt) }
+                    ctx.stroke(p, with: .color(col), style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round))
                 }
             }
 
-            // ── HELPER: orbiting dots ────────────────────────────────────
+            // Radial spokes
+            func spokes(_ rIn: Double, _ rOut: Double, _ n: Int, _ col: Color, _ w: Double, rot: Double = 0) {
+                let rotOff = rot * ph
+                for i in 0..<n {
+                    let a = Double(i) / Double(n) * pi2 + rotOff
+                    let sp = Path { p in
+                        p.move(to: CGPoint(x: c.x + cos(a) * rIn, y: c.y + sin(a) * rIn))
+                        p.addLine(to: CGPoint(x: c.x + cos(a) * rOut, y: c.y + sin(a) * rOut))
+                    }
+                    ctx.stroke(sp, with: .color(col), style: StrokeStyle(lineWidth: w, lineCap: .butt))
+                }
+            }
+
+            // Tick marks
+            func ticks(_ r: Double, _ n: Int, _ len: Double, _ col: Color, _ w: Double, rot: Double = 0) {
+                let rotOff = rot * ph
+                for i in 0..<n {
+                    let a = Double(i) / Double(n) * pi2 + rotOff
+                    let isMajor = i % 5 == 0
+                    let tLen = isMajor ? len * 1.6 : len
+                    let tW = isMajor ? w * 1.8 : w
+                    let p = Path { p in
+                        p.move(to: CGPoint(x: c.x + cos(a) * (r - tLen/2), y: c.y + sin(a) * (r - tLen/2)))
+                        p.addLine(to: CGPoint(x: c.x + cos(a) * (r + tLen/2), y: c.y + sin(a) * (r + tLen/2)))
+                    }
+                    ctx.stroke(p, with: .color(isMajor ? col : col.opacity(0.5)), style: StrokeStyle(lineWidth: tW))
+                }
+            }
+
+            // Orbiting dots
             func dots(_ r: Double, _ n: Int, _ col: Color, _ sz: Double, rot: Double = 0) {
                 let rotOff = rot * ph
                 for i in 0..<n {
@@ -533,371 +555,156 @@ struct JarvisReactorCanvas: View {
                 }
             }
 
-            // ── HELPER: data core arcs — VIVID arcs with bloom ─
-            func coreArcs(_ usages: [Double], _ r: Double, _ w: Double, _ col: Color) {
-                guard !usages.isEmpty else { return }
-                let n = usages.count; let sw = pi2 / Double(n); let gap = sw * 0.06
-                for (i, u) in usages.enumerated() {
-                    let s0 = top + sw * Double(i) + gap / 2; let s1 = s0 + sw - gap
-                    // Track background
-                    let tp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s0), endAngle: .radians(s1), clockwise: false) }
-                    ctx.stroke(tp, with: .color(col.opacity(0.08)), style: StrokeStyle(lineWidth: w, lineCap: .round))
-                    guard u > 0 else { continue }
-                    let fe = s0 + (s1 - s0) * u
-                    let fp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s0), endAngle: .radians(fe), clockwise: false) }
-                    // 4-layer bloom — vivid and punchy
-                    ctx.stroke(fp, with: .color(col.opacity(0.08)), style: StrokeStyle(lineWidth: w + 6, lineCap: .round))
-                    ctx.stroke(fp, with: .color(col.opacity(0.25)), style: StrokeStyle(lineWidth: w + 2, lineCap: .round))
-                    ctx.stroke(fp, with: .color(col.opacity(0.85)), style: StrokeStyle(lineWidth: w, lineCap: .round))
-                    ctx.stroke(fp, with: .color(Color.white.opacity(0.20)), style: StrokeStyle(lineWidth: w * 0.4, lineCap: .round))
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 1: OUTER BEZEL (0.96R - 1.08R)
+            // ══════════════════════════════════════════════════════════════
+
+            // Solid steel fill ring — thick structural frame
+            ring(R * 1.01, steel.opacity(0.50), 3.0)
+
+            // 12-segment bezel panels (steel, visible gaps)
+            segRing(R * 1.01, 12, 0.75, steel.opacity(0.35), 6.0, rot: 0.0)
+
+            // Bright outer edge ring — crisp cyan boundary
+            glowRing(R * 1.06, cyan.opacity(0.80), 2.5, bloom: 8)
+
+            // Bright inner edge ring
+            ring(R * 0.96, steel.opacity(0.70), 3.0)
+
+            // Amber accent glowRing at 0.955R
+            glowRing(R * 0.955, amber.opacity(0.80), 2.5, bloom: 10)
+
+            // 36 radial spokes through bezel (structural)
+            spokes(R * 0.96, R * 1.06, 36, steel.opacity(0.30), 0.6)
+
+            // 4 chevrons at outer edge
+            chevrons(R * 1.03, cyan.opacity(0.65), 12, 4)
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 2: OUTER DATA RING (0.88R - 0.95R)
+            // ══════════════════════════════════════════════════════════════
+
+            // 150 tick marks
+            ticks(R * 0.95, 150, 8, steel.opacity(0.70), 0.8, rot: 0.06)
+
+            // Bright structural glowRing
+            glowRing(R * 0.94, cyan, 3.0, bloom: 14)
+
+            // Rotating glow arcs (decorative)
+            segRing(R * 0.93, 8, 0.40, cyanDim.opacity(0.60), 4.0, rot: -0.04)
+
+            // GPU DATA ARC at 0.915R — WIDE (12px), cyan, BRIGHT
+            let gpuVal = [min(store.gpuUsage, 1.0)]
+            dataArc(gpuVal, R * 0.915, 12.0, cyan)
+
+            // Structural ring below GPU arc
+            ring(R * 0.895, steel.opacity(0.55), 2.5)
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 3: E-CORE ZONE (0.82R - 0.87R)
+            // ══════════════════════════════════════════════════════════════
+
+            // Structural bezel (steel, segmented 16 panels)
+            segRing(R * 0.87, 16, 0.70, steel.opacity(0.50), 4.0, rot: 0.01)
+            ring(R * 0.875, steel.opacity(0.60), 2.0)
+
+            // E-CORE DATA ARCS at 0.845R — WIDE (12px), cyan
+            dataArc(store.eCoreUsages, R * 0.845, 12.0, cyan)
+
+            // Bright glowRing at 0.83R
+            glowRing(R * 0.83, cyan, 3.0, bloom: 12)
+
+            // 16 dots at 0.815R
+            dots(R * 0.815, 16, cyan.opacity(0.70), 4.0, rot: 0.12)
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 4: P-CORE ZONE (0.72R - 0.78R)
+            // ══════════════════════════════════════════════════════════════
+
+            // Structural bezel (steel, segmented 20 panels)
+            segRing(R * 0.78, 20, 0.65, steel.opacity(0.50), 4.0, rot: -0.01)
+            ring(R * 0.785, steel.opacity(0.60), 2.0)
+
+            // P-CORE DATA ARCS at 0.745R — WIDE (12px), amber
+            dataArc(store.pCoreUsages, R * 0.745, 12.0, amber)
+
+            // Bright glowRing at 0.73R (amber)
+            glowRing(R * 0.73, amber, 3.0, bloom: 12)
+
+            // 4 chevrons at 0.70R
+            chevrons(R * 0.70, cyan.opacity(0.60), 8, 4, rot: 0.05)
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 5: S-CORE ZONE (0.62R - 0.66R)
+            // ══════════════════════════════════════════════════════════════
+
+            // S-CORE DATA ARCS at 0.645R — WIDE (10px), crimson
+            dataArc(store.sCoreUsages, R * 0.645, 10.0, crimson)
+
+            // Ticks at 0.615R
+            ticks(R * 0.615, 48, 6, steel.opacity(0.70), 0.8, rot: 0.25)
+
+            // GlowRing at 0.63R (crimson)
+            glowRing(R * 0.63, crimson, 2.5, bloom: 10)
+
+            // Structural ring below S-cores
+            ring(R * 0.60, steel.opacity(0.55), 2.0)
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 6: INNER DETAIL (0.40R - 0.58R)
+            // ══════════════════════════════════════════════════════════════
+
+            // Segmented rotating ring 1 — slow CW
+            segRing(R * 0.56, 6, 0.60, cyan.opacity(0.70), 5.0, rot: 0.03)
+
+            // Ticks between rings
+            ticks(R * 0.53, 36, 7, steel.opacity(0.65), 1.0, rot: -0.08)
+
+            // Segmented rotating ring 2 — medium CCW
+            segRing(R * 0.50, 8, 0.55, steel.opacity(0.60), 4.0, rot: -0.06)
+
+            // Rotating glow arcs
+            segRing(R * 0.47, 12, 0.35, cyanDim.opacity(0.55), 3.0, rot: 0.10)
+
+            // Segmented rotating ring 3 — fast CW
+            segRing(R * 0.44, 10, 0.50, cyan.opacity(0.65), 3.5, rot: 0.15)
+
+            // GlowRing at 0.44R (bright cyan — inner boundary)
+            glowRing(R * 0.44, cyan, 3.5, bloom: 14)
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 7: REACTOR CORE (0R - 0.25R)
+            // ══════════════════════════════════════════════════════════════
+
+            // Structural spokes from core to inner boundary
+            spokes(R * 0.18, R * 0.44, 12, steel.opacity(0.40), 1.0, rot: -0.02)
+
+            // 12 ticks at 0.20R
+            ticks(R * 0.20, 12, 6, steel.opacity(0.70), 1.2, rot: -0.40)
+
+            // GlowRing at 0.18R
+            glowRing(R * 0.18, cyan, 2.0, bloom: 10)
+
+            // Targeting reticle (dashed circles + crosshairs)
+            let reticlePulse = 0.85 + sin(ph * 1.5) * 0.15
+            for (rr, op) in [(R * 0.14, 0.35), (R * 0.10, 0.45), (R * 0.06, 0.30)] {
+                let rp = Path { p in p.addArc(center: c, radius: rr, startAngle: .zero, endAngle: .radians(pi2), clockwise: false) }
+                ctx.stroke(rp, with: .color(cyan.opacity(op * reticlePulse)), style: StrokeStyle(lineWidth: 1.0, dash: [4, 4]))
+            }
+            // Cross lines through center
+            for angle in [0.0, Double.pi / 2] {
+                let dx = cos(angle)
+                let dy = sin(angle)
+                let cp = Path { p in
+                    p.move(to: CGPoint(x: c.x + dx * R * 0.03, y: c.y + dy * R * 0.03))
+                    p.addLine(to: CGPoint(x: c.x + dx * R * 0.12, y: c.y + dy * R * 0.12))
+                    p.move(to: CGPoint(x: c.x - dx * R * 0.03, y: c.y - dy * R * 0.03))
+                    p.addLine(to: CGPoint(x: c.x - dx * R * 0.12, y: c.y - dy * R * 0.12))
                 }
+                ctx.stroke(cp, with: .color(cyan.opacity(0.40 * reticlePulse)), style: StrokeStyle(lineWidth: 1.0))
             }
 
-            // ── HELPER: radial spoke lines (reference shows these at zone boundaries)
-            func spokes(_ rInner: Double, _ rOuter: Double, _ n: Int, _ col: Color, _ w: Double, rot: Double = 0) {
-                let rotOff = rot * ph
-                for i in 0..<n {
-                    let a = Double(i) / Double(n) * pi2 + rotOff
-                    let sp = Path { p in
-                        p.move(to: CGPoint(x: c.x + cos(a) * rInner, y: c.y + sin(a) * rInner))
-                        p.addLine(to: CGPoint(x: c.x + cos(a) * rOuter, y: c.y + sin(a) * rOuter))
-                    }
-                    ctx.stroke(sp, with: .color(col), style: StrokeStyle(lineWidth: w, lineCap: .butt))
-                }
-            }
-
-            // ══════════════════════════════════════════════════════════════
-            //  CINEMA-GRADE JARVIS REACTOR — 240+ ring layers
-            // ══════════════════════════════════════════════════════════════
-
-            // ── 0. ULTRA-DENSE BASE RING FILL ────────────────────────────
-            // 220 concentric rings from 0.06R to 0.97R with varied styles
-            for i in 0..<220 {
-                let frac = Double(i) / 220.0
-                let r = R * (0.06 + frac * 0.91)
-                let distFromCenter = 1.0 - frac
-                let baseOp = 0.22 + distFromCenter * 0.30
-                let m = i % 18
-
-                if m == 0 {
-                    // Every 18th: steel accent with subtle cyan edge
-                    ring(r, steel.opacity(min(baseOp + 0.18, 0.50)), 2.2)
-                    ring(r, cyanDim.opacity(min(baseOp * 0.15, 0.06)), 3)
-                } else if m == 9 {
-                    // Offset accent: medium steel
-                    ring(r, steel.opacity(min(baseOp + 0.10, 0.40)), 1.5)
-                } else if m == 3 || m == 12 {
-                    // Thicker steel band (2px)
-                    ring(r, steel.opacity(baseOp * 1.2), 2.0)
-                } else if m == 6 || m == 15 {
-                    // Dashed ring
-                    ring(r, steel.opacity(baseOp * 0.8), 0.5, dash: [2, 5])
-                } else if m == 4 || m == 13 {
-                    // Segmented ring
-                    let nSeg = 6 + (i % 7) * 2
-                    notch(r, nSeg, 0.6, steel.opacity(baseOp * 0.9), 0.8)
-                } else if m == 7 || m == 16 {
-                    // Fine dotted ring
-                    ring(r, steel.opacity(baseOp * 0.6), 0.4, dash: [1, 3])
-                } else {
-                    // Default fill — visible steel rings
-                    ring(r, steel.opacity(baseOp * 0.7), 0.4)
-                }
-            }
-
-            // ── 0b. ACCENT GLOW RINGS — bright cyan, no dimming ──
-            glowRing(R * 0.94, cyan, 1.2, bloom: 6)
-            glowRing(R * 0.82, cyan, 1.0, bloom: 6)
-            glowRing(R * 0.72, cyan, 1.0, bloom: 5)
-            glowRing(R * 0.62, cyan, 1.0, bloom: 5)
-            glowRing(R * 0.50, cyan, 0.8, bloom: 4)
-            glowRing(R * 0.38, cyan, 0.8, bloom: 4)
-            glowRing(R * 0.25, cyan, 0.8, bloom: 4)
-
-            // ══════════════════════════════════════════════════════════════
-            //  HELPER: rectangular panel bezel (reused at multiple radii)
-            // ══════════════════════════════════════════════════════════════
-            func bezelPanels(_ inner: Double, _ outer: Double, _ count: Int, _ frac: Double, _ edgeBrightness: Double = 0.30) {
-                let pw = outer - inner
-                let midR = (inner + outer) / 2
-                for i in 0..<count {
-                    let seg = pi2 / Double(count)
-                    let sA = Double(i) * seg + seg * (1.0 - frac) / 2
-                    let eA = sA + seg * frac
-                    // Dark fill — darker for more contrast
-                    let pp = Path { p in p.addArc(center: c, radius: midR, startAngle: .radians(sA), endAngle: .radians(eA), clockwise: false) }
-                    ctx.stroke(pp, with: .color(steel.opacity(0.10)), style: StrokeStyle(lineWidth: pw, lineCap: .butt))
-                    // Animated border
-                    let bOp = 0.25 + sin(ph * 0.5 + Double(i) * 0.5) * 0.06
-                    ctx.stroke(pp, with: .color(steel.opacity(bOp)), style: StrokeStyle(lineWidth: pw, lineCap: .butt))
-                    // Inner & outer edge lines — brighter for visible panel boundaries
-                    let ip = Path { p in p.addArc(center: c, radius: inner, startAngle: .radians(sA), endAngle: .radians(eA), clockwise: false) }
-                    let op = Path { p in p.addArc(center: c, radius: outer, startAngle: .radians(sA), endAngle: .radians(eA), clockwise: false) }
-                    ctx.stroke(ip, with: .color(steel.opacity(edgeBrightness * 1.2)), style: StrokeStyle(lineWidth: 1.0))
-                    ctx.stroke(op, with: .color(steel.opacity(edgeBrightness * 1.2)), style: StrokeStyle(lineWidth: 1.0))
-                    // Radial side edges — visible panel separators
-                    for angle in [sA, eA] {
-                        let sp = Path { p in
-                            p.move(to: CGPoint(x: c.x + cos(angle) * inner, y: c.y + sin(angle) * inner))
-                            p.addLine(to: CGPoint(x: c.x + cos(angle) * outer, y: c.y + sin(angle) * outer))
-                        }
-                        ctx.stroke(sp, with: .color(steel.opacity(edgeBrightness * 0.9)), style: StrokeStyle(lineWidth: 0.7))
-                    }
-                }
-            }
-
-            // ══════════════════════════════════════════════════════════════
-            //  PRIMARY OUTER BEZEL — thick industrial frame (0.96R → 1.06R)
-            // ══════════════════════════════════════════════════════════════
-
-            // ── MASSIVE OUTER BEZEL — dark industrial steel (ref-02 style) ──
-            // Solid dark fill — bezel must read as a distinct opaque band
-            ring(R * 1.01, Color(red: 0.08, green: 0.10, blue: 0.14).opacity(0.85), R * 0.14)
-            ring(R * 1.01, steel.opacity(0.35), R * 0.14)   // steel tint over dark base
-            ring(R * 1.01, steel.opacity(0.12), R * 0.20)   // wider shadow
-
-            // Internal structure lines — visible metallic ridges
-            ring(R * 0.96, steel.opacity(0.38), 1.5)
-            ring(R * 0.98, steel.opacity(0.32), 1.2)
-            ring(R * 1.00, steel.opacity(0.42), 2.0)        // center spine
-            ring(R * 1.02, steel.opacity(0.32), 1.2)
-            ring(R * 1.04, steel.opacity(0.35), 1.2)
-            ring(R * 1.06, steel.opacity(0.32), 1.2)
-
-            // Crisp edge lines — bright to define bezel boundary
-            ring(R * 1.08, steel.opacity(0.72), 2.5)        // outer edge
-            ring(R * 0.94, steel.opacity(0.75), 2.5)        // inner edge
-
-            // 12 large rectangular segment panels (full bezel width)
-            bezelPanels(R * 0.95, R * 1.07, 12, 0.62, 0.50)
-
-            // Radial spokes through outer bezel (structural dividers)
-            spokes(R * 0.94, R * 1.08, 36, steel.opacity(0.16), 0.4)
-            spokes(R * 0.94, R * 1.08, 12, steel.opacity(0.30), 0.7)
-
-            // Bezel accent elements
-            chevrons(R * 1.03, cyan.opacity(0.25), 10, 4)
-            ring(R * 0.965, steel.opacity(0.28), 0.8)
-
-            // ── AMBER ACCENT RING (tucked inside bezel at inner edge) ────
-            glowRing(R * 0.955, amber.opacity(0.65), 1.5, bloom: 4)
-            ring(R * 0.955, amber.opacity(0.15), 3)    // warm glow
-
-            // ── 2. OUTER TICK RING (150 ticks, CW) ──────────────────────
-            ticks(R * 0.96, 150, 8, steel.opacity(0.55), 0.6, rot: 0.06, majorEvery: 5)
-            ring(R * 0.95, steel.opacity(0.35), 0.8)
-
-            // ── 3. ROTATING GLOW ARC SEGMENTS (outer) ───────────────────
-            glowArcs(R * 0.935, [
-                (0.2, 0.9), (1.6, 1.2), (3.2, 0.7), (4.8, 1.0), (5.8, 0.5)
-            ], cyanDim.opacity(0.6), 2.0, rot: -0.04, bloom: 3)
-            ring(R * 0.925, steel.opacity(0.18), 0.5, dash: [2, 5])
-
-            // ── 4. GPU DATA ARC (thin, tight glow) ──────────────────────
-            let gN = min(store.gpuUsage, 1.0)
-            ring(R * 0.915, steel.opacity(0.08), 3)
-            if gN > 0 {
-                let gS = -Double.pi * 0.75; let gE = gS + Double.pi * 1.5 * gN
-                let gP = Path { p in p.addArc(center: c, radius: R * 0.915, startAngle: .radians(gS), endAngle: .radians(gE), clockwise: false) }
-                ctx.stroke(gP, with: .color(cyan.opacity(0.10)), style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                ctx.stroke(gP, with: .color(cyan.opacity(0.30)), style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                ctx.stroke(gP, with: .color(cyan.opacity(0.85)), style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                ctx.stroke(gP, with: .color(Color.white.opacity(0.20)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-            }
-            ring(R * 0.905, cyan.opacity(0.18), 0.5)
-
-            // ── 5. TICK RING 2 (100 ticks, CCW) ─────────────────────────
-            ticks(R * 0.895, 100, 6, steel.opacity(0.52), 0.6, rot: -0.10, majorEvery: 5)
-            notch(R * 0.88, 40, 0.50, steel.opacity(0.38), 3.5, rot: 0.02)
-            ring(R * 0.87, steel.opacity(0.40), 1.0)
-
-            // ══════════════════════════════════════════════════════════════
-            //  INTERMEDIATE BEZEL 1 (0.86R → 0.89R) — E-core boundary
-            // ══════════════════════════════════════════════════════════════
-            ring(R * 0.875, Color(red: 0.08, green: 0.10, blue: 0.14).opacity(0.70), R * 0.04)
-            ring(R * 0.875, steel.opacity(0.30), R * 0.04)   // steel tint
-            ring(R * 0.875, steel.opacity(0.12), R * 0.06)   // wider subtle
-            ring(R * 0.895, steel.opacity(0.60), 1.8)        // outer edge
-            ring(R * 0.855, steel.opacity(0.62), 1.8)        // inner edge
-            ring(R * 0.875, steel.opacity(0.38), 1.2)        // mid accent
-            bezelPanels(R * 0.858, R * 0.892, 16, 0.55, 0.50)
-            spokes(R * 0.855, R * 0.895, 24, steel.opacity(0.28), 0.5, rot: 0.01)
-
-            // ══════════════════════════════════════════════════════════════
-            //  E-CORE ZONE (0.80R → 0.86R)
-            // ══════════════════════════════════════════════════════════════
-
-            // ── 6. E-CORE DATA RING (thin precision arcs) ────────────────
-            coreArcs(store.eCoreUsages, R * 0.845, 6, cyan)
-            ring(R * 0.83, steel.opacity(0.30), 0.6)
-
-            // ── 7. ORBITING DOTS ────────────────────────────────────────
-            dots(R * 0.815, 16, cyan.opacity(0.40), 3, rot: 0.12)
-
-            // ── 8. TICK RING 3 (80 ticks, CW) ──────────────────────────
-            ticks(R * 0.80, 80, 5, steel.opacity(0.40), 0.5, rot: 0.14, majorEvery: 8)
-            ring(R * 0.79, steel.opacity(0.22), 0.5, dash: [1, 3])
-
-            // ── 9. ROTATING GLOW ARCS (mid-outer) ───────────────────────
-            glowArcs(R * 0.78, [
-                (0.5, 1.4), (2.3, 0.8), (4.0, 1.6), (5.8, 0.5)
-            ], cyanDim.opacity(0.5), 1.8, rot: -0.08, bloom: 3)
-            notch(R * 0.77, 20, 0.55, steel.opacity(0.32), 3.5, rot: 0.03)
-            ring(R * 0.765, steel.opacity(0.30), 0.6)
-            ring(R * 0.76, steel.opacity(0.25), 0.8)
-
-            // ══════════════════════════════════════════════════════════════
-            //  INTERMEDIATE BEZEL 2 (0.755R → 0.775R) — P-core boundary
-            // ══════════════════════════════════════════════════════════════
-            ring(R * 0.765, Color(red: 0.08, green: 0.10, blue: 0.14).opacity(0.65), R * 0.035)
-            ring(R * 0.765, steel.opacity(0.28), R * 0.035)  // steel tint
-            ring(R * 0.765, steel.opacity(0.10), R * 0.05)   // wider subtle
-            ring(R * 0.78, steel.opacity(0.55), 1.5)         // outer edge
-            ring(R * 0.75, steel.opacity(0.58), 1.5)         // inner edge
-            ring(R * 0.765, steel.opacity(0.35), 1.0)        // mid accent
-            bezelPanels(R * 0.752, R * 0.778, 20, 0.50, 0.45)
-            spokes(R * 0.75, R * 0.78, 30, steel.opacity(0.25), 0.5, rot: -0.01)
-
-            // ══════════════════════════════════════════════════════════════
-            //  P-CORE ZONE (0.70R → 0.76R)
-            // ══════════════════════════════════════════════════════════════
-
-            // ── 10. P-CORE DATA RING (thin precision arcs) ───────────────
-            coreArcs(store.pCoreUsages, R * 0.745, 7, amber)
-            ring(R * 0.73, steel.opacity(0.28), 0.5)
-
-            // ── 11. TICK RING 4 (60 ticks, CCW) ─────────────────────────
-            ticks(R * 0.715, 60, 5, steel.opacity(0.38), 0.5, rot: -0.18, majorEvery: 5)
-            chevrons(R * 0.70, cyan.opacity(0.35), 7, 4, rot: 0.05)
-            ring(R * 0.695, steel.opacity(0.22), 0.5)
-
-            // ── 12. ROTATING ARCS (mid) ─────────────────────────────────
-            glowArcs(R * 0.685, [
-                (0.8, 0.6), (1.8, 1.1), (3.5, 0.9), (5.0, 0.5), (5.7, 0.4)
-            ], cyanDim, 2, rot: 0.06, bloom: 3)
-            notch(R * 0.675, 14, 0.65, steel.opacity(0.25), 3.5, rot: -0.04)
-            ring(R * 0.665, steel.opacity(0.25), 0.8)
-
-            // ══════════════════════════════════════════════════════════════
-            //  S-CORE ZONE (0.60R → 0.66R)
-            // ══════════════════════════════════════════════════════════════
-
-            // ── 13. S-CORE DATA RING (thin precision arcs) ───────────────
-            coreArcs(store.sCoreUsages, R * 0.645, 6, crimson)
-            ring(R * 0.63, steel.opacity(0.28), 0.5)
-
-            // ── 14. TICK RING 5 (48 ticks, CW fast) ─────────────────────
-            ticks(R * 0.615, 48, 5, steel.opacity(0.35), 0.5, rot: 0.25, majorEvery: 4)
-            ring(R * 0.605, steel.opacity(0.18), 0.5, dash: [1, 3])
-
-            // ── 14b. ADDITIONAL MID-ZONE DENSITY ─────────────────────────
-            ring(R * 0.60, steel.opacity(0.28), 0.5)
-            ticks(R * 0.595, 40, 4, steel.opacity(0.30), 0.4, rot: -0.08)
-            ring(R * 0.59, steel.opacity(0.22), 0.5, dash: [1, 3])
-            notch(R * 0.585, 12, 0.55, steel.opacity(0.20), 2.0, rot: 0.05)
-            ring(R * 0.58, steel.opacity(0.20), 0.4)
-
-            // ── 15. ORBITING DOTS (inner) ───────────────────────────────
-            dots(R * 0.595, 10, cyan.opacity(0.30), 2.5, rot: -0.20)
-
-            // ══════════════════════════════════════════════════════════════
-            //  INNER DETAIL ZONE (0.40R → 0.58R)
-            // ══════════════════════════════════════════════════════════════
-
-            // ── 16. ROTATING ARCS (inner) ───────────────────────────────
-            glowArcs(R * 0.58, [
-                (0.3, 1.6), (2.5, 1.0), (4.2, 1.3), (5.9, 0.3)
-            ], cyanDim, 2, rot: -0.12, bloom: 3)
-            ring(R * 0.57, cyan.opacity(0.18), 0.6)
-
-            // ── 17. TICK RING 6 (36 ticks, CCW fast) ────────────────────
-            ticks(R * 0.555, 36, 6, steel.opacity(0.35), 0.6, rot: -0.35, majorEvery: 3)
-            notch(R * 0.54, 9, 0.72, steel.opacity(0.25), 3.5, rot: 0.08)
-            ring(R * 0.53, steel.opacity(0.20), 0.5, dash: [2, 4])
-
-            // ── 18. ULTRA-DENSE INNER DETAIL (packed tight like refs) ────
-            ticks(R * 0.525, 120, 3.5, steel.opacity(0.28), 0.3, rot: 0.18)
-            ring(R * 0.52, steel.opacity(0.16), 0.4)
-            ring(R * 0.515, cyan.opacity(0.12), 0.4)
-            ticks(R * 0.51, 60, 2.5, steel.opacity(0.20), 0.3, rot: -0.12)
-            ring(R * 0.505, steel.opacity(0.14), 0.4, dash: [1, 2])
-            notch(R * 0.50, 24, 0.50, steel.opacity(0.18), 2.0, rot: -0.06)
-            ring(R * 0.495, cyan.opacity(0.10), 0.4)
-            ring(R * 0.49, steel.opacity(0.12), 0.3)
-            ticks(R * 0.485, 80, 2.5, steel.opacity(0.18), 0.3, rot: 0.22)
-            ring(R * 0.48, steel.opacity(0.14), 0.4)
-            arcs(R * 0.475, [(0.0, 0.9), (1.4, 0.7), (2.8, 1.1), (4.5, 0.6), (5.5, 0.5)], cyanDim.opacity(0.08), 1.5, rot: 0.10)
-            ring(R * 0.47, cyan.opacity(0.10), 0.4)
-            ticks(R * 0.465, 48, 3, steel.opacity(0.16), 0.3, rot: -0.15)
-            ring(R * 0.46, steel.opacity(0.12), 0.3, dash: [1, 2])
-            notch(R * 0.455, 12, 0.60, steel.opacity(0.15), 2.0, rot: 0.04)
-
-            // ══════════════════════════════════════════════════════════════
-            //  INNER REACTOR CORE (0.08R → 0.44R)
-            // ══════════════════════════════════════════════════════════════
-
-            // ── 19. INNER REACTOR BOUNDARY ──────────────────────────────
-            ticks(R * 0.45, 24, 7, steel.opacity(0.42), 0.7, rot: -0.15)
-            ring(R * 0.445, steel.opacity(0.35), 0.8)
-            glowRing(R * 0.44, cyan.opacity(0.5), 1.0, bloom: 3)
-            ring(R * 0.435, steel.opacity(0.30), 0.6)
-            chevrons(R * 0.43, steel.opacity(0.30), 6, 4, rot: 0.08)
-
-            // ── 20. TICK RING 7 (24 ticks, CW fast) ─────────────────────
-            ticks(R * 0.41, 24, 5, steel.opacity(0.32), 0.5, rot: 0.45)
-            ring(R * 0.40, steel.opacity(0.18), 0.5)
-            notch(R * 0.39, 6, 0.78, steel.opacity(0.20), 2.5, rot: -0.10)
-            ring(R * 0.385, cyan.opacity(0.15), 0.5, dash: [2, 3])
-
-            // ── 21. DEEP CORE (dense concentric detail) ────────────────
-            ring(R * 0.37, steel.opacity(0.28), 0.6)
-            ticks(R * 0.365, 16, 4, steel.opacity(0.25), 0.4, rot: 0.15)
-            ring(R * 0.36, steel.opacity(0.22), 0.5)
-            notch(R * 0.355, 8, 0.65, steel.opacity(0.20), 2.0, rot: 0.06)
-            ticks(R * 0.35, 12, 8, steel.opacity(0.30), 0.6, rot: -0.25)
-            ring(R * 0.345, steel.opacity(0.18), 0.4)
-            glowRing(R * 0.34, cyanDim.opacity(0.35), 0.5, bloom: 2)
-            ring(R * 0.335, steel.opacity(0.22), 0.5)
-            ticks(R * 0.33, 14, 3, steel.opacity(0.18), 0.3, rot: 0.12)
-            ring(R * 0.325, steel.opacity(0.16), 0.4)
-            ring(R * 0.32, steel.opacity(0.22), 0.5, dash: [1, 2])
-            ticks(R * 0.315, 10, 3, steel.opacity(0.20), 0.4, rot: 0.20)
-            ring(R * 0.31, steel.opacity(0.18), 0.4)
-            dots(R * 0.30, 8, cyan.opacity(0.18), 2.0, rot: 0.30)
-            ring(R * 0.295, steel.opacity(0.18), 0.4)
-            ring(R * 0.29, steel.opacity(0.20), 0.5)
-            ticks(R * 0.285, 12, 3, steel.opacity(0.16), 0.3, rot: -0.18)
-            ring(R * 0.28, steel.opacity(0.18), 0.4)
-            notch(R * 0.275, 6, 0.70, steel.opacity(0.16), 1.8, rot: -0.08)
-            ticks(R * 0.27, 8, 4, steel.opacity(0.20), 0.4, rot: -0.30)
-            ring(R * 0.265, steel.opacity(0.16), 0.4)
-            ring(R * 0.26, steel.opacity(0.18), 0.4)
-            ring(R * 0.255, steel.opacity(0.14), 0.3, dash: [1, 2])
-            ring(R * 0.25, steel.opacity(0.18), 0.5)
-            ticks(R * 0.245, 10, 3, steel.opacity(0.14), 0.3, rot: 0.22)
-            ring(R * 0.24, steel.opacity(0.15), 0.4, dash: [1, 2])
-            ring(R * 0.235, steel.opacity(0.14), 0.3)
-            ring(R * 0.23, steel.opacity(0.16), 0.4)
-            ring(R * 0.225, steel.opacity(0.12), 0.3, dash: [1, 2])
-            ring(R * 0.22, steel.opacity(0.15), 0.4, dash: [1, 2])
-            ticks(R * 0.215, 8, 3, steel.opacity(0.14), 0.3, rot: -0.25)
-            ring(R * 0.21, steel.opacity(0.14), 0.4)
-            ticks(R * 0.205, 6, 4, steel.opacity(0.16), 0.4, rot: 0.18)
-            ticks(R * 0.20, 8, 5, steel.opacity(0.18), 0.4, rot: -0.40)
-            ring(R * 0.195, steel.opacity(0.14), 0.3)
-            ring(R * 0.19, steel.opacity(0.14), 0.4)
-            ring(R * 0.185, steel.opacity(0.12), 0.3, dash: [1, 2])
-            ring(R * 0.18, steel.opacity(0.12), 0.3)
-
-            // ── 21b. LONG STRUCTURAL SPOKES (full-radius radial lines) ──
-            spokes(R * 0.18, R * 0.44, 12, steel.opacity(0.18), 0.5, rot: -0.02)
-            spokes(R * 0.45, R * 0.60, 18, steel.opacity(0.16), 0.5, rot: 0.03)
-            spokes(R * 0.60, R * 0.75, 24, steel.opacity(0.14), 0.4, rot: -0.01)
-            spokes(R * 0.80, R * 0.96, 36, steel.opacity(0.10), 0.4, rot: 0.02)
-            // Extra structural spokes at zone boundaries
-            spokes(R * 0.18, R * 0.96, 8, steel.opacity(0.06), 0.3)
-
-            // ── CORE GLOW — CARDIAC HEARTBEAT ───────────────────────
+            // ── BLAZING CORE GLOW — cardiac heartbeat ───────────────
             let bpm = 45.0 + cpuAvg * 75.0
             let heartPeriod = 60.0 / bpm
             let heartPhase = (ph.truncatingRemainder(dividingBy: heartPeriod)) / heartPeriod
@@ -913,59 +720,53 @@ struct JarvisReactorCanvas: View {
             }
             let corePulse = cardiac
 
-            // Wider, brighter core glow
-            for layer in 0..<8 {
-                let lr = R * 0.02 + Double(layer) * 4
-                let lo = 0.12 * corePulse * (1.0 - Double(layer) / 8.0)
+            // 12 glow layers radiating from center (0 -> 15%R)
+            // The BRIGHTEST element on screen — visible light source
+            for layer in 0..<12 {
+                let lr = R * 0.01 + Double(layer) * R * 0.013
+                let lo = 0.30 * corePulse * (1.0 - Double(layer) / 12.0)
                 let coreRect = CGRect(x: c.x - lr, y: c.y - lr, width: lr * 2, height: lr * 2)
                 ctx.fill(Path(ellipseIn: coreRect), with: .color(cyan.opacity(lo)))
             }
-            let hotR = R * 0.025 * corePulse
+            // Bright cyan sphere (R*0.04 radius, 0.5 opacity)
+            let hotR = R * 0.04 * corePulse
             let hotRect = CGRect(x: c.x - hotR, y: c.y - hotR, width: hotR * 2, height: hotR * 2)
-            ctx.fill(Path(ellipseIn: hotRect), with: .color(Color.white.opacity(0.25 * corePulse)))
-            // Extra bright inner point
-            let innerR = hotR * 0.5
+            ctx.fill(Path(ellipseIn: hotRect), with: .color(cyanBright.opacity(0.50 * corePulse)))
+            // White-hot center (R*0.02, 0.7 white opacity)
+            let innerR = R * 0.02 * corePulse
             let innerRect = CGRect(x: c.x - innerR, y: c.y - innerR, width: innerR * 2, height: innerR * 2)
-            ctx.fill(Path(ellipseIn: innerRect), with: .color(cyanBright.opacity(0.35 * corePulse)))
+            ctx.fill(Path(ellipseIn: innerRect), with: .color(Color.white.opacity(0.70 * corePulse)))
 
             // ══════════════════════════════════════════════════════════════
-            //  ANIMATED SWEEP LINE (radar-style)
+            //  ZONE 8: SWEEP LINE
             // ══════════════════════════════════════════════════════════════
 
             let sweepPeriod = 10.0
             let sA = ph.truncatingRemainder(dividingBy: sweepPeriod) / sweepPeriod * pi2
-            // Main sweep line
+            // Rotating 1px bright line from core to outer ring
             let sP = Path { p in
-                p.move(to: CGPoint(x: c.x + cos(sA) * R * 0.15, y: c.y + sin(sA) * R * 0.15))
+                p.move(to: CGPoint(x: c.x + cos(sA) * R * 0.05, y: c.y + sin(sA) * R * 0.05))
                 p.addLine(to: CGPoint(x: c.x + cos(sA) * R * 1.00, y: c.y + sin(sA) * R * 1.00))
             }
-            ctx.stroke(sP, with: .color(cyan.opacity(0.14)), style: StrokeStyle(lineWidth: 1.2))
-            // Trailing glow (8 trailing lines)
+            ctx.stroke(sP, with: .color(cyan.opacity(0.35)), style: StrokeStyle(lineWidth: 1.0))
+            // Fading trail (8 trailing lines at decreasing opacity)
             for t in 1...8 {
-                let tA = sA - Double(t) * 0.015
+                let tA = sA - Double(t) * 0.018
                 let tP = Path { p in
-                    p.move(to: CGPoint(x: c.x + cos(tA) * R * 0.15, y: c.y + sin(tA) * R * 0.15))
+                    p.move(to: CGPoint(x: c.x + cos(tA) * R * 0.05, y: c.y + sin(tA) * R * 0.05))
                     p.addLine(to: CGPoint(x: c.x + cos(tA) * R * 1.00, y: c.y + sin(tA) * R * 1.00))
                 }
-                ctx.stroke(tP, with: .color(cyan.opacity(0.06 / Double(t))), style: StrokeStyle(lineWidth: 1.0))
+                ctx.stroke(tP, with: .color(cyan.opacity(0.18 / Double(t))), style: StrokeStyle(lineWidth: 1.0))
             }
 
-            // ── COUNTER-ROTATING SWEEP (slower, opposite direction) ─────
-            let sA2 = ph.truncatingRemainder(dividingBy: 16.0) / 16.0 * pi2
-            let sP2 = Path { p in
-                p.move(to: CGPoint(x: c.x + cos(-sA2) * R * 0.30, y: c.y + sin(-sA2) * R * 0.30))
-                p.addLine(to: CGPoint(x: c.x + cos(-sA2) * R * 0.80, y: c.y + sin(-sA2) * R * 0.80))
-            }
-            ctx.stroke(sP2, with: .color(cyanDim.opacity(0.08)), style: StrokeStyle(lineWidth: 0.8))
-
-            // ── SWEEP GRADIENT WEDGE (pie-slice fade behind the sweep) ──
-            let wedgeAngle = 0.35  // ~20 degrees trailing
+            // Sweep gradient wedge (pie-slice fade behind the sweep)
+            let wedgeAngle = 0.35
             let wedgeSteps = 20
             for s in 0..<wedgeSteps {
                 let frac = Double(s) / Double(wedgeSteps)
                 let aStart = sA - wedgeAngle * frac
                 let aEnd = sA - wedgeAngle * (frac + 1.0 / Double(wedgeSteps))
-                let opacity = 0.05 * (1.0 - frac)
+                let opacity = 0.08 * (1.0 - frac)
                 let wp = Path { p in
                     p.move(to: c)
                     p.addArc(center: c, radius: R * 0.98, startAngle: .radians(aStart), endAngle: .radians(aEnd), clockwise: true)
@@ -974,28 +775,10 @@ struct JarvisReactorCanvas: View {
                 ctx.fill(wp, with: .color(cyan.opacity(opacity)))
             }
 
-            // ── CENTER TARGETING RETICLE ─────────────────────────────────
-            let reticlePulse = 0.85 + sin(ph * 1.5) * 0.15
-            // Concentric targeting circles
-            for (rr, op) in [(R * 0.12, 0.12), (R * 0.08, 0.18), (R * 0.05, 0.08)] {
-                let rp = Path { p in p.addArc(center: c, radius: rr, startAngle: .zero, endAngle: .radians(pi2), clockwise: false) }
-                ctx.stroke(rp, with: .color(cyan.opacity(op * reticlePulse)), style: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-            }
-            // Cross lines through center
-            for angle in [0.0, Double.pi / 2] {
-                let dx = cos(angle)
-                let dy = sin(angle)
-                let cp = Path { p in
-                    p.move(to: CGPoint(x: c.x + dx * R * 0.03, y: c.y + dy * R * 0.03))
-                    p.addLine(to: CGPoint(x: c.x + dx * R * 0.10, y: c.y + dy * R * 0.10))
-                    p.move(to: CGPoint(x: c.x - dx * R * 0.03, y: c.y - dy * R * 0.03))
-                    p.addLine(to: CGPoint(x: c.x - dx * R * 0.10, y: c.y - dy * R * 0.10))
-                }
-                ctx.stroke(cp, with: .color(cyan.opacity(0.15 * reticlePulse)), style: StrokeStyle(lineWidth: 0.5))
-            }
+            // ══════════════════════════════════════════════════════════════
+            //  DEGREE MARKERS at 8 compass points (000-315) at 1.10R
+            // ══════════════════════════════════════════════════════════════
 
-            // ── RADIAL DATA TEXT (scattered around outer edge) ───────────
-            // Render degree markers at cardinal & ordinal points
             let degreeMarkers: [(Double, String)] = [
                 (0, "000"), (Double.pi/4, "045"), (Double.pi/2, "090"),
                 (Double.pi*3/4, "135"), (Double.pi, "180"),
@@ -1008,8 +791,8 @@ struct JarvisReactorCanvas: View {
                 let ty = c.y + sin(angle - Double.pi/2) * textR
                 ctx.draw(
                     Text(label)
-                        .font(.custom("Menlo", size: 7))
-                        .foregroundColor(steel.opacity(0.35)),
+                        .font(.custom("Menlo", size: 8))
+                        .foregroundColor(steel.opacity(0.60)),
                     at: CGPoint(x: tx, y: ty)
                 )
             }
@@ -1284,13 +1067,13 @@ struct CentralStatsView: View {
 
             DigitCipherText(
                 value: String(format: "%.0f", store.totalPower),
-                font: .custom("Menlo", size: 48).weight(.bold),
+                font: .custom("Menlo", size: 72).weight(.bold),
                 color: Color(red: 0.41, green: 0.95, blue: 0.95)
             )
-                .shadow(color: cyan.opacity(0.95), radius: 3)
-                .shadow(color: cyan.opacity(0.50), radius: 12)
-                .shadow(color: cyan.opacity(0.25), radius: 30)
-                .shadow(color: cyan.opacity(0.10), radius: 60)
+                .shadow(color: cyan.opacity(0.95), radius: 4)
+                .shadow(color: cyan.opacity(0.60), radius: 16)
+                .shadow(color: cyan.opacity(0.35), radius: 40)
+                .shadow(color: cyan.opacity(0.15), radius: 80)
 
             Text("WATTS")
                 .font(.custom("Menlo", size: 7)).tracking(5)
