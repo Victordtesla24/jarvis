@@ -41,17 +41,30 @@ struct JarvisHUDView: View {
                 // Hex grid background
                 HexGridCanvas(width: w, height: h, phase: phase, color: gridBlue)
 
-                // Subtle radial vignette centered on reactor
-                // Reactor ambient bloom — the reactor casts cyan light
+                // Reactor ambient bloom — CINEMA GRADE volumetric light cast
                 RadialGradient(
                     gradient: Gradient(colors: [
-                        Color.white.opacity(0.04),
-                        Color.white.opacity(0.02),
+                        cyan.opacity(0.12),
+                        cyan.opacity(0.08),
+                        cyan.opacity(0.04),
+                        Color.white.opacity(0.015),
                         Color.clear
                     ]),
                     center: .center,
-                    startRadius: R * 0.1,
-                    endRadius: R * 1.2
+                    startRadius: R * 0.03,
+                    endRadius: R * 1.6
+                )
+                .ignoresSafeArea()
+                // Secondary bloom — tighter, brighter core glow
+                RadialGradient(
+                    gradient: Gradient(colors: [
+                        cyan.opacity(0.10),
+                        cyan.opacity(0.04),
+                        Color.clear
+                    ]),
+                    center: .center,
+                    startRadius: R * 0.01,
+                    endRadius: R * 0.5
                 )
                 .ignoresSafeArea()
 
@@ -90,102 +103,205 @@ struct JarvisHUDView: View {
                 CentralStatsView().environmentObject(store)
                     .position(x: cx, y: cy)
 
-                // ── 8. LEFT PANEL ───────────────────────────────────────
-                VStack(spacing: 10) {
-                    // Circular gauges row
-                    HStack(spacing: 8) {
+                // ── 8. LEFT PANEL — ENHANCED HOLOGRAPHIC TELEMETRY ─────
+                VStack(spacing: 12) {
+                    // Section header
+                    HStack(spacing: 4) {
+                        Rectangle().fill(cyan.opacity(0.6)).frame(width: 12, height: 1)
+                        Text("THERMAL SENSORS")
+                            .font(.custom("Menlo", size: 8)).tracking(3)
+                            .foregroundColor(cyan.opacity(0.65))
+                        Rectangle().fill(cyan.opacity(0.3)).frame(height: 1)
+                    }
+
+                    // Circular gauges row — LARGER
+                    HStack(spacing: 10) {
                         JarvisCircularGauge(
                             value: min(store.cpuTemp / 100.0, 1.0),
                             displayValue: String(format: "%.1f", store.cpuTemp),
                             unit: "\u{00B0}C", label: "CPU TEMP",
-                            size: 56, phase: phase
+                            size: 72, phase: phase,
+                            accentColor: store.cpuTemp > 55 ? Color(red: 1.0, green: 0.15, blue: 0.20) :
+                                         store.cpuTemp > 45 ? Color(red: 1.0, green: 0.78, blue: 0.0) :
+                                         Color(red: 0.0, green: 0.83, blue: 1.0)
                         )
                         JarvisCircularGauge(
                             value: min(store.gpuTemp / 100.0, 1.0),
                             displayValue: String(format: "%.1f", store.gpuTemp),
                             unit: "\u{00B0}C", label: "GPU TEMP",
-                            size: 56, phase: phase
+                            size: 72, phase: phase,
+                            accentColor: store.gpuTemp > 55 ? Color(red: 1.0, green: 0.15, blue: 0.20) :
+                                         store.gpuTemp > 45 ? Color(red: 1.0, green: 0.78, blue: 0.0) :
+                                         Color(red: 0.0, green: 0.83, blue: 1.0)
                         )
                     }
 
-                    // Data rows
+                    // Section header
+                    HStack(spacing: 4) {
+                        Rectangle().fill(cyan.opacity(0.6)).frame(width: 12, height: 1)
+                        Text("CUSTOM METRICS")
+                            .font(.custom("Menlo", size: 8)).tracking(3)
+                            .foregroundColor(cyan.opacity(0.65))
+                        Rectangle().fill(cyan.opacity(0.3)).frame(height: 1)
+                    }
+
+                    // Data rows — color coded
                     JarvisPanelBox {
-                        VStack(spacing: 4) {
-                            JarvisDataRow(label: "DVHOP", value: String(format: "%.2f%%", store.dvhopCPUPct))
-                            JarvisDataRow(label: "GUMER", value: String(format: "%.2f MB/s", store.gumerMBs))
-                            JarvisDataRow(label: "CCTC", value: String(format: "+%.1f\u{00B0}C", store.cctcDeltaC))
-                            JarvisDataRow(label: "ANE", value: String(format: "%.2fW", store.anePower))
+                        VStack(spacing: 5) {
+                            JarvisDataRow(label: "DVHOP", value: String(format: "%.2f%%", store.dvhopCPUPct),
+                                          accentColor: store.dvhopCPUPct > 5 ? .amber : .cyan)
+                            JarvisDataRow(label: "GUMER", value: String(format: "%.2f MB/s", store.gumerMBs),
+                                          accentColor: store.gumerMBs > 10 ? .amber : .cyan)
+                            JarvisDataRow(label: "CCTC", value: String(format: "+%.1f\u{00B0}C", store.cctcDeltaC),
+                                          accentColor: store.cctcDeltaC > 10 ? .crimson : store.cctcDeltaC > 5 ? .amber : .cyan)
+                            JarvisDataRow(label: "ANE", value: String(format: "%.2fW", store.anePower),
+                                          accentColor: .cyan)
                         }
                     }
 
-                    // Core bars
+                    // Section header
+                    HStack(spacing: 4) {
+                        Rectangle().fill(cyan.opacity(0.6)).frame(width: 12, height: 1)
+                        Text("CORE UTILIZATION")
+                            .font(.custom("Menlo", size: 8)).tracking(3)
+                            .foregroundColor(cyan.opacity(0.65))
+                        Rectangle().fill(cyan.opacity(0.3)).frame(height: 1)
+                    }
+
+                    // Core bars — ENHANCED
                     JarvisPanelBox {
-                        VStack(spacing: 6) {
-                            JarvisCoreBarGauge(values: store.eCoreUsages, label: "E-CORES")
-                            JarvisCoreBarGauge(values: store.pCoreUsages, label: "P-CORES")
+                        VStack(spacing: 8) {
+                            JarvisCoreBarGauge(values: store.eCoreUsages, label: "E-CORES",
+                                               barColor: Color(red: 0.0, green: 0.83, blue: 1.0))
+                            JarvisCoreBarGauge(values: store.pCoreUsages, label: "P-CORES",
+                                               barColor: Color(red: 1.0, green: 0.78, blue: 0.0))
                             if !store.sCoreUsages.isEmpty {
-                                JarvisCoreBarGauge(values: store.sCoreUsages, label: "S-CORES")
+                                JarvisCoreBarGauge(values: store.sCoreUsages, label: "S-CORES",
+                                                   barColor: Color(red: 1.0, green: 0.15, blue: 0.20))
                             }
                         }
                     }
                 }
-                .frame(width: w * 0.12)
-                .position(x: w * 0.07, y: h * 0.45)
+                .frame(width: w * 0.15)
+                .position(x: w * 0.09, y: h * 0.45)
 
-                // ── 9. RIGHT PANEL ──────────────────────────────────────
-                VStack(spacing: 10) {
-                    // GPU gauge — larger
+                // ── 9. RIGHT PANEL — ENHANCED HOLOGRAPHIC TELEMETRY ────
+                VStack(spacing: 12) {
+                    // Section header
+                    HStack(spacing: 4) {
+                        Rectangle().fill(cyan.opacity(0.3)).frame(height: 1)
+                        Text("GPU COMPLEX")
+                            .font(.custom("Menlo", size: 8)).tracking(3)
+                            .foregroundColor(cyan.opacity(0.65))
+                        Rectangle().fill(cyan.opacity(0.6)).frame(width: 12, height: 1)
+                    }
+
+                    // GPU gauge — MUCH LARGER
                     JarvisCircularGauge(
                         value: store.gpuUsage,
                         displayValue: String(format: "%.0f", store.gpuUsage * 100),
                         unit: "%", label: "GPU USAGE",
-                        size: 68, phase: phase
+                        size: 88, phase: phase,
+                        accentColor: store.gpuUsage > 0.9 ? Color(red: 1.0, green: 0.15, blue: 0.20) :
+                                     store.gpuUsage > 0.7 ? Color(red: 1.0, green: 0.78, blue: 0.0) :
+                                     Color(red: 0.0, green: 0.83, blue: 1.0)
                     )
 
-                    // Data rows
+                    // Section header
+                    HStack(spacing: 4) {
+                        Rectangle().fill(cyan.opacity(0.3)).frame(height: 1)
+                        Text("MEMORY SUBSYSTEM")
+                            .font(.custom("Menlo", size: 8)).tracking(3)
+                            .foregroundColor(cyan.opacity(0.65))
+                        Rectangle().fill(cyan.opacity(0.6)).frame(width: 12, height: 1)
+                    }
+
+                    // Memory data — color coded
                     JarvisPanelBox {
-                        VStack(spacing: 4) {
-                            JarvisDataRow(label: "MEMORY", value: String(format: "%.1f / %.0f GB", store.memoryUsedGB, store.memoryTotalGB))
-                            JarvisDataRow(label: "SWAP", value: String(format: "%.0f%%", store.swapPressure * 100))
-                            JarvisDataRow(label: "DRAM RD", value: String(format: "%.1f GB/s", store.dramReadBW))
-                            JarvisDataRow(label: "DRAM WR", value: String(format: "%.1f GB/s", store.dramWriteBW))
+                        VStack(spacing: 5) {
+                            JarvisDataRow(label: "MEMORY", value: String(format: "%.1f / %.0f GB", store.memoryUsedGB, store.memoryTotalGB),
+                                          accentColor: store.memoryUsedGB / max(store.memoryTotalGB, 1) > 0.85 ? .crimson : .cyan)
+                            // Memory usage bar with holographic glow
+                            GeometryReader { geo in
+                                let memFrac = min(store.memoryUsedGB / max(store.memoryTotalGB, 1), 1.0)
+                                let memColor: Color = memFrac > 0.85 ? Color(red: 1.0, green: 0.15, blue: 0.20) :
+                                                      memFrac > 0.7 ? Color(red: 1.0, green: 0.78, blue: 0.0) :
+                                                      Color(red: 0.0, green: 0.83, blue: 1.0)
+                                ZStack(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(Color.white.opacity(0.06))
+                                        .frame(height: 6)
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(memColor.opacity(0.70))
+                                        .frame(width: geo.size.width * memFrac, height: 6)
+                                        .shadow(color: memColor.opacity(0.5), radius: 4)
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(memColor.opacity(0.15))
+                                        .frame(width: geo.size.width * memFrac, height: 14)
+                                        .blur(radius: 3)
+                                }
+                            }
+                            .frame(height: 14)
+
+                            JarvisDataRow(label: "SWAP", value: String(format: "%.0f%%", store.swapPressure * 100),
+                                          accentColor: store.swapPressure > 0.25 ? .amber : .cyan)
+                            JarvisDataRow(label: "DRAM RD", value: String(format: "%.1f GB/s", store.dramReadBW),
+                                          accentColor: .cyan)
+                            JarvisDataRow(label: "DRAM WR", value: String(format: "%.1f GB/s", store.dramWriteBW),
+                                          accentColor: .cyan)
                         }
                     }
 
-                    // Power bar
+                    // Section header
+                    HStack(spacing: 4) {
+                        Rectangle().fill(cyan.opacity(0.3)).frame(height: 1)
+                        Text("POWER DRAW")
+                            .font(.custom("Menlo", size: 8)).tracking(3)
+                            .foregroundColor(cyan.opacity(0.65))
+                        Rectangle().fill(cyan.opacity(0.6)).frame(width: 12, height: 1)
+                    }
+
+                    // Power bar — ENHANCED with color coding
                     JarvisPanelBox {
-                        VStack(alignment: .leading, spacing: 3) {
-                            JarvisDataRow(label: "POWER", value: String(format: "%.0fW", store.totalPower))
+                        VStack(alignment: .leading, spacing: 4) {
+                            JarvisDataRow(label: "TOTAL", value: String(format: "%.1fW", store.totalPower),
+                                          accentColor: store.totalPower > 40 ? .crimson : store.totalPower > 25 ? .amber : .cyan)
                             GeometryReader { geo in
+                                let pwrFrac = min(store.totalPower / 60.0, 1.0)
+                                let pwrColor: Color = pwrFrac > 0.65 ? Color(red: 1.0, green: 0.15, blue: 0.20) :
+                                                      pwrFrac > 0.4 ? Color(red: 1.0, green: 0.78, blue: 0.0) :
+                                                      Color(red: 0.0, green: 0.83, blue: 1.0)
                                 ZStack(alignment: .leading) {
-                                    RoundedRectangle(cornerRadius: 1)
+                                    RoundedRectangle(cornerRadius: 2)
                                         .fill(Color.white.opacity(0.06))
-                                        .frame(height: 4)
-                                    RoundedRectangle(cornerRadius: 1)
-                                        .fill(Color.white.opacity(0.60))
-                                        .frame(width: geo.size.width * min(store.totalPower / 60.0, 1.0), height: 4)
-                                    RoundedRectangle(cornerRadius: 1)
-                                        .fill(Color.white.opacity(0.08))
-                                        .frame(width: geo.size.width * min(store.totalPower / 60.0, 1.0), height: 10)
-                                        .blur(radius: 2)
+                                        .frame(height: 6)
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(pwrColor.opacity(0.70))
+                                        .frame(width: geo.size.width * pwrFrac, height: 6)
+                                        .shadow(color: pwrColor.opacity(0.5), radius: 4)
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(pwrColor.opacity(0.15))
+                                        .frame(width: geo.size.width * pwrFrac, height: 14)
+                                        .blur(radius: 3)
                                 }
                             }
-                            .frame(height: 10)
+                            .frame(height: 14)
 
                             HStack {
                                 Text("THERMAL")
-                                    .font(.custom("Menlo", size: 6)).tracking(2)
-                                    .foregroundColor(Color(red: 0.4, green: 0.45, blue: 0.5).opacity(0.70))
+                                    .font(.custom("Menlo", size: 7)).tracking(2)
+                                    .foregroundColor(Color(red: 0.4, green: 0.50, blue: 0.55).opacity(0.75))
                                 Spacer()
                                 Text(store.thermalState.uppercased())
-                                    .font(.custom("Menlo", size: 8)).fontWeight(.medium)
-                                    .foregroundColor(Color.white.opacity(0.70))
+                                    .font(.custom("Menlo", size: 9)).fontWeight(.bold)
+                                    .foregroundColor(thermalTextColor(store.thermalState))
+                                    .shadow(color: thermalTextColor(store.thermalState).opacity(0.5), radius: 4)
                             }
                         }
                     }
                 }
-                .frame(width: w * 0.13)
-                .position(x: w * 0.935, y: h * 0.45)
+                .frame(width: w * 0.16)
+                .position(x: w * 0.93, y: h * 0.45)
 
                 // ── 10. CHATTER STREAMS ─────────────────────────────────
                 ChatterStreamView(engine: chatterEngine, alignment: .left, phase: phase)
@@ -200,10 +316,10 @@ struct JarvisHUDView: View {
                 AwarenessPulseOverlay(engine: awarenessEngine, cx: cx, cy: cy)
 
                 // ── 12. FLOATING DIAGNOSTIC PANELS ──────────────────────
-                FloatingPanelOverlay(manager: floatingPanelManager, cyan: Color.white, amber: Color(red: 0.85, green: 0.90, blue: 0.95))
+                FloatingPanelOverlay(manager: floatingPanelManager, cyan: cyan, amber: amber)
 
                 // ── 13. SCANNER SWEEP ───────────────────────────────────
-                ScannerSweepOverlay(width: w, height: h, phase: phase, cyan: Color.white)
+                ScannerSweepOverlay(width: w, height: h, phase: phase, cyan: cyan)
             }
             .holographicFlicker(phase: phase)
             .onAppear {
@@ -211,6 +327,16 @@ struct JarvisHUDView: View {
                 awarenessEngine.bind(to: store)
                 floatingPanelManager.bind(to: store)
             }
+        }
+    }
+
+    private func thermalTextColor(_ state: String) -> Color {
+        switch state.lowercased() {
+        case "nominal", "normal": return Color(red: 0.0, green: 0.83, blue: 1.0)
+        case "fair": return Color(red: 1.0, green: 0.78, blue: 0.0)
+        case "serious": return Color(red: 1.0, green: 0.4, blue: 0.0)
+        case "critical": return Color(red: 1.0, green: 0.15, blue: 0.20)
+        default: return .white
         }
     }
 }
@@ -414,25 +540,25 @@ struct TopBarView: View {
 
                 Spacer()
 
-                // Center: Time
+                // Center: Time — cyan holographic glow
                 Text(store.timeString)
                     .font(.custom("Menlo", size: 26)).fontWeight(.light)
-                    .foregroundColor(Color.white)
-                    .shadow(color: Color.white.opacity(0.7), radius: 4)
-                    .shadow(color: Color.white.opacity(0.3), radius: 16)
-                    .shadow(color: Color.white.opacity(0.10), radius: 40)
+                    .foregroundColor(cyanBright)
+                    .shadow(color: cyan.opacity(0.6), radius: 6)
+                    .shadow(color: cyan.opacity(0.25), radius: 18)
+                    .shadow(color: cyan.opacity(0.08), radius: 40)
 
                 Spacer()
 
-                // Right: Date
+                // Right: Date — cyan-tinted
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(currentDayOfMonth)
                         .font(.custom("Menlo", size: 32)).fontWeight(.bold)
-                        .foregroundColor(Color.white.opacity(0.80))
-                        .shadow(color: Color.white.opacity(0.5), radius: 6)
+                        .foregroundColor(cyanBright.opacity(0.80))
+                        .shadow(color: cyan.opacity(0.4), radius: 6)
                     Text(currentMonthYear)
                         .font(.custom("Menlo", size: 8)).tracking(3)
-                        .foregroundColor(Color.white.opacity(0.35))
+                        .foregroundColor(cyan.opacity(0.35))
                 }
             }
             .padding(.horizontal, 30)
@@ -476,11 +602,11 @@ struct BottomBarView: View {
 
                 Spacer()
 
-                // Center: large clock
+                // Center: large clock — cyan glow
                 Text(store.timeString)
                     .font(.custom("Menlo", size: 22)).fontWeight(.medium)
-                    .foregroundColor(Color.white.opacity(0.60))
-                    .shadow(color: Color.white.opacity(0.3), radius: 8)
+                    .foregroundColor(cyanBright.opacity(0.65))
+                    .shadow(color: cyan.opacity(0.25), radius: 8)
 
                 Spacer()
 
@@ -514,25 +640,41 @@ struct JarvisReactorCanvas: View {
             let c = center
             let pi2 = Double.pi * 2.0
             let top = -Double.pi / 2.0
-            let cpuAvg = (store.eCoreUsages + store.pCoreUsages + store.sCoreUsages)
-                .reduce(0, +) / max(1, Double(store.eCoreUsages.count + store.pCoreUsages.count + store.sCoreUsages.count))
-            let speedMul = 1.0 + cpuAvg * 0.5
+            let allCores = store.eCoreUsages + store.pCoreUsages + store.sCoreUsages
+            let cpuAvg = allCores.isEmpty ? 0 : allCores.reduce(0, +) / Double(allCores.count)
+            let gpuLoad = store.gpuUsage
+            let aggregateLoad = cpuAvg * 0.6 + gpuLoad * 0.3 + store.swapPressure * 0.1
+
+            // Dynamic speed — rings accelerate with system load
+            let speedMul = 1.0 + aggregateLoad * 0.8
             let ph = phase * speedMul
 
+            // Dynamic bloom intensity — glow brightens with load
+            let bloomScale = 0.8 + aggregateLoad * 0.5
+
+            // Thermal threat detection — shifts palette
+            let thermalThreat = store.thermalState.lowercased().contains("serious") || store.thermalState.lowercased().contains("critical")
+
             // ══════════════════════════════════════════════════════════════
-            //  IRON MAN JARVIS REACTOR — White/Silver Cinema Reference
-            //  Bright white rings with massive bloom glow halos.
-            //  Segmented arcs, dotted perimeter, chevron markers.
-            //  Pure black background, projected-light aesthetic.
+            //  IRON MAN JARVIS REACTOR — Cinema-grade volumetric hologram
+            //  Reactive to CPU/GPU/thermal — rings accelerate, bloom intensifies,
+            //  color shifts from cyan to amber/crimson under thermal stress.
             // ══════════════════════════════════════════════════════════════
 
             // ═══════════════════════════════════════════════════════════
-            //  JARVIS white/silver palette (from reference video)
+            //  JARVIS blended palette — white structure + cyan holographic
             // ═══════════════════════════════════════════════════════════
-            let jarvisWhite = Color.white
-            let jarvisSilver = Color(red: 0.85, green: 0.90, blue: 0.95)
-            let jarvisCyan = Color(red: 0.5, green: 0.8, blue: 0.9)
-            let jarvisDim = Color(red: 0.4, green: 0.45, blue: 0.5)
+            // Thermal-reactive palette — shifts warm under thermal stress
+            let jarvisWhite = thermalThreat
+                ? Color(red: 0.95, green: 0.85, blue: 0.80)  // warm-tinted white
+                : Color(red: 0.85, green: 0.95, blue: 1.00)  // cyan-tinted white
+            let jarvisSilver = thermalThreat
+                ? Color(red: 0.85, green: 0.75, blue: 0.70)
+                : Color(red: 0.70, green: 0.85, blue: 0.92)
+            let jarvisCyan = thermalThreat
+                ? Color(red: 1.00, green: 0.50, blue: 0.15)   // shifts to amber-orange
+                : Color(red: 0.00, green: 0.83, blue: 1.00)   // #00D4FF — primary
+            let jarvisDim = Color(red: 0.25, green: 0.40, blue: 0.50)
 
             // ═══════════════════════════════════════════════════════════
             //  HELPERS — cinema bloom style
@@ -544,25 +686,32 @@ struct JarvisReactorCanvas: View {
                 ctx.stroke(p, with: .color(col), style: s)
             }
 
-            // Cinema bloom — 5-layer glow that makes rings look like illuminated light tubes
+            // Cinema bloom — ENHANCED volumetric glow, scales with system load
+            let bs = bloomScale  // capture for closure
             func bloomRing(_ r: Double, _ col: Color, _ w: Double) {
-                ring(r, col.opacity(0.03), w + 30)  // ultra-wide ambient
-                ring(r, col.opacity(0.06), w + 20)  // wide soft glow
-                ring(r, col.opacity(0.12), w + 12)  // medium glow
-                ring(r, col.opacity(0.40), w + 4)   // near glow
-                ring(r, col.opacity(0.90), w)        // bright core
-                ring(r, Color.white.opacity(0.60), w * 0.4) // white-hot center
+                ring(r, jarvisCyan.opacity(0.015 * bs), w + 44)   // ultra-ultra-wide cyan haze
+                ring(r, jarvisCyan.opacity(0.025 * bs), w + 32)   // ultra-wide cyan ambient
+                ring(r, col.opacity(0.04 * bs), w + 24)    // wide soft glow
+                ring(r, col.opacity(0.08 * bs), w + 16)    // medium-wide glow
+                ring(r, col.opacity(0.14 * bs), w + 10)    // medium glow
+                ring(r, col.opacity(0.30 * bs), w + 5)     // near glow
+                ring(r, col.opacity(0.75 * bs), w + 1)     // bright edge
+                ring(r, col.opacity(min(0.90 * bs, 1.0)), w)  // bright core
+                ring(r, Color.white.opacity(min(0.55 * bs, 1.0)), w * 0.4) // white-hot center
             }
 
-            // Bloom arc — same layered glow for partial arcs
+            // Bloom arc — ENHANCED volumetric glow for partial arcs
             func bloomArc(_ r: Double, _ startAngle: Double, _ sweep: Double, _ col: Color, _ w: Double) {
-                for (extraW, opacity) in [(30.0, 0.03), (20.0, 0.06), (12.0, 0.12), (4.0, 0.40), (0.0, 0.90)] {
+                // Cyan ambient haze — ultra wide
+                let cp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(startAngle), endAngle: .radians(startAngle + sweep), clockwise: false) }
+                ctx.stroke(cp, with: .color(jarvisCyan.opacity(0.015)), style: StrokeStyle(lineWidth: w + 40, lineCap: .round))
+                for (extraW, opacity) in [(28.0, 0.025), (20.0, 0.05), (14.0, 0.10), (8.0, 0.22), (4.0, 0.40), (0.0, 0.85)] {
                     let p = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(startAngle), endAngle: .radians(startAngle + sweep), clockwise: false) }
                     ctx.stroke(p, with: .color(col.opacity(opacity)), style: StrokeStyle(lineWidth: w + extraW, lineCap: .round))
                 }
                 // white-hot center line
                 let wp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(startAngle), endAngle: .radians(startAngle + sweep), clockwise: false) }
-                ctx.stroke(wp, with: .color(Color.white.opacity(0.55)), style: StrokeStyle(lineWidth: w * 0.4, lineCap: .round))
+                ctx.stroke(wp, with: .color(Color.white.opacity(0.50)), style: StrokeStyle(lineWidth: w * 0.4, lineCap: .round))
             }
 
             // Data arc with bloom — tracks + filled segments
@@ -678,9 +827,9 @@ struct JarvisReactorCanvas: View {
             // Faint cyan zone marker
             bloomRing(R * 0.90, jarvisCyan.opacity(0.30), 2.0)
 
-            // GPU data arc — white, 10px wide, with bloom
+            // GPU data arc — cyan, 10px wide, with bloom
             let gpuVal = [min(store.gpuUsage, 1.0)]
-            dataArc(gpuVal, R * 0.88, 10.0, jarvisWhite)
+            dataArc(gpuVal, R * 0.88, 10.0, jarvisCyan)
 
             // ══════════════════════════════════════════════════════════════
             //  ZONE 4: E-CORE DATA (0.78R)
@@ -690,8 +839,8 @@ struct JarvisReactorCanvas: View {
             // Cyan zone marker
             bloomRing(R * 0.82, jarvisCyan.opacity(0.25), 2.0)
 
-            // E-core data arcs — white, 10px wide
-            dataArc(store.eCoreUsages, R * 0.78, 10.0, jarvisWhite)
+            // E-core data arcs — cyan, 10px wide
+            dataArc(store.eCoreUsages, R * 0.78, 10.0, jarvisCyan)
 
             // Segmented structural arc at 0.76R — CLOCKWISE, moderate speed
             let structSweep6 = (pi2 / 6.0) * 0.55
@@ -713,8 +862,8 @@ struct JarvisReactorCanvas: View {
             // Silver zone marker
             bloomRing(R * 0.70, jarvisSilver.opacity(0.30), 2.0)
 
-            // P-core data arcs — silver, 10px wide
-            dataArc(store.pCoreUsages, R * 0.65, 10.0, jarvisSilver)
+            // P-core data arcs — amber, 10px wide
+            dataArc(store.pCoreUsages, R * 0.65, 10.0, amber)
 
             // 4 chevrons at 0.63R — COUNTER-CLOCKWISE
             chevrons(R * 0.63, jarvisWhite.opacity(0.50), 8, 4, rot: -0.06)
@@ -724,8 +873,8 @@ struct JarvisReactorCanvas: View {
             //  S-core data arcs + segmented arc
             // ══════════════════════════════════════════════════════════════
 
-            // S-core data arcs — silver, 8px wide
-            dataArc(store.sCoreUsages, R * 0.55, 8.0, jarvisSilver)
+            // S-core data arcs — crimson, 8px wide
+            dataArc(store.sCoreUsages, R * 0.55, 8.0, crimson)
 
             // Segmented arc at 0.53R — COG TICK motion (steps every 0.5s like a clock)
             let cogStep = floor(ph * 2.0) / 2.0  // snaps to 0.5s intervals
@@ -792,63 +941,165 @@ struct JarvisReactorCanvas: View {
 
             // ══════════════════════════════════════════════════════════════
             //  ZONE 8: CORE (0R - 0.25R)
-            //  Bloom rings + targeting reticle + crosshair + BLAZING CORE
+            //  IRON MAN ARC REACTOR CORE — Volumetric bloom, geodesic
+            //  wireframe sphere, energy tendrils, targeting reticle
             // ══════════════════════════════════════════════════════════════
 
-            // Bloom rings at core boundary
-            bloomRing(R * 0.22, jarvisWhite, 2.0)
+            // Bloom rings at core boundary — ENHANCED with double-layer glow
+            bloomRing(R * 0.25, jarvisCyan.opacity(0.45), 2.5)
+            bloomRing(R * 0.22, jarvisWhite, 2.5)
+            bloomRing(R * 0.18, jarvisCyan.opacity(0.35), 1.5)
             bloomRing(R * 0.15, jarvisWhite, 2.0)
 
-            // Targeting reticle — dashed circles
+            // Targeting reticle — dashed circles with cyan pulse
             let reticlePulse = 0.85 + sin(ph * 1.5) * 0.15
+            ring(R * 0.12, jarvisCyan.opacity(0.25 * reticlePulse), 1.0, dash: [6, 3])
             ring(R * 0.10, jarvisWhite.opacity(0.35 * reticlePulse), 1.0, dash: [4, 4])
+            ring(R * 0.08, jarvisCyan.opacity(0.20 * reticlePulse), 0.8, dash: [2, 6])
             ring(R * 0.06, jarvisWhite.opacity(0.30 * reticlePulse), 1.0, dash: [3, 5])
 
-            // Crosshair lines (4 directions, 0.03R to 0.08R)
+            // Crosshair lines (4 directions, 0.03R to 0.10R) — EXTENDED
             for angle in [0.0, Double.pi / 2, Double.pi, Double.pi * 1.5] {
                 let dx = cos(angle)
                 let dy = sin(angle)
+                // Outer crosshair segment
                 let cp = Path { p in
                     p.move(to: CGPoint(x: c.x + dx * R * 0.03, y: c.y + dy * R * 0.03))
-                    p.addLine(to: CGPoint(x: c.x + dx * R * 0.08, y: c.y + dy * R * 0.08))
+                    p.addLine(to: CGPoint(x: c.x + dx * R * 0.10, y: c.y + dy * R * 0.10))
                 }
+                ctx.stroke(cp, with: .color(jarvisCyan.opacity(0.08)), style: StrokeStyle(lineWidth: 6))
                 ctx.stroke(cp, with: .color(jarvisWhite.opacity(0.45 * reticlePulse)), style: StrokeStyle(lineWidth: 1.0))
             }
+            // Diagonal crosshairs (8 directions total)
+            for angle in [Double.pi / 4, Double.pi * 3 / 4, Double.pi * 5 / 4, Double.pi * 7 / 4] {
+                let dx = cos(angle)
+                let dy = sin(angle)
+                let cp = Path { p in
+                    p.move(to: CGPoint(x: c.x + dx * R * 0.04, y: c.y + dy * R * 0.04))
+                    p.addLine(to: CGPoint(x: c.x + dx * R * 0.07, y: c.y + dy * R * 0.07))
+                }
+                ctx.stroke(cp, with: .color(jarvisCyan.opacity(0.20 * reticlePulse)), style: StrokeStyle(lineWidth: 0.6))
+            }
 
-            // ── BLAZING CORE GLOW — cardiac heartbeat ───────────────
+            // ── GEODESIC WIREFRAME SPHERE — Iron Man arc reactor signature ──
+            let geoR = R * 0.13
+            let geoRot = ph * 0.12  // slow rotation
+            let geoTilt = 0.3  // slight tilt for 3D feel
+            // Draw icosphere-like wireframe with 3 intersecting great circles
+            for ring_i in 0..<5 {
+                let ringAngle = Double(ring_i) * (Double.pi / 5.0) + geoRot
+                let tiltedR = geoR * (0.4 + 0.6 * abs(sin(ringAngle + geoTilt)))
+                let geoPath = Path { p in
+                    p.addEllipse(in: CGRect(
+                        x: c.x - tiltedR, y: c.y - tiltedR * 0.4,
+                        width: tiltedR * 2, height: tiltedR * 0.8
+                    ))
+                }
+                // Rotate the ellipse path by applying transform
+                let rotAngle = Double(ring_i) * (Double.pi / 5.0)
+                var transform = CGAffineTransform.identity
+                transform = transform.translatedBy(x: c.x, y: c.y)
+                transform = transform.rotated(by: rotAngle + geoRot * 0.3)
+                transform = transform.translatedBy(x: -c.x, y: -c.y)
+                let rotatedPath = geoPath.applying(transform)
+
+                let geoOp = 0.18 + sin(ph * 0.8 + Double(ring_i)) * 0.08
+                ctx.stroke(rotatedPath, with: .color(jarvisCyan.opacity(geoOp)), style: StrokeStyle(lineWidth: 0.6))
+                ctx.stroke(rotatedPath, with: .color(jarvisCyan.opacity(geoOp * 0.3)), style: StrokeStyle(lineWidth: 3))
+            }
+            // Latitude lines on the geodesic sphere
+            for lat in 0..<4 {
+                let latFrac = Double(lat + 1) / 5.0
+                let latR = geoR * sin(latFrac * Double.pi)
+                let latY = c.y - geoR * cos(latFrac * Double.pi) * 0.4
+                let latPath = Path { p in
+                    p.addEllipse(in: CGRect(x: c.x - latR, y: latY - latR * 0.15, width: latR * 2, height: latR * 0.3))
+                }
+                let latOp = 0.12 + sin(ph * 0.5 + Double(lat) * 1.5) * 0.06
+                ctx.stroke(latPath, with: .color(jarvisCyan.opacity(latOp)), style: StrokeStyle(lineWidth: 0.4))
+            }
+            // Geodesic vertex dots — bright nodes at intersections
+            for i in 0..<12 {
+                let vAngle = Double(i) * (pi2 / 12.0) + geoRot * 0.5
+                let vR = geoR * (0.6 + 0.4 * sin(Double(i) * 2.4))
+                let vx = c.x + cos(vAngle) * vR * 0.85
+                let vy = c.y + sin(vAngle) * vR * 0.35
+                let vSz = 1.5 + sin(ph * 2 + Double(i)) * 0.5
+                let vGlow = CGRect(x: vx - vSz * 2, y: vy - vSz * 2, width: vSz * 4, height: vSz * 4)
+                ctx.fill(Path(ellipseIn: vGlow), with: .color(jarvisCyan.opacity(0.15)))
+                let vDot = CGRect(x: vx - vSz / 2, y: vy - vSz / 2, width: vSz, height: vSz)
+                ctx.fill(Path(ellipseIn: vDot), with: .color(Color.white.opacity(0.6)))
+            }
+
+            // ── BLAZING CORE GLOW — cardiac heartbeat, ENHANCED ────────
             let bpm = 45.0 + cpuAvg * 75.0
             let heartPeriod = 60.0 / bpm
             let heartPhase = (ph.truncatingRemainder(dividingBy: heartPeriod)) / heartPeriod
             let cardiac: Double
             if heartPhase < 0.1 {
-                cardiac = 0.85 + 0.15 * (heartPhase / 0.1)
+                cardiac = 0.80 + 0.20 * (heartPhase / 0.1)
             } else if heartPhase < 0.25 {
                 cardiac = 1.0 - 0.15 * ((heartPhase - 0.1) / 0.15)
             } else if heartPhase < 0.35 {
-                cardiac = 0.85 + 0.05 * sin((heartPhase - 0.25) / 0.10 * .pi)
+                cardiac = 0.85 + 0.08 * sin((heartPhase - 0.25) / 0.10 * .pi)
             } else {
-                cardiac = 0.85
+                cardiac = 0.82 + 0.03 * sin(ph * 3.0)  // subtle ambient throb
             }
             let corePulse = cardiac
 
-            // 20 glow layers — MASSIVE bloom, the core is a LIGHT SOURCE
-            for layer in 0..<20 {
-                let lr = R * 0.005 + Double(layer) * R * 0.018
-                let lo = (0.30 - Double(layer) * 0.014) * corePulse
-                guard lo > 0 else { continue }
+            // 35 glow layers — VOLUMETRIC cyan bloom, the core is a LIGHT SOURCE
+            // Ultra-wide ambient halo (outermost)
+            for layer in 0..<8 {
+                let lr = R * 0.25 + Double(layer) * R * 0.04
+                let lo = 0.015 * corePulse * (1.0 - Double(layer) / 8.0)
                 let coreRect = CGRect(x: c.x - lr, y: c.y - lr, width: lr * 2, height: lr * 2)
-                ctx.fill(Path(ellipseIn: coreRect), with: .color(jarvisWhite.opacity(lo)))
+                ctx.fill(Path(ellipseIn: coreRect), with: .color(jarvisCyan.opacity(lo)))
+            }
+            // Main volumetric bloom (35 layers from center outward)
+            for layer in 0..<35 {
+                let lr = R * 0.004 + Double(layer) * R * 0.012
+                let falloff = 1.0 - Double(layer) / 35.0
+                let lo = (0.35 * falloff * falloff) * corePulse  // quadratic falloff
+                guard lo > 0.005 else { continue }
+                let coreRect = CGRect(x: c.x - lr, y: c.y - lr, width: lr * 2, height: lr * 2)
+                let cyanBlend = Double(layer) / 35.0
+                if cyanBlend > 0.5 {
+                    ctx.fill(Path(ellipseIn: coreRect), with: .color(jarvisCyan.opacity(lo * 0.8)))
+                } else if cyanBlend > 0.2 {
+                    // Transition zone — blended cyan-white
+                    ctx.fill(Path(ellipseIn: coreRect), with: .color(jarvisCyan.opacity(lo * 0.4)))
+                    ctx.fill(Path(ellipseIn: coreRect), with: .color(jarvisWhite.opacity(lo * 0.5)))
+                } else {
+                    ctx.fill(Path(ellipseIn: coreRect), with: .color(jarvisWhite.opacity(lo)))
+                }
             }
 
-            // Bright white sphere at 0.05R — LARGER
-            let hotR = R * 0.05 * corePulse
-            let hotRect = CGRect(x: c.x - hotR, y: c.y - hotR, width: hotR * 2, height: hotR * 2)
-            ctx.fill(Path(ellipseIn: hotRect), with: .color(Color.white.opacity(0.85 * corePulse)))
+            // Energy tendrils radiating from core — 6 faint lines pulsing outward
+            for i in 0..<6 {
+                let tAngle = Double(i) * (pi2 / 6.0) + ph * 0.04
+                let tPulse = 0.5 + 0.5 * sin(ph * 1.2 + Double(i) * 1.1)
+                let tLen = R * (0.15 + 0.07 * tPulse)
+                let tp = Path { p in
+                    p.move(to: CGPoint(x: c.x + cos(tAngle) * R * 0.05, y: c.y + sin(tAngle) * R * 0.05))
+                    p.addLine(to: CGPoint(x: c.x + cos(tAngle) * tLen, y: c.y + sin(tAngle) * tLen))
+                }
+                ctx.stroke(tp, with: .color(jarvisCyan.opacity(0.08 * tPulse * corePulse)), style: StrokeStyle(lineWidth: 3))
+                ctx.stroke(tp, with: .color(jarvisWhite.opacity(0.15 * tPulse * corePulse)), style: StrokeStyle(lineWidth: 0.5))
+            }
 
-            // Center point — PURE BLAZING white, 0.025R
-            let innerR = R * 0.025 * corePulse
+            // Bright cyan-white sphere at 0.06R — LARGER, more vivid
+            let hotR = R * 0.06 * corePulse
+            let hotRect = CGRect(x: c.x - hotR, y: c.y - hotR, width: hotR * 2, height: hotR * 2)
+            ctx.fill(Path(ellipseIn: hotRect), with: .color(jarvisCyan.opacity(0.65 * corePulse)))
+            ctx.fill(Path(ellipseIn: hotRect), with: .color(Color.white.opacity(0.70 * corePulse)))
+
+            // Center point — white-hot center, 0.03R
+            let innerR = R * 0.03 * corePulse
             let innerRect = CGRect(x: c.x - innerR, y: c.y - innerR, width: innerR * 2, height: innerR * 2)
-            ctx.fill(Path(ellipseIn: innerRect), with: .color(Color.white.opacity(1.0)))
+            ctx.fill(Path(ellipseIn: innerRect), with: .color(Color.white.opacity(0.97)))
+            // Inner glow ring around center
+            let innerGlowPath = Path { p in p.addArc(center: c, radius: innerR * 1.5, startAngle: .zero, endAngle: .radians(pi2), clockwise: false) }
+            ctx.stroke(innerGlowPath, with: .color(Color.white.opacity(0.4 * corePulse)), style: StrokeStyle(lineWidth: 1.5))
 
             // ══════════════════════════════════════════════════════════════
             //  RADAR SWEEP — white, with heavy bloom trail
@@ -879,31 +1130,31 @@ struct JarvisReactorCanvas: View {
                 p.move(to: CGPoint(x: c.x + cos(sa) * R * 0.15, y: c.y + sin(sa) * R * 0.15))
                 p.addLine(to: CGPoint(x: c.x + cos(sa) * R * 0.96, y: c.y + sin(sa) * R * 0.96))
             }
-            // Bloom layers for the sweep line
-            ctx.stroke(mainSweep, with: .color(jarvisWhite.opacity(0.06)), style: StrokeStyle(lineWidth: 12))
-            ctx.stroke(mainSweep, with: .color(jarvisWhite.opacity(0.15)), style: StrokeStyle(lineWidth: 4))
-            ctx.stroke(mainSweep, with: .color(jarvisWhite.opacity(0.60)), style: StrokeStyle(lineWidth: 1.5))
+            // Bloom layers for the sweep line — cyan-tinted
+            ctx.stroke(mainSweep, with: .color(jarvisCyan.opacity(0.04)), style: StrokeStyle(lineWidth: 14))
+            ctx.stroke(mainSweep, with: .color(jarvisWhite.opacity(0.12)), style: StrokeStyle(lineWidth: 4))
+            ctx.stroke(mainSweep, with: .color(jarvisWhite.opacity(0.55)), style: StrokeStyle(lineWidth: 1.5))
 
-            // Trailing afterglow (fading wedge behind sweep)
+            // Trailing afterglow (fading cyan wedge behind sweep)
             if sweepTime < 6.0 {
                 for trail in 1..<16 {
                     let trailAngle = sa - Double(trail) * 0.025
-                    let trailOpacity = (1.0 - Double(trail) / 16.0) * 0.18
+                    let trailOpacity = (1.0 - Double(trail) / 16.0) * 0.15
                     let sp = Path { p in
                         p.move(to: CGPoint(x: c.x + cos(trailAngle) * R * 0.20, y: c.y + sin(trailAngle) * R * 0.20))
                         p.addLine(to: CGPoint(x: c.x + cos(trailAngle) * R * 0.94, y: c.y + sin(trailAngle) * R * 0.94))
                     }
-                    ctx.stroke(sp, with: .color(jarvisWhite.opacity(trailOpacity)), style: StrokeStyle(lineWidth: 1.0))
+                    ctx.stroke(sp, with: .color(jarvisCyan.opacity(trailOpacity)), style: StrokeStyle(lineWidth: 1.0))
                 }
             }
 
-            // Bright dot at sweep tip
+            // Bright dot at sweep tip — cyan glow + white center
             let tipX = c.x + cos(sa) * R * 0.96
             let tipY = c.y + sin(sa) * R * 0.96
-            let tipGlow = CGRect(x: tipX - 6, y: tipY - 6, width: 12, height: 12)
-            ctx.fill(Path(ellipseIn: tipGlow), with: .color(jarvisWhite.opacity(0.15)))
+            let tipGlow = CGRect(x: tipX - 7, y: tipY - 7, width: 14, height: 14)
+            ctx.fill(Path(ellipseIn: tipGlow), with: .color(jarvisCyan.opacity(0.12)))
             let tipDot = CGRect(x: tipX - 2.5, y: tipY - 2.5, width: 5, height: 5)
-            ctx.fill(Path(ellipseIn: tipDot), with: .color(jarvisWhite.opacity(0.80)))
+            ctx.fill(Path(ellipseIn: tipDot), with: .color(Color.white.opacity(0.75)))
 
             // ══════════════════════════════════════════════════════════════
             //  DEGREE MARKERS — 8 compass points at 1.06R
@@ -931,21 +1182,21 @@ struct JarvisReactorCanvas: View {
         // Ring labels overlay — white/silver
         .overlay(
             ZStack {
-                // E-CORES label
+                // E-CORES label — cyan
                 Text("E-CORES")
                     .font(.custom("Menlo", size: 9)).tracking(3)
-                    .foregroundColor(Color.white.opacity(0.60))
-                    .shadow(color: Color.white.opacity(0.3), radius: 4)
+                    .foregroundColor(cyan.opacity(0.65))
+                    .shadow(color: cyan.opacity(0.3), radius: 4)
                     .position(x: center.x, y: center.y - R * 0.78 - 18)
-                // P-CORES label
+                // P-CORES label — amber
                 Text("P-CORES")
                     .font(.custom("Menlo", size: 8)).tracking(2)
-                    .foregroundColor(Color(red: 0.85, green: 0.90, blue: 0.95).opacity(0.50))
+                    .foregroundColor(amber.opacity(0.55))
                     .position(x: center.x, y: center.y - R * 0.65 - 15)
-                // S-CORES label
+                // S-CORES label — crimson
                 Text("S-CORES")
                     .font(.custom("Menlo", size: 8)).tracking(2)
-                    .foregroundColor(Color(red: 0.85, green: 0.90, blue: 0.95).opacity(0.50))
+                    .foregroundColor(crimson.opacity(0.55))
                     .position(x: center.x, y: center.y - R * 0.55 - 15)
                 // GPU label
                 Text("GPU")
@@ -962,80 +1213,108 @@ struct JarvisReactorCanvas: View {
 // MARK: - JarvisCircularGauge ────────────────────────────────────────────────
 
 struct JarvisCircularGauge: View {
-    let value: Double      // 0.0-1.0 normalized
-    let displayValue: String  // e.g. "42.1"
-    let unit: String       // e.g. "°C"
-    let label: String      // e.g. "CPU TEMP"
-    let size: CGFloat      // diameter
+    let value: Double
+    let displayValue: String
+    let unit: String
+    let label: String
+    let size: CGFloat
     let phase: Double
+    var accentColor: Color = Color(red: 0.0, green: 0.83, blue: 1.0)
 
     var body: some View {
         ZStack {
-            // Track arc (270°)
+            // Track arc (270°) — subtle with accent tint
             Circle()
                 .trim(from: 0.125, to: 0.875)
-                .stroke(Color.white.opacity(0.08), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .stroke(accentColor.opacity(0.10), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                 .frame(width: size, height: size)
+
+            // Ultra-wide bloom behind fill
+            Circle()
+                .trim(from: 0.125, to: 0.125 + 0.75 * min(value, 1.0))
+                .stroke(accentColor.opacity(0.06), style: StrokeStyle(lineWidth: 20, lineCap: .round))
+                .frame(width: size, height: size)
+                .blur(radius: 4)
 
             // Bloom behind fill
             Circle()
                 .trim(from: 0.125, to: 0.125 + 0.75 * min(value, 1.0))
-                .stroke(Color.white.opacity(0.10), style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                .stroke(accentColor.opacity(0.15), style: StrokeStyle(lineWidth: 10, lineCap: .round))
                 .frame(width: size, height: size)
                 .blur(radius: 2)
 
-            // Fill arc
+            // Fill arc — accent colored
             Circle()
                 .trim(from: 0.125, to: 0.125 + 0.75 * min(value, 1.0))
-                .stroke(Color.white.opacity(0.80), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .stroke(accentColor.opacity(0.85), style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
                 .frame(width: size, height: size)
 
-            // 12 tick marks
+            // White-hot center of fill arc
+            Circle()
+                .trim(from: 0.125, to: 0.125 + 0.75 * min(value, 1.0))
+                .stroke(Color.white.opacity(0.45), style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+                .frame(width: size, height: size)
+
+            // 12 tick marks — accent tinted
             ForEach(0..<12, id: \.self) { i in
                 let angle = 135.0 + Double(i) * (270.0 / 11.0)
                 Rectangle()
-                    .fill(Color.white.opacity(i % 3 == 0 ? 0.40 : 0.15))
-                    .frame(width: 0.5, height: i % 3 == 0 ? 5 : 3)
+                    .fill(accentColor.opacity(i % 3 == 0 ? 0.50 : 0.20))
+                    .frame(width: 0.6, height: i % 3 == 0 ? 6 : 3)
                     .offset(y: -size / 2 + 2)
                     .rotationEffect(.degrees(angle))
             }
 
-            // Value + unit
-            VStack(spacing: 0) {
+            // Value + unit — LARGER, with accent glow
+            VStack(spacing: 1) {
                 Text(displayValue)
-                    .font(.custom("Menlo", size: size * 0.28)).fontWeight(.bold)
-                    .foregroundColor(Color.white.opacity(0.85))
+                    .font(.custom("Menlo", size: size * 0.30)).fontWeight(.bold)
+                    .foregroundColor(accentColor.opacity(0.95))
+                    .shadow(color: accentColor.opacity(0.5), radius: 4)
                 Text(unit)
-                    .font(.custom("Menlo", size: size * 0.12))
-                    .foregroundColor(Color.white.opacity(0.40))
+                    .font(.custom("Menlo", size: size * 0.13))
+                    .foregroundColor(accentColor.opacity(0.50))
             }
         }
         .frame(width: size, height: size)
         .overlay(alignment: .bottom) {
             Text(label)
-                .font(.custom("Menlo", size: 6)).tracking(2)
-                .foregroundColor(Color(red: 0.4, green: 0.45, blue: 0.5).opacity(0.70))
-                .offset(y: 8)
+                .font(.custom("Menlo", size: 7)).tracking(2)
+                .foregroundColor(accentColor.opacity(0.60))
+                .offset(y: 10)
         }
     }
 }
 
 // MARK: - JarvisDataRow ──────────────────────────────────────────────────────
 
+enum JarvisAccentColor {
+    case cyan, amber, crimson
+
+    var color: Color {
+        switch self {
+        case .cyan: return Color(red: 0.0, green: 0.83, blue: 1.0)
+        case .amber: return Color(red: 1.0, green: 0.78, blue: 0.0)
+        case .crimson: return Color(red: 1.0, green: 0.15, blue: 0.20)
+        }
+    }
+}
+
 struct JarvisDataRow: View {
     let label: String
     let value: String
+    var accentColor: JarvisAccentColor = .cyan
 
     var body: some View {
         HStack {
             Text(label)
-                .font(.custom("Menlo", size: 7)).tracking(2)
-                .foregroundColor(Color(red: 0.4, green: 0.45, blue: 0.5).opacity(0.70))
+                .font(.custom("Menlo", size: 8)).tracking(2)
+                .foregroundColor(Color(red: 0.4, green: 0.50, blue: 0.55).opacity(0.75))
             Spacer()
             Text(value)
-                .font(.custom("Menlo", size: 10)).fontWeight(.medium)
-                .foregroundColor(Color.white.opacity(0.80))
-                .shadow(color: Color.white.opacity(0.15), radius: 4)
+                .font(.custom("Menlo", size: 11)).fontWeight(.bold)
+                .foregroundColor(accentColor.color.opacity(0.90))
+                .shadow(color: accentColor.color.opacity(0.4), radius: 4)
         }
     }
 }
@@ -1045,28 +1324,38 @@ struct JarvisDataRow: View {
 struct JarvisCoreBarGauge: View {
     let values: [Double]
     let label: String
+    var barColor: Color = Color(red: 0.0, green: 0.83, blue: 1.0)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label)
-                .font(.custom("Menlo", size: 6)).tracking(2)
-                .foregroundColor(Color(red: 0.4, green: 0.45, blue: 0.5).opacity(0.70))
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(label)
+                    .font(.custom("Menlo", size: 7)).tracking(2)
+                    .foregroundColor(barColor.opacity(0.65))
+                Spacer()
+                // Average value display
+                Text(String(format: "%.0f%%", (values.reduce(0, +) / max(1, Double(values.count))) * 100))
+                    .font(.custom("Menlo", size: 8)).fontWeight(.bold)
+                    .foregroundColor(barColor.opacity(0.80))
+            }
 
-            HStack(spacing: 1.5) {
+            HStack(spacing: 2) {
                 ForEach(Array(values.enumerated()), id: \.offset) { _, val in
                     ZStack(alignment: .bottom) {
                         // Track
-                        RoundedRectangle(cornerRadius: 1)
-                            .fill(Color.white.opacity(0.06))
-                            .frame(width: 4, height: 24)
-                        // Fill
-                        RoundedRectangle(cornerRadius: 1)
-                            .fill(Color.white.opacity(0.65))
-                            .frame(width: 4, height: max(1, CGFloat(val) * 24))
-                        // Bloom
-                        RoundedRectangle(cornerRadius: 1)
-                            .fill(Color.white.opacity(0.10))
-                            .frame(width: 8, height: max(1, CGFloat(val) * 24))
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(barColor.opacity(0.08))
+                            .frame(width: 5, height: 28)
+                        // Fill — color-coded by intensity
+                        let fillColor = val > 0.9 ? Color(red: 1.0, green: 0.15, blue: 0.20) :
+                                        val > 0.7 ? Color(red: 1.0, green: 0.78, blue: 0.0) : barColor
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(fillColor.opacity(0.75))
+                            .frame(width: 5, height: max(1, CGFloat(val) * 28))
+                        // Bloom glow
+                        RoundedRectangle(cornerRadius: 1.5)
+                            .fill(fillColor.opacity(0.15))
+                            .frame(width: 10, height: max(1, CGFloat(val) * 28))
                             .blur(radius: 2)
                     }
                 }
@@ -1084,17 +1373,42 @@ struct JarvisPanelBox<Content: View>: View {
         self.content = content()
     }
 
+    private let panelCyan = Color(red: 0.0, green: 0.83, blue: 1.0)
+
     var body: some View {
         content
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.black.opacity(0.50))
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.black.opacity(0.55))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 4)
+                    .stroke(panelCyan.opacity(0.18), lineWidth: 0.6)
+            )
+            .overlay(
+                GeometryReader { geo in
+                    // Corner accent dots — holographic border detail
+                    let w = geo.size.width
+                    let h = geo.size.height
+                    ZStack {
+                        Circle().fill(panelCyan.opacity(0.40)).frame(width: 3, height: 3)
+                            .position(x: 4, y: 4)
+                        Circle().fill(panelCyan.opacity(0.40)).frame(width: 3, height: 3)
+                            .position(x: w - 4, y: 4)
+                        Circle().fill(panelCyan.opacity(0.25)).frame(width: 3, height: 3)
+                            .position(x: 4, y: h - 4)
+                        Circle().fill(panelCyan.opacity(0.25)).frame(width: 3, height: 3)
+                            .position(x: w - 4, y: h - 4)
+                        // Bottom edge accent line
+                        Path { p in
+                            p.move(to: CGPoint(x: 8, y: h - 1))
+                            p.addLine(to: CGPoint(x: w - 8, y: h - 1))
+                        }
+                        .stroke(panelCyan.opacity(0.10), lineWidth: 0.5)
+                    }
+                }
             )
     }
 }
