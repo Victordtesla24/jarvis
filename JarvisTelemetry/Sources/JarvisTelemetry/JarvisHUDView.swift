@@ -10,6 +10,7 @@ import SwiftUI
 struct JarvisHUDView: View {
     @EnvironmentObject var store: TelemetryStore
     @Environment(\.animationPhase) var phase
+    @StateObject private var chatterEngine = ChatterEngine()
 
     // ── Jarvis color palette (matched from reference screenshots) ────────
     private let cyan      = Color(red: 0.00, green: 0.83, blue: 1.00)   // #00D4FF — primary
@@ -105,8 +106,20 @@ struct JarvisHUDView: View {
                 }
                 .frame(width: w * 0.16)
                 .position(x: w * 0.92, y: h * 0.48)
+
+                // ── 10. CHATTER STREAMS ─────────────────────────────────
+                ChatterStreamView(engine: chatterEngine, alignment: .left, phase: phase)
+                    .frame(width: w * 0.20, alignment: .leading)
+                    .position(x: w * 0.12, y: h * 0.65)
+
+                ChatterStreamView(engine: chatterEngine, alignment: .right, phase: phase)
+                    .frame(width: w * 0.18, alignment: .trailing)
+                    .position(x: w * 0.88, y: h * 0.65)
             }
             .holographicFlicker(phase: phase)
+            .onAppear {
+                chatterEngine.bind(to: store)
+            }
         }
     }
 }
