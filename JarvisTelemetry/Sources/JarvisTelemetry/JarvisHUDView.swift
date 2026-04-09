@@ -428,7 +428,11 @@ struct JarvisReactorCanvas: View {
             let c = center
             let pi2 = Double.pi * 2.0
             let top = -Double.pi / 2.0
-            let ph = phase
+            // Load-reactive speed: rings spin faster under load
+            let cpuAvg = (store.eCoreUsages + store.pCoreUsages + store.sCoreUsages)
+                .reduce(0, +) / max(1, Double(store.eCoreUsages.count + store.pCoreUsages.count + store.sCoreUsages.count))
+            let speedMul = 1.0 + cpuAvg * 0.5
+            let ph = phase * speedMul
 
             // ── HELPER: full circle ring ─────────────────────────────────
             func ring(_ r: Double, _ col: Color, _ w: Double, dash: [CGFloat]? = nil) {
@@ -883,19 +887,31 @@ struct JarvisReactorCanvas: View {
             // Extra structural spokes at zone boundaries
             spokes(R * 0.18, R * 0.96, 8, steel.opacity(0.06), 0.3)
 
-            // ── 22. CORE GLOW (tight pinpoint — not diffuse) ────────────
-            let corePulse = 0.85 + sin(ph * 2.5) * 0.15
-            // Small concentrated bloom (5 layers, tight radius)
+            // ── CORE GLOW — CARDIAC HEARTBEAT ───────────────────────
+            let bpm = 45.0 + cpuAvg * 75.0
+            let heartPeriod = 60.0 / bpm
+            let heartPhase = (ph.truncatingRemainder(dividingBy: heartPeriod)) / heartPeriod
+            let cardiac: Double
+            if heartPhase < 0.1 {
+                cardiac = 0.85 + 0.15 * (heartPhase / 0.1)
+            } else if heartPhase < 0.25 {
+                cardiac = 1.0 - 0.15 * ((heartPhase - 0.1) / 0.15)
+            } else if heartPhase < 0.35 {
+                cardiac = 0.85 + 0.05 * sin((heartPhase - 0.25) / 0.10 * .pi)
+            } else {
+                cardiac = 0.85
+            }
+            let corePulse = cardiac
+
             for layer in 0..<5 {
                 let lr = R * 0.02 + Double(layer) * 3
-                let lo = 0.06 * corePulse * (1.0 - Double(layer) / 5.0)
-                let cp = Path(ellipseIn: CGRect(x: c.x - lr, y: c.y - lr, width: lr * 2, height: lr * 2))
-                ctx.fill(cp, with: .color(cyan.opacity(lo)))
+                let lo = 0.08 * corePulse * (1.0 - Double(layer) / 5.0)
+                let coreRect = CGRect(x: c.x - lr, y: c.y - lr, width: lr * 2, height: lr * 2)
+                ctx.fill(Path(ellipseIn: coreRect), with: .color(cyan.opacity(lo)))
             }
-            // Tiny white-hot center dot
             let hotR = R * 0.015 * corePulse
-            let hotP = Path(ellipseIn: CGRect(x: c.x - hotR, y: c.y - hotR, width: hotR * 2, height: hotR * 2))
-            ctx.fill(hotP, with: .color(Color.white.opacity(0.15 * corePulse)))
+            let hotRect = CGRect(x: c.x - hotR, y: c.y - hotR, width: hotR * 2, height: hotR * 2)
+            ctx.fill(Path(ellipseIn: hotRect), with: .color(Color.white.opacity(0.15 * corePulse)))
 
             // ══════════════════════════════════════════════════════════════
             //  ANIMATED SWEEP LINE (radar-style)
