@@ -1267,9 +1267,11 @@ struct CentralStatsView: View {
                 .font(.custom("Menlo", size: 9)).tracking(4)
                 .foregroundColor(cyan.opacity(0.40))
 
-            Text(String(format: "%.0f", store.totalPower))
-                .font(.custom("Menlo", size: 48)).fontWeight(.bold)
-                .foregroundColor(cyanBright)
+            DigitCipherText(
+                value: String(format: "%.0f", store.totalPower),
+                font: .custom("Menlo", size: 48).weight(.bold),
+                color: Color(red: 0.41, green: 0.95, blue: 0.95)
+            )
                 .shadow(color: cyan.opacity(0.95), radius: 3)
                 .shadow(color: cyan.opacity(0.50), radius: 12)
                 .shadow(color: cyan.opacity(0.25), radius: 30)
