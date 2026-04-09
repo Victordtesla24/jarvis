@@ -35,7 +35,7 @@ struct JarvisHUDView: View {
             ZStack {
                 // ── 1. BACKGROUND: dark blue-black (shifts crimson under thermal threat) ──
                 let thermalThreat = store.thermalState.lowercased().contains("serious") || store.thermalState.lowercased().contains("critical")
-                let bgColor = thermalThreat ? Color(red: 0.04, green: 0.02, blue: 0.03) : darkBlue
+                let bgColor = thermalThreat ? Color(red: 0.04, green: 0.02, blue: 0.03) : Color.black
                 bgColor.ignoresSafeArea()
 
                 // Hex grid background
@@ -45,9 +45,8 @@ struct JarvisHUDView: View {
                 // Reactor ambient bloom — the reactor casts cyan light
                 RadialGradient(
                     gradient: Gradient(colors: [
-                        cyan.opacity(0.12),
-                        cyan.opacity(0.06),
-                        cyan.opacity(0.02),
+                        Color.white.opacity(0.04),
+                        Color.white.opacity(0.02),
                         Color.clear
                     ]),
                     center: .center,
@@ -445,13 +444,22 @@ struct JarvisReactorCanvas: View {
             let ph = phase * speedMul
 
             // ══════════════════════════════════════════════════════════════
-            //  IRON MAN JARVIS REACTOR — Cinema-grade, high-contrast
-            //  ~15-20 DISTINCT, THICK structural rings with deliberate gaps.
-            //  WIDE data arcs, BLAZING core, HIGH CONTRAST, visible bloom.
+            //  IRON MAN JARVIS REACTOR — White/Silver Cinema Reference
+            //  Bright white rings with massive bloom glow halos.
+            //  Segmented arcs, dotted perimeter, chevron markers.
+            //  Pure black background, projected-light aesthetic.
             // ══════════════════════════════════════════════════════════════
 
             // ═══════════════════════════════════════════════════════════
-            //  HELPERS — high-contrast JARVIS style
+            //  JARVIS white/silver palette (from reference video)
+            // ═══════════════════════════════════════════════════════════
+            let jarvisWhite = Color.white
+            let jarvisSilver = Color(red: 0.85, green: 0.90, blue: 0.95)
+            let jarvisCyan = Color(red: 0.5, green: 0.8, blue: 0.9)
+            let jarvisDim = Color(red: 0.4, green: 0.45, blue: 0.5)
+
+            // ═══════════════════════════════════════════════════════════
+            //  HELPERS — cinema bloom style
             // ═══════════════════════════════════════════════════════════
 
             func ring(_ r: Double, _ col: Color, _ w: Double, dash: [CGFloat]? = nil) {
@@ -460,12 +468,44 @@ struct JarvisReactorCanvas: View {
                 ctx.stroke(p, with: .color(col), style: s)
             }
 
-            // JARVIS glow — visible bloom halo around every bright element
-            func glowRing(_ r: Double, _ col: Color, _ w: Double, bloom: Double = 12) {
-                ring(r, col.opacity(0.15), w + bloom * 2)   // wide soft outer glow
-                ring(r, col.opacity(0.35), w + bloom)       // medium glow
-                ring(r, col.opacity(0.80), w)               // bright core ring
-                ring(r, Color.white.opacity(0.25), w * 0.5) // white-hot highlight
+            // Cinema bloom — 5-layer glow that makes rings look like illuminated light tubes
+            func bloomRing(_ r: Double, _ col: Color, _ w: Double) {
+                ring(r, col.opacity(0.03), w + 30)  // ultra-wide ambient
+                ring(r, col.opacity(0.06), w + 20)  // wide soft glow
+                ring(r, col.opacity(0.12), w + 12)  // medium glow
+                ring(r, col.opacity(0.40), w + 4)   // near glow
+                ring(r, col.opacity(0.90), w)        // bright core
+                ring(r, Color.white.opacity(0.60), w * 0.4) // white-hot center
+            }
+
+            // Bloom arc — same layered glow for partial arcs
+            func bloomArc(_ r: Double, _ startAngle: Double, _ sweep: Double, _ col: Color, _ w: Double) {
+                for (extraW, opacity) in [(30.0, 0.03), (20.0, 0.06), (12.0, 0.12), (4.0, 0.40), (0.0, 0.90)] {
+                    let p = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(startAngle), endAngle: .radians(startAngle + sweep), clockwise: false) }
+                    ctx.stroke(p, with: .color(col.opacity(opacity)), style: StrokeStyle(lineWidth: w + extraW, lineCap: .round))
+                }
+                // white-hot center line
+                let wp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(startAngle), endAngle: .radians(startAngle + sweep), clockwise: false) }
+                ctx.stroke(wp, with: .color(Color.white.opacity(0.55)), style: StrokeStyle(lineWidth: w * 0.4, lineCap: .round))
+            }
+
+            // Data arc with bloom — tracks + filled segments
+            func dataArc(_ usages: [Double], _ r: Double, _ w: Double, _ col: Color) {
+                guard !usages.isEmpty else { return }
+                let n = usages.count
+                let sw = pi2 / Double(n)
+                let gap = sw * 0.10  // wider gaps between segments
+                for (i, u) in usages.enumerated() {
+                    let s0 = top + sw * Double(i) + gap / 2
+                    let s1 = s0 + sw - gap
+                    // Track — dim but visible
+                    let tp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s0), endAngle: .radians(s1), clockwise: false) }
+                    ctx.stroke(tp, with: .color(col.opacity(0.12)), style: StrokeStyle(lineWidth: w, lineCap: .round))
+                    guard u > 0 else { continue }
+                    let fe = s0 + (s1 - s0) * u
+                    // Bloom data fill
+                    bloomArc(r, s0, (fe - s0), col, w)
+                }
             }
 
             // Segmented ring — N segments with gaps, rotating
@@ -479,30 +519,7 @@ struct JarvisReactorCanvas: View {
                 }
             }
 
-            // Data arc — WIDE, BRIGHT, with visible bloom
-            func dataArc(_ usages: [Double], _ r: Double, _ w: Double, _ col: Color) {
-                guard !usages.isEmpty else { return }
-                let n = usages.count
-                let sw = pi2 / Double(n)
-                let gap = sw * 0.08
-                for (i, u) in usages.enumerated() {
-                    let s0 = top + sw * Double(i) + gap / 2
-                    let s1 = s0 + sw - gap
-                    // Track background — always visible
-                    let tp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s0), endAngle: .radians(s1), clockwise: false) }
-                    ctx.stroke(tp, with: .color(col.opacity(0.20)), style: StrokeStyle(lineWidth: w, lineCap: .round))
-                    guard u > 0 else { continue }
-                    let fe = s0 + (s1 - s0) * u
-                    let fp = Path { p in p.addArc(center: c, radius: r, startAngle: .radians(s0), endAngle: .radians(fe), clockwise: false) }
-                    // 4-layer bloom — WIDE and BRIGHT
-                    ctx.stroke(fp, with: .color(col.opacity(0.12)), style: StrokeStyle(lineWidth: w + 10, lineCap: .round))
-                    ctx.stroke(fp, with: .color(col.opacity(0.40)), style: StrokeStyle(lineWidth: w + 4, lineCap: .round))
-                    ctx.stroke(fp, with: .color(col.opacity(0.90)), style: StrokeStyle(lineWidth: w, lineCap: .round))
-                    ctx.stroke(fp, with: .color(Color.white.opacity(0.30)), style: StrokeStyle(lineWidth: w * 0.3, lineCap: .round))
-                }
-            }
-
-            // Chevron arrows
+            // Chevron arrows — triangular pointers
             func chevrons(_ r: Double, _ col: Color, _ sz: Double, _ count: Int = 4, rot: Double = 0) {
                 let rotOff = rot * ph
                 for i in 0..<count {
@@ -510,21 +527,10 @@ struct JarvisReactorCanvas: View {
                     let tipPt = CGPoint(x: c.x + cos(a) * (r + sz), y: c.y + sin(a) * (r + sz))
                     let lPt = CGPoint(x: c.x + cos(a - 0.08) * (r - sz * 0.2), y: c.y + sin(a - 0.08) * (r - sz * 0.2))
                     let rPt = CGPoint(x: c.x + cos(a + 0.08) * (r - sz * 0.2), y: c.y + sin(a + 0.08) * (r - sz * 0.2))
-                    let p = Path { p in p.move(to: lPt); p.addLine(to: tipPt); p.addLine(to: rPt) }
-                    ctx.stroke(p, with: .color(col), style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round))
-                }
-            }
-
-            // Radial spokes
-            func spokes(_ rIn: Double, _ rOut: Double, _ n: Int, _ col: Color, _ w: Double, rot: Double = 0) {
-                let rotOff = rot * ph
-                for i in 0..<n {
-                    let a = Double(i) / Double(n) * pi2 + rotOff
-                    let sp = Path { p in
-                        p.move(to: CGPoint(x: c.x + cos(a) * rIn, y: c.y + sin(a) * rIn))
-                        p.addLine(to: CGPoint(x: c.x + cos(a) * rOut, y: c.y + sin(a) * rOut))
-                    }
-                    ctx.stroke(sp, with: .color(col), style: StrokeStyle(lineWidth: w, lineCap: .butt))
+                    // Glow halo behind chevron
+                    let gp = Path { p in p.move(to: lPt); p.addLine(to: tipPt); p.addLine(to: rPt) }
+                    ctx.stroke(gp, with: .color(col.opacity(0.15)), style: StrokeStyle(lineWidth: 8.0, lineCap: .round, lineJoin: .round))
+                    ctx.stroke(gp, with: .color(col.opacity(0.80)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round, lineJoin: .round))
                 }
             }
 
@@ -550,158 +556,163 @@ struct JarvisReactorCanvas: View {
                 for i in 0..<n {
                     let a = Double(i) / Double(n) * pi2 + rotOff
                     let pt = CGPoint(x: c.x + cos(a) * r, y: c.y + sin(a) * r)
+                    // Glow behind each dot
+                    let glowRect = CGRect(x: pt.x - sz * 2, y: pt.y - sz * 2, width: sz * 4, height: sz * 4)
+                    ctx.fill(Path(ellipseIn: glowRect), with: .color(col.opacity(0.10)))
                     let rect = CGRect(x: pt.x - sz/2, y: pt.y - sz/2, width: sz, height: sz)
                     ctx.fill(Path(ellipseIn: rect), with: .color(col))
                 }
             }
 
             // ══════════════════════════════════════════════════════════════
-            //  ZONE 1: OUTER BEZEL (0.96R - 1.08R)
+            //  ZONE 1: OUTER PERIMETER (1.02R)
+            //  Dotted ring + compass chevrons
             // ══════════════════════════════════════════════════════════════
 
-            // Solid steel fill ring — thick structural frame
-            ring(R * 1.01, steel.opacity(0.50), 3.0)
+            // Dotted perimeter ring — 120 evenly spaced dots
+            dots(R * 1.02, 120, jarvisDim.opacity(0.50), 1.5)
 
-            // 12-segment bezel panels (steel, visible gaps)
-            segRing(R * 1.01, 12, 0.75, steel.opacity(0.35), 6.0, rot: 0.0)
-
-            // Bright outer edge ring — crisp cyan boundary
-            glowRing(R * 1.06, cyan.opacity(0.80), 2.5, bloom: 8)
-
-            // Bright inner edge ring
-            ring(R * 0.96, steel.opacity(0.70), 3.0)
-
-            // Amber accent glowRing at 0.955R
-            glowRing(R * 0.955, amber.opacity(0.80), 2.5, bloom: 10)
-
-            // 36 radial spokes through bezel (structural)
-            spokes(R * 0.96, R * 1.06, 36, steel.opacity(0.30), 0.6)
-
-            // 4 chevrons at outer edge
-            chevrons(R * 1.03, cyan.opacity(0.65), 12, 4)
+            // 4 chevrons at compass points (white, 10px)
+            chevrons(R * 1.02, jarvisWhite.opacity(0.70), 10, 4)
 
             // ══════════════════════════════════════════════════════════════
-            //  ZONE 2: OUTER DATA RING (0.88R - 0.95R)
+            //  ZONE 2: OUTER STRUCTURAL (0.93R - 0.96R)
+            //  Thick bloom ring + segmented arcs + ticks
             // ══════════════════════════════════════════════════════════════
 
-            // 150 tick marks
-            ticks(R * 0.95, 150, 8, steel.opacity(0.70), 0.8, rot: 0.06)
+            // Main outer bloom ring — THICK, creates ~34px visible with bloom
+            bloomRing(R * 0.95, jarvisSilver, 4.0)
 
-            // Bright structural glowRing
-            glowRing(R * 0.94, cyan, 3.0, bloom: 14)
-
-            // Rotating glow arcs (decorative)
-            segRing(R * 0.93, 8, 0.40, cyanDim.opacity(0.60), 4.0, rot: -0.04)
-
-            // GPU DATA ARC at 0.915R — WIDE (12px), cyan, BRIGHT
-            let gpuVal = [min(store.gpuUsage, 1.0)]
-            dataArc(gpuVal, R * 0.915, 12.0, cyan)
-
-            // Structural ring below GPU arc
-            ring(R * 0.895, steel.opacity(0.55), 2.5)
-
-            // ══════════════════════════════════════════════════════════════
-            //  ZONE 3: E-CORE ZONE (0.82R - 0.87R)
-            // ══════════════════════════════════════════════════════════════
-
-            // Structural bezel (steel, segmented 16 panels)
-            segRing(R * 0.87, 16, 0.70, steel.opacity(0.50), 4.0, rot: 0.01)
-            ring(R * 0.875, steel.opacity(0.60), 2.0)
-
-            // E-CORE DATA ARCS at 0.845R — WIDE (12px), cyan
-            dataArc(store.eCoreUsages, R * 0.845, 12.0, cyan)
-
-            // Bright glowRing at 0.83R
-            glowRing(R * 0.83, cyan, 3.0, bloom: 12)
-
-            // 16 dots at 0.815R
-            dots(R * 0.815, 16, cyan.opacity(0.70), 4.0, rot: 0.12)
-
-            // ══════════════════════════════════════════════════════════════
-            //  ZONE 4: P-CORE ZONE (0.72R - 0.78R)
-            // ══════════════════════════════════════════════════════════════
-
-            // Structural bezel (steel, segmented 20 panels)
-            segRing(R * 0.78, 20, 0.65, steel.opacity(0.50), 4.0, rot: -0.01)
-            ring(R * 0.785, steel.opacity(0.60), 2.0)
-
-            // P-CORE DATA ARCS at 0.745R — WIDE (12px), amber
-            dataArc(store.pCoreUsages, R * 0.745, 12.0, amber)
-
-            // Bright glowRing at 0.73R (amber)
-            glowRing(R * 0.73, amber, 3.0, bloom: 12)
-
-            // 4 chevrons at 0.70R
-            chevrons(R * 0.70, cyan.opacity(0.60), 8, 4, rot: 0.05)
-
-            // ══════════════════════════════════════════════════════════════
-            //  ZONE 5: S-CORE ZONE (0.62R - 0.66R)
-            // ══════════════════════════════════════════════════════════════
-
-            // S-CORE DATA ARCS at 0.645R — WIDE (10px), crimson
-            dataArc(store.sCoreUsages, R * 0.645, 10.0, crimson)
-
-            // Ticks at 0.615R
-            ticks(R * 0.615, 48, 6, steel.opacity(0.70), 0.8, rot: 0.25)
-
-            // GlowRing at 0.63R (crimson)
-            glowRing(R * 0.63, crimson, 2.5, bloom: 10)
-
-            // Structural ring below S-cores
-            ring(R * 0.60, steel.opacity(0.55), 2.0)
-
-            // ══════════════════════════════════════════════════════════════
-            //  ZONE 6: INNER DETAIL (0.40R - 0.58R)
-            // ══════════════════════════════════════════════════════════════
-
-            // Segmented rotating ring 1 — slow CW
-            segRing(R * 0.56, 6, 0.60, cyan.opacity(0.70), 5.0, rot: 0.03)
-
-            // Ticks between rings
-            ticks(R * 0.53, 36, 7, steel.opacity(0.65), 1.0, rot: -0.08)
-
-            // Segmented rotating ring 2 — medium CCW
-            segRing(R * 0.50, 8, 0.55, steel.opacity(0.60), 4.0, rot: -0.06)
-
-            // Rotating glow arcs
-            segRing(R * 0.47, 12, 0.35, cyanDim.opacity(0.55), 3.0, rot: 0.10)
-
-            // Segmented rotating ring 3 — fast CW
-            segRing(R * 0.44, 10, 0.50, cyan.opacity(0.65), 3.5, rot: 0.15)
-
-            // GlowRing at 0.44R (bright cyan — inner boundary)
-            glowRing(R * 0.44, cyan, 3.5, bloom: 14)
-
-            // ══════════════════════════════════════════════════════════════
-            //  ZONE 7: REACTOR CORE (0R - 0.25R)
-            // ══════════════════════════════════════════════════════════════
-
-            // Structural spokes from core to inner boundary
-            spokes(R * 0.18, R * 0.44, 12, steel.opacity(0.40), 1.0, rot: -0.02)
-
-            // 12 ticks at 0.20R
-            ticks(R * 0.20, 12, 6, steel.opacity(0.70), 1.2, rot: -0.40)
-
-            // GlowRing at 0.18R
-            glowRing(R * 0.18, cyan, 2.0, bloom: 10)
-
-            // Targeting reticle (dashed circles + crosshairs)
-            let reticlePulse = 0.85 + sin(ph * 1.5) * 0.15
-            for (rr, op) in [(R * 0.14, 0.35), (R * 0.10, 0.45), (R * 0.06, 0.30)] {
-                let rp = Path { p in p.addArc(center: c, radius: rr, startAngle: .zero, endAngle: .radians(pi2), clockwise: false) }
-                ctx.stroke(rp, with: .color(cyan.opacity(op * reticlePulse)), style: StrokeStyle(lineWidth: 1.0, dash: [4, 4]))
+            // 8-segment partial arcs at 0.93R (each ~35 degrees sweep)
+            let segSweep = (pi2 / 8.0) * 0.60  // ~35 degrees each
+            for i in 0..<8 {
+                let segStart = Double(i) * (pi2 / 8.0) + 0.08 + ph * 0.02
+                let ap = Path { p in p.addArc(center: c, radius: R * 0.93, startAngle: .radians(segStart), endAngle: .radians(segStart + segSweep), clockwise: false) }
+                ctx.stroke(ap, with: .color(jarvisDim.opacity(0.35)), style: StrokeStyle(lineWidth: 3.0, lineCap: .round))
             }
-            // Cross lines through center
-            for angle in [0.0, Double.pi / 2] {
+
+            // 60 tick marks at 0.96R
+            ticks(R * 0.96, 60, 6, jarvisDim.opacity(0.50), 0.8)
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 3: GPU DATA (0.88R)
+            //  Bloom marker + GPU data arc
+            // ══════════════════════════════════════════════════════════════
+
+            // Faint cyan zone marker
+            bloomRing(R * 0.90, jarvisCyan.opacity(0.30), 2.0)
+
+            // GPU data arc — white, 10px wide, with bloom
+            let gpuVal = [min(store.gpuUsage, 1.0)]
+            dataArc(gpuVal, R * 0.88, 10.0, jarvisWhite)
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 4: E-CORE DATA (0.78R)
+            //  Bloom marker + E-core data arcs + structural
+            // ══════════════════════════════════════════════════════════════
+
+            // Cyan zone marker
+            bloomRing(R * 0.82, jarvisCyan.opacity(0.25), 2.0)
+
+            // E-core data arcs — white, 10px wide
+            dataArc(store.eCoreUsages, R * 0.78, 10.0, jarvisWhite)
+
+            // Segmented structural arc at 0.76R (6 segments)
+            let structSweep6 = (pi2 / 6.0) * 0.55
+            for i in 0..<6 {
+                let segStart = Double(i) * (pi2 / 6.0) + 0.12 - ph * 0.015
+                let ap = Path { p in p.addArc(center: c, radius: R * 0.76, startAngle: .radians(segStart), endAngle: .radians(segStart + structSweep6), clockwise: false) }
+                ctx.stroke(ap, with: .color(jarvisDim.opacity(0.30)), style: StrokeStyle(lineWidth: 3.0, lineCap: .round))
+            }
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 5: P-CORE DATA (0.65R)
+            //  Bloom marker + P-core data arcs + chevrons
+            // ══════════════════════════════════════════════════════════════
+
+            // Silver zone marker
+            bloomRing(R * 0.70, jarvisSilver.opacity(0.30), 2.0)
+
+            // P-core data arcs — silver, 10px wide
+            dataArc(store.pCoreUsages, R * 0.65, 10.0, jarvisSilver)
+
+            // 4 chevrons at 0.63R
+            chevrons(R * 0.63, jarvisWhite.opacity(0.50), 8, 4, rot: 0.05)
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 6: S-CORE DATA (0.55R)
+            //  S-core data arcs + segmented arc
+            // ══════════════════════════════════════════════════════════════
+
+            // S-core data arcs — silver, 8px wide
+            dataArc(store.sCoreUsages, R * 0.55, 8.0, jarvisSilver)
+
+            // Segmented arc at 0.53R (8 segments)
+            let structSweep8 = (pi2 / 8.0) * 0.50
+            for i in 0..<8 {
+                let segStart = Double(i) * (pi2 / 8.0) + 0.20 + ph * 0.03
+                let ap = Path { p in p.addArc(center: c, radius: R * 0.53, startAngle: .radians(segStart), endAngle: .radians(segStart + structSweep8), clockwise: false) }
+                ctx.stroke(ap, with: .color(jarvisDim.opacity(0.25)), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+            }
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 7: INNER DETAIL (0.38R - 0.45R)
+            //  Bright inner boundary + wavy ring + ticks + rotating arcs
+            // ══════════════════════════════════════════════════════════════
+
+            // Bright inner boundary bloom ring
+            bloomRing(R * 0.44, jarvisWhite, 3.0)
+
+            // Wavy/gear-tooth ring at 0.42R — 24-segment irregular edge
+            let gearTeeth = 24
+            let gearSegAngle = pi2 / Double(gearTeeth)
+            for i in 0..<gearTeeth {
+                let a0 = Double(i) * gearSegAngle + ph * 0.08
+                let innerR = R * 0.41
+                let outerR = R * (i % 2 == 0 ? 0.43 : 0.415)
+                let mid = a0 + gearSegAngle * 0.5
+                let gp = Path { p in
+                    p.move(to: CGPoint(x: c.x + cos(a0) * innerR, y: c.y + sin(a0) * innerR))
+                    p.addLine(to: CGPoint(x: c.x + cos(mid) * outerR, y: c.y + sin(mid) * outerR))
+                    p.addLine(to: CGPoint(x: c.x + cos(a0 + gearSegAngle) * innerR, y: c.y + sin(a0 + gearSegAngle) * innerR))
+                }
+                ctx.stroke(gp, with: .color(jarvisDim.opacity(0.35)), style: StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round))
+            }
+
+            // 12 tick marks at 0.40R
+            ticks(R * 0.40, 12, 5, jarvisDim.opacity(0.55), 1.0)
+
+            // 4 small rotating arcs at 0.38R
+            let smallArcSweep = pi2 * 0.08
+            for i in 0..<4 {
+                let arcStart = Double(i) * (pi2 / 4.0) + ph * 0.12
+                let ap = Path { p in p.addArc(center: c, radius: R * 0.38, startAngle: .radians(arcStart), endAngle: .radians(arcStart + smallArcSweep), clockwise: false) }
+                ctx.stroke(ap, with: .color(jarvisCyan.opacity(0.40)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
+            }
+
+            // ══════════════════════════════════════════════════════════════
+            //  ZONE 8: CORE (0R - 0.25R)
+            //  Bloom rings + targeting reticle + crosshair + BLAZING CORE
+            // ══════════════════════════════════════════════════════════════
+
+            // Bloom rings at core boundary
+            bloomRing(R * 0.22, jarvisWhite, 2.0)
+            bloomRing(R * 0.15, jarvisWhite, 2.0)
+
+            // Targeting reticle — dashed circles
+            let reticlePulse = 0.85 + sin(ph * 1.5) * 0.15
+            ring(R * 0.10, jarvisWhite.opacity(0.35 * reticlePulse), 1.0, dash: [4, 4])
+            ring(R * 0.06, jarvisWhite.opacity(0.30 * reticlePulse), 1.0, dash: [3, 5])
+
+            // Crosshair lines (4 directions, 0.03R to 0.08R)
+            for angle in [0.0, Double.pi / 2, Double.pi, Double.pi * 1.5] {
                 let dx = cos(angle)
                 let dy = sin(angle)
                 let cp = Path { p in
                     p.move(to: CGPoint(x: c.x + dx * R * 0.03, y: c.y + dy * R * 0.03))
-                    p.addLine(to: CGPoint(x: c.x + dx * R * 0.12, y: c.y + dy * R * 0.12))
-                    p.move(to: CGPoint(x: c.x - dx * R * 0.03, y: c.y - dy * R * 0.03))
-                    p.addLine(to: CGPoint(x: c.x - dx * R * 0.12, y: c.y - dy * R * 0.12))
+                    p.addLine(to: CGPoint(x: c.x + dx * R * 0.08, y: c.y + dy * R * 0.08))
                 }
-                ctx.stroke(cp, with: .color(cyan.opacity(0.40 * reticlePulse)), style: StrokeStyle(lineWidth: 1.0))
+                ctx.stroke(cp, with: .color(jarvisWhite.opacity(0.45 * reticlePulse)), style: StrokeStyle(lineWidth: 1.0))
             }
 
             // ── BLAZING CORE GLOW — cardiac heartbeat ───────────────
@@ -720,63 +731,42 @@ struct JarvisReactorCanvas: View {
             }
             let corePulse = cardiac
 
-            // 12 glow layers radiating from center (0 -> 15%R)
-            // The BRIGHTEST element on screen — visible light source
-            for layer in 0..<12 {
-                let lr = R * 0.01 + Double(layer) * R * 0.013
-                let lo = 0.30 * corePulse * (1.0 - Double(layer) / 12.0)
+            // 15 glow layers (0 -> 20%R spread), white, cinema bloom
+            for layer in 0..<15 {
+                let lr = R * 0.005 + Double(layer) * R * 0.014
+                let lo = (0.20 - Double(layer) * 0.012) * corePulse
+                guard lo > 0 else { continue }
                 let coreRect = CGRect(x: c.x - lr, y: c.y - lr, width: lr * 2, height: lr * 2)
-                ctx.fill(Path(ellipseIn: coreRect), with: .color(cyan.opacity(lo)))
+                ctx.fill(Path(ellipseIn: coreRect), with: .color(jarvisWhite.opacity(lo)))
             }
-            // Bright cyan sphere (R*0.04 radius, 0.5 opacity)
-            let hotR = R * 0.04 * corePulse
+
+            // Bright white sphere at 0.03R
+            let hotR = R * 0.03 * corePulse
             let hotRect = CGRect(x: c.x - hotR, y: c.y - hotR, width: hotR * 2, height: hotR * 2)
-            ctx.fill(Path(ellipseIn: hotRect), with: .color(cyanBright.opacity(0.50 * corePulse)))
-            // White-hot center (R*0.02, 0.7 white opacity)
-            let innerR = R * 0.02 * corePulse
+            ctx.fill(Path(ellipseIn: hotRect), with: .color(Color.white.opacity(0.70 * corePulse)))
+
+            // Center point — pure white, 0.01R
+            let innerR = R * 0.01 * corePulse
             let innerRect = CGRect(x: c.x - innerR, y: c.y - innerR, width: innerR * 2, height: innerR * 2)
-            ctx.fill(Path(ellipseIn: innerRect), with: .color(Color.white.opacity(0.70 * corePulse)))
+            ctx.fill(Path(ellipseIn: innerRect), with: .color(Color.white.opacity(1.0 * corePulse)))
 
             // ══════════════════════════════════════════════════════════════
-            //  ZONE 8: SWEEP LINE
+            //  RADAR SWEEP — white, with heavy bloom trail
             // ══════════════════════════════════════════════════════════════
 
-            let sweepPeriod = 10.0
-            let sA = ph.truncatingRemainder(dividingBy: sweepPeriod) / sweepPeriod * pi2
-            // Rotating 1px bright line from core to outer ring
-            let sP = Path { p in
-                p.move(to: CGPoint(x: c.x + cos(sA) * R * 0.05, y: c.y + sin(sA) * R * 0.05))
-                p.addLine(to: CGPoint(x: c.x + cos(sA) * R * 1.00, y: c.y + sin(sA) * R * 1.00))
-            }
-            ctx.stroke(sP, with: .color(cyan.opacity(0.35)), style: StrokeStyle(lineWidth: 1.0))
-            // Fading trail (8 trailing lines at decreasing opacity)
-            for t in 1...8 {
-                let tA = sA - Double(t) * 0.018
-                let tP = Path { p in
-                    p.move(to: CGPoint(x: c.x + cos(tA) * R * 0.05, y: c.y + sin(tA) * R * 0.05))
-                    p.addLine(to: CGPoint(x: c.x + cos(tA) * R * 1.00, y: c.y + sin(tA) * R * 1.00))
+            let sweepAngle = (ph.truncatingRemainder(dividingBy: 8.0) / 8.0) * pi2
+            for trail in 0..<12 {
+                let trailAngle = sweepAngle - Double(trail) * 0.02
+                let trailOpacity = (1.0 - Double(trail) / 12.0) * 0.3
+                let sp = Path { p in
+                    p.move(to: CGPoint(x: c.x + cos(trailAngle) * R * 0.25, y: c.y + sin(trailAngle) * R * 0.25))
+                    p.addLine(to: CGPoint(x: c.x + cos(trailAngle) * R * 0.95, y: c.y + sin(trailAngle) * R * 0.95))
                 }
-                ctx.stroke(tP, with: .color(cyan.opacity(0.18 / Double(t))), style: StrokeStyle(lineWidth: 1.0))
-            }
-
-            // Sweep gradient wedge (pie-slice fade behind the sweep)
-            let wedgeAngle = 0.35
-            let wedgeSteps = 20
-            for s in 0..<wedgeSteps {
-                let frac = Double(s) / Double(wedgeSteps)
-                let aStart = sA - wedgeAngle * frac
-                let aEnd = sA - wedgeAngle * (frac + 1.0 / Double(wedgeSteps))
-                let opacity = 0.08 * (1.0 - frac)
-                let wp = Path { p in
-                    p.move(to: c)
-                    p.addArc(center: c, radius: R * 0.98, startAngle: .radians(aStart), endAngle: .radians(aEnd), clockwise: true)
-                    p.closeSubpath()
-                }
-                ctx.fill(wp, with: .color(cyan.opacity(opacity)))
+                ctx.stroke(sp, with: .color(jarvisWhite.opacity(trailOpacity)), style: StrokeStyle(lineWidth: 1.5))
             }
 
             // ══════════════════════════════════════════════════════════════
-            //  DEGREE MARKERS at 8 compass points (000-315) at 1.10R
+            //  DEGREE MARKERS — 8 compass points at 1.06R
             // ══════════════════════════════════════════════════════════════
 
             let degreeMarkers: [(Double, String)] = [
@@ -786,42 +776,42 @@ struct JarvisReactorCanvas: View {
                 (Double.pi*7/4, "315")
             ]
             for (angle, label) in degreeMarkers {
-                let textR = R * 1.10
+                let textR = R * 1.06
                 let tx = c.x + cos(angle - Double.pi/2) * textR
                 let ty = c.y + sin(angle - Double.pi/2) * textR
                 ctx.draw(
                     Text(label)
                         .font(.custom("Menlo", size: 8))
-                        .foregroundColor(steel.opacity(0.60)),
+                        .foregroundColor(jarvisWhite.opacity(0.50)),
                     at: CGPoint(x: tx, y: ty)
                 )
             }
 
         } // end Canvas
-        // Ring labels overlay
+        // Ring labels overlay — white/silver
         .overlay(
             ZStack {
                 // E-CORES label
                 Text("E-CORES")
                     .font(.custom("Menlo", size: 9)).tracking(3)
-                    .foregroundColor(cyan.opacity(0.55))
-                    .shadow(color: cyan.opacity(0.3), radius: 4)
-                    .position(x: center.x, y: center.y - R * 0.845 - 18)
+                    .foregroundColor(Color.white.opacity(0.60))
+                    .shadow(color: Color.white.opacity(0.3), radius: 4)
+                    .position(x: center.x, y: center.y - R * 0.78 - 18)
                 // P-CORES label
                 Text("P-CORES")
                     .font(.custom("Menlo", size: 8)).tracking(2)
-                    .foregroundColor(amber.opacity(0.45))
-                    .position(x: center.x, y: center.y - R * 0.745 - 15)
+                    .foregroundColor(Color(red: 0.85, green: 0.90, blue: 0.95).opacity(0.50))
+                    .position(x: center.x, y: center.y - R * 0.65 - 15)
                 // S-CORES label
                 Text("S-CORES")
                     .font(.custom("Menlo", size: 8)).tracking(2)
-                    .foregroundColor(crimson.opacity(0.45))
-                    .position(x: center.x, y: center.y - R * 0.645 - 15)
+                    .foregroundColor(Color(red: 0.85, green: 0.90, blue: 0.95).opacity(0.50))
+                    .position(x: center.x, y: center.y - R * 0.55 - 15)
                 // GPU label
                 Text("GPU")
                     .font(.custom("Menlo", size: 8)).tracking(2)
-                    .foregroundColor(cyan.opacity(0.40))
-                    .position(x: center.x, y: center.y - R * 0.915 - 14)
+                    .foregroundColor(Color.white.opacity(0.50))
+                    .position(x: center.x, y: center.y - R * 0.88 - 14)
             }
         )
     }
