@@ -73,7 +73,7 @@ struct DigitCipherText: View {
 
             if digitElapsed >= flipDuration {
                 result.append(targetChars[i])
-                DispatchQueue.main.async { self.settledIndices.insert(i) }
+                settledIndices.insert(i)
             } else if digitElapsed > 0 {
                 let cycleIndex = Int(digitElapsed * 40)
                 if targetChars[i].isNumber {
@@ -87,7 +87,7 @@ struct DigitCipherText: View {
         }
 
         if settledIndices.count >= targetChars.count {
-            DispatchQueue.main.async { self.flipStartTime = nil }
+            flipStartTime = nil
         }
 
         return result

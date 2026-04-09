@@ -16,8 +16,8 @@ struct ParticleFieldView: View {
             let particles = generateParticles(phase: phase, width: Double(width), height: Double(height))
 
             for p in particles {
-                let adjustedSize = (1.0 + p.depth) * p.size
-                let adjustedOpacity = (0.1 + p.depth * 0.2) * p.opacity
+                let adjustedSize = (1.5 + p.depth * 1.5) * p.size
+                let adjustedOpacity = (0.5 + p.depth * 0.5) * p.opacity
                 let rect = CGRect(
                     x: p.x - adjustedSize / 2,
                     y: p.y - adjustedSize / 2,
@@ -34,7 +34,7 @@ struct ParticleFieldView: View {
                         width: glowSize,
                         height: glowSize
                     )
-                    ctx.fill(Path(ellipseIn: glowRect), with: .color(cyan.opacity(adjustedOpacity * 0.15)))
+                    ctx.fill(Path(ellipseIn: glowRect), with: .color(cyan.opacity(adjustedOpacity * 0.45)))
                 }
             }
         }
@@ -50,13 +50,13 @@ struct ParticleFieldView: View {
         for i in 0..<targetCount {
             let seed = Double(i) * 137.508
             let depth = (sin(seed * 0.7) + 1) / 2
-            let lifetime = 15.0 + sin(seed * 0.3) * 8.0
+            let lifetime = (15.0 + sin(seed * 0.3) * 8.0) / speedMultiplier
 
             let birthPhase = seed.truncatingRemainder(dividingBy: lifetime)
             let age = (phase - birthPhase).truncatingRemainder(dividingBy: lifetime)
             let normalizedAge = ((age / lifetime) + 1.0).truncatingRemainder(dividingBy: 1.0)
 
-            let x = normalizedAge * (width + 100) - 50
+            let x = normalizedAge * (width + 100) * speedMultiplier - 50
             let wobble = sin(phase * 0.5 + seed * 0.2) * 30
             let baseY = (sin(seed * 2.3) + 1) / 2 * height
             let y = baseY + wobble

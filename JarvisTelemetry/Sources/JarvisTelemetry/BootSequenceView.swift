@@ -285,7 +285,7 @@ struct BootTextStream: View {
                 if progress >= line.threshold {
                     let lineAge = progress - line.threshold
                     let opacity = min(1.0, lineAge / 0.03)
-                    let charsToShow = min(line.text.count, Int(lineAge * 600))
+                    let charsToShow = min(line.text.count, Int(lineAge * 67))
                     let displayText = String(line.text.prefix(charsToShow))
 
                     Text(displayText)
