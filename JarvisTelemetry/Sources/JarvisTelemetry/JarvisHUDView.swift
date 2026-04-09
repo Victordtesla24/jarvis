@@ -583,16 +583,16 @@ struct JarvisReactorCanvas: View {
             // Main outer bloom ring — THICK, creates ~34px visible with bloom
             bloomRing(R * 0.95, jarvisSilver, 4.0)
 
-            // 8-segment partial arcs at 0.93R (each ~35 degrees sweep)
-            let segSweep = (pi2 / 8.0) * 0.60  // ~35 degrees each
+            // 8-segment partial arcs at 0.93R — COUNTER-CLOCKWISE rotation
+            let segSweep = (pi2 / 8.0) * 0.60
             for i in 0..<8 {
-                let segStart = Double(i) * (pi2 / 8.0) + 0.08 + ph * 0.02
+                let segStart = Double(i) * (pi2 / 8.0) + 0.08 - ph * 0.03  // CCW
                 let ap = Path { p in p.addArc(center: c, radius: R * 0.93, startAngle: .radians(segStart), endAngle: .radians(segStart + segSweep), clockwise: false) }
                 ctx.stroke(ap, with: .color(jarvisDim.opacity(0.35)), style: StrokeStyle(lineWidth: 3.0, lineCap: .round))
             }
 
-            // 60 tick marks at 0.96R
-            ticks(R * 0.96, 60, 6, jarvisDim.opacity(0.50), 0.8)
+            // 60 tick marks at 0.96R — CLOCKWISE, slow
+            ticks(R * 0.96, 60, 6, jarvisDim.opacity(0.50), 0.8, rot: 0.01)
 
             // ══════════════════════════════════════════════════════════════
             //  ZONE 3: GPU DATA (0.88R)
@@ -617,13 +617,17 @@ struct JarvisReactorCanvas: View {
             // E-core data arcs — white, 10px wide
             dataArc(store.eCoreUsages, R * 0.78, 10.0, jarvisWhite)
 
-            // Segmented structural arc at 0.76R (6 segments)
+            // Segmented structural arc at 0.76R — CLOCKWISE, moderate speed
             let structSweep6 = (pi2 / 6.0) * 0.55
             for i in 0..<6 {
-                let segStart = Double(i) * (pi2 / 6.0) + 0.12 - ph * 0.015
+                let segStart = Double(i) * (pi2 / 6.0) + 0.12 + ph * 0.04  // CW
                 let ap = Path { p in p.addArc(center: c, radius: R * 0.76, startAngle: .radians(segStart), endAngle: .radians(segStart + structSweep6), clockwise: false) }
                 ctx.stroke(ap, with: .color(jarvisDim.opacity(0.30)), style: StrokeStyle(lineWidth: 3.0, lineCap: .round))
             }
+
+            // Half-sweep arc at 0.74R — only covers 180°, rotates CCW slowly
+            let halfStart = ph * -0.02
+            bloomArc(R * 0.74, halfStart, Double.pi, jarvisDim.opacity(0.20), 1.5)
 
             // ══════════════════════════════════════════════════════════════
             //  ZONE 5: P-CORE DATA (0.65R)
@@ -636,8 +640,8 @@ struct JarvisReactorCanvas: View {
             // P-core data arcs — silver, 10px wide
             dataArc(store.pCoreUsages, R * 0.65, 10.0, jarvisSilver)
 
-            // 4 chevrons at 0.63R
-            chevrons(R * 0.63, jarvisWhite.opacity(0.50), 8, 4, rot: 0.05)
+            // 4 chevrons at 0.63R — COUNTER-CLOCKWISE
+            chevrons(R * 0.63, jarvisWhite.opacity(0.50), 8, 4, rot: -0.06)
 
             // ══════════════════════════════════════════════════════════════
             //  ZONE 6: S-CORE DATA (0.55R)
@@ -647,10 +651,12 @@ struct JarvisReactorCanvas: View {
             // S-core data arcs — silver, 8px wide
             dataArc(store.sCoreUsages, R * 0.55, 8.0, jarvisSilver)
 
-            // Segmented arc at 0.53R (8 segments)
+            // Segmented arc at 0.53R — COG TICK motion (steps every 0.5s like a clock)
+            let cogStep = floor(ph * 2.0) / 2.0  // snaps to 0.5s intervals
+            let cogAngle = cogStep * (pi2 / 16.0)  // tick forward by 22.5° per step
             let structSweep8 = (pi2 / 8.0) * 0.50
             for i in 0..<8 {
-                let segStart = Double(i) * (pi2 / 8.0) + 0.20 + ph * 0.03
+                let segStart = Double(i) * (pi2 / 8.0) + 0.20 + cogAngle
                 let ap = Path { p in p.addArc(center: c, radius: R * 0.53, startAngle: .radians(segStart), endAngle: .radians(segStart + structSweep8), clockwise: false) }
                 ctx.stroke(ap, with: .color(jarvisDim.opacity(0.25)), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
             }
@@ -667,7 +673,8 @@ struct JarvisReactorCanvas: View {
             let gearTeeth = 24
             let gearSegAngle = pi2 / Double(gearTeeth)
             for i in 0..<gearTeeth {
-                let a0 = Double(i) * gearSegAngle + ph * 0.08
+                let gearTick = floor(ph * 3.0) / 3.0 * (pi2 / 24.0)  // tick every 0.33s
+                let a0 = Double(i) * gearSegAngle - gearTick  // CCW tick
                 let innerR = R * 0.41
                 let outerR = R * (i % 2 == 0 ? 0.43 : 0.415)
                 let mid = a0 + gearSegAngle * 0.5
@@ -682,13 +689,30 @@ struct JarvisReactorCanvas: View {
             // 12 tick marks at 0.40R
             ticks(R * 0.40, 12, 5, jarvisDim.opacity(0.55), 1.0)
 
-            // 4 small rotating arcs at 0.38R
+            // 4 small arcs at 0.38R — FAST clockwise
             let smallArcSweep = pi2 * 0.08
             for i in 0..<4 {
-                let arcStart = Double(i) * (pi2 / 4.0) + ph * 0.12
+                let arcStart = Double(i) * (pi2 / 4.0) + ph * 0.15  // fast CW
                 let ap = Path { p in p.addArc(center: c, radius: R * 0.38, startAngle: .radians(arcStart), endAngle: .radians(arcStart + smallArcSweep), clockwise: false) }
                 ctx.stroke(ap, with: .color(jarvisCyan.opacity(0.40)), style: StrokeStyle(lineWidth: 2.0, lineCap: .round))
             }
+
+            // 3 arcs at 0.35R — COUNTER-CLOCKWISE, slower
+            for i in 0..<3 {
+                let arcStart = Double(i) * (pi2 / 3.0) - ph * 0.08  // CCW
+                bloomArc(R * 0.35, arcStart, pi2 * 0.12, jarvisDim.opacity(0.25), 1.5)
+            }
+
+            // 6-segment COG ring at 0.32R — tick-steps like a clock
+            let innerCogTick = floor(ph * 1.5) / 1.5 * (pi2 / 12.0)  // tick every 0.67s
+            for i in 0..<6 {
+                let segStart = Double(i) * (pi2 / 6.0) + innerCogTick
+                let ap = Path { p in p.addArc(center: c, radius: R * 0.32, startAngle: .radians(segStart), endAngle: .radians(segStart + pi2 / 6.0 * 0.5), clockwise: false) }
+                ctx.stroke(ap, with: .color(jarvisDim.opacity(0.30)), style: StrokeStyle(lineWidth: 2.0, lineCap: .butt))
+            }
+
+            // Half-sweep accent at 0.48R — 180° arc, smooth CW
+            bloomArc(R * 0.48, ph * 0.05, Double.pi, jarvisDim.opacity(0.15), 1.5)
 
             // ══════════════════════════════════════════════════════════════
             //  ZONE 8: CORE (0R - 0.25R)
@@ -731,39 +755,79 @@ struct JarvisReactorCanvas: View {
             }
             let corePulse = cardiac
 
-            // 15 glow layers (0 -> 20%R spread), white, cinema bloom
-            for layer in 0..<15 {
-                let lr = R * 0.005 + Double(layer) * R * 0.014
-                let lo = (0.20 - Double(layer) * 0.012) * corePulse
+            // 20 glow layers — MASSIVE bloom, the core is a LIGHT SOURCE
+            for layer in 0..<20 {
+                let lr = R * 0.005 + Double(layer) * R * 0.018
+                let lo = (0.30 - Double(layer) * 0.014) * corePulse
                 guard lo > 0 else { continue }
                 let coreRect = CGRect(x: c.x - lr, y: c.y - lr, width: lr * 2, height: lr * 2)
                 ctx.fill(Path(ellipseIn: coreRect), with: .color(jarvisWhite.opacity(lo)))
             }
 
-            // Bright white sphere at 0.03R
-            let hotR = R * 0.03 * corePulse
+            // Bright white sphere at 0.05R — LARGER
+            let hotR = R * 0.05 * corePulse
             let hotRect = CGRect(x: c.x - hotR, y: c.y - hotR, width: hotR * 2, height: hotR * 2)
-            ctx.fill(Path(ellipseIn: hotRect), with: .color(Color.white.opacity(0.70 * corePulse)))
+            ctx.fill(Path(ellipseIn: hotRect), with: .color(Color.white.opacity(0.85 * corePulse)))
 
-            // Center point — pure white, 0.01R
-            let innerR = R * 0.01 * corePulse
+            // Center point — PURE BLAZING white, 0.025R
+            let innerR = R * 0.025 * corePulse
             let innerRect = CGRect(x: c.x - innerR, y: c.y - innerR, width: innerR * 2, height: innerR * 2)
-            ctx.fill(Path(ellipseIn: innerRect), with: .color(Color.white.opacity(1.0 * corePulse)))
+            ctx.fill(Path(ellipseIn: innerRect), with: .color(Color.white.opacity(1.0)))
 
             // ══════════════════════════════════════════════════════════════
             //  RADAR SWEEP — white, with heavy bloom trail
             // ══════════════════════════════════════════════════════════════
 
-            let sweepAngle = (ph.truncatingRemainder(dividingBy: 8.0) / 8.0) * pi2
-            for trail in 0..<12 {
-                let trailAngle = sweepAngle - Double(trail) * 0.02
-                let trailOpacity = (1.0 - Double(trail) / 12.0) * 0.3
-                let sp = Path { p in
-                    p.move(to: CGPoint(x: c.x + cos(trailAngle) * R * 0.25, y: c.y + sin(trailAngle) * R * 0.25))
-                    p.addLine(to: CGPoint(x: c.x + cos(trailAngle) * R * 0.95, y: c.y + sin(trailAngle) * R * 0.95))
-                }
-                ctx.stroke(sp, with: .color(jarvisWhite.opacity(trailOpacity)), style: StrokeStyle(lineWidth: 1.5))
+            // SOPHISTICATED RADAR SWEEP — sweeps 270°, pauses, snaps back
+            // Cycle: 6s sweep (0-270°) → 1s pause → instant snap to start → repeat
+            let sweepCycle = 8.0
+            let sweepTime = ph.truncatingRemainder(dividingBy: sweepCycle)
+            let sweepAngle: Double
+            if sweepTime < 6.0 {
+                // Smooth sweep over 270° with ease-in-out
+                let t = sweepTime / 6.0
+                let eased = t * t * (3.0 - 2.0 * t)  // smoothstep
+                sweepAngle = eased * pi2 * 0.75  // 270 degrees
+            } else if sweepTime < 7.0 {
+                // Pause at 270°
+                sweepAngle = pi2 * 0.75
+            } else {
+                // Snap back (fast return over 1s)
+                let t = (sweepTime - 7.0)
+                sweepAngle = pi2 * 0.75 * (1.0 - t)
             }
+
+            // Main sweep line with bloom
+            let sa = sweepAngle + top
+            let mainSweep = Path { p in
+                p.move(to: CGPoint(x: c.x + cos(sa) * R * 0.15, y: c.y + sin(sa) * R * 0.15))
+                p.addLine(to: CGPoint(x: c.x + cos(sa) * R * 0.96, y: c.y + sin(sa) * R * 0.96))
+            }
+            // Bloom layers for the sweep line
+            ctx.stroke(mainSweep, with: .color(jarvisWhite.opacity(0.06)), style: StrokeStyle(lineWidth: 12))
+            ctx.stroke(mainSweep, with: .color(jarvisWhite.opacity(0.15)), style: StrokeStyle(lineWidth: 4))
+            ctx.stroke(mainSweep, with: .color(jarvisWhite.opacity(0.60)), style: StrokeStyle(lineWidth: 1.5))
+
+            // Trailing afterglow (fading wedge behind sweep)
+            if sweepTime < 6.0 {
+                for trail in 1..<16 {
+                    let trailAngle = sa - Double(trail) * 0.025
+                    let trailOpacity = (1.0 - Double(trail) / 16.0) * 0.18
+                    let sp = Path { p in
+                        p.move(to: CGPoint(x: c.x + cos(trailAngle) * R * 0.20, y: c.y + sin(trailAngle) * R * 0.20))
+                        p.addLine(to: CGPoint(x: c.x + cos(trailAngle) * R * 0.94, y: c.y + sin(trailAngle) * R * 0.94))
+                    }
+                    ctx.stroke(sp, with: .color(jarvisWhite.opacity(trailOpacity)), style: StrokeStyle(lineWidth: 1.0))
+                }
+            }
+
+            // Bright dot at sweep tip
+            let tipX = c.x + cos(sa) * R * 0.96
+            let tipY = c.y + sin(sa) * R * 0.96
+            let tipGlow = CGRect(x: tipX - 6, y: tipY - 6, width: 12, height: 12)
+            ctx.fill(Path(ellipseIn: tipGlow), with: .color(jarvisWhite.opacity(0.15)))
+            let tipDot = CGRect(x: tipX - 2.5, y: tipY - 2.5, width: 5, height: 5)
+            ctx.fill(Path(ellipseIn: tipDot), with: .color(jarvisWhite.opacity(0.80)))
 
             // ══════════════════════════════════════════════════════════════
             //  DEGREE MARKERS — 8 compass points at 1.06R

@@ -67,7 +67,7 @@
 
 <div class="top-bar">
   <div class="top-left">
-    <div class="label1">S.H.I.E.L.D. OS</div>
+    <div class="label1">macOS SILICON</div>
     <div class="label2">JARVIS TELEMETRY v3.1</div>
   </div>
   <div class="top-center" id="topTime"></div>
@@ -97,17 +97,17 @@
 <div class="side-panel" id="leftPanel">
   <div class="panel-box">
     <div class="panel-header"><div class="accent" style="background:rgba(255,200,0,0.5)"></div><div class="name" style="color:rgba(255,200,0,0.55)">DVHOP</div></div>
-    <div class="panel-value" style="color:#FFC800;text-shadow:0 0 3px rgba(255,200,0,0.9),0 0 10px rgba(255,200,0,0.4),0 0 25px rgba(255,200,0,0.15)">0.42%</div>
+    <div class="panel-value" id="dvhopVal" style="color:#FFC800;text-shadow:0 0 3px rgba(255,200,0,0.9),0 0 10px rgba(255,200,0,0.4),0 0 25px rgba(255,200,0,0.15)">0.42%</div>
     <div class="panel-sub" style="color:#FFC800">Hypervisor CPU Tax</div>
   </div>
   <div class="panel-box">
     <div class="panel-header"><div class="accent" style="background:rgba(0,212,255,0.5)"></div><div class="name" style="color:rgba(0,212,255,0.55)">GUMER</div></div>
-    <div class="panel-value" style="color:#00D4FF;text-shadow:0 0 3px rgba(0,212,255,0.9),0 0 10px rgba(0,212,255,0.4),0 0 25px rgba(0,212,255,0.15)">1.24 MB/s</div>
+    <div class="panel-value" id="gumerVal" style="color:#00D4FF;text-shadow:0 0 3px rgba(0,212,255,0.9),0 0 10px rgba(0,212,255,0.4),0 0 25px rgba(0,212,255,0.15)">1.24 MB/s</div>
     <div class="panel-sub" style="color:#00D4FF">UMA Eviction Rate</div>
   </div>
   <div class="panel-box">
     <div class="panel-header"><div class="accent" style="background:rgba(255,38,51,0.5)"></div><div class="name" style="color:rgba(255,38,51,0.55)">CCTC</div></div>
-    <div class="panel-value" style="color:#FF2633;text-shadow:0 0 3px rgba(255,38,51,0.9),0 0 10px rgba(255,38,51,0.4),0 0 25px rgba(255,38,51,0.15)">+2.1°C</div>
+    <div class="panel-value" id="cctcVal" style="color:#FF2633;text-shadow:0 0 3px rgba(255,38,51,0.9),0 0 10px rgba(255,38,51,0.4),0 0 25px rgba(255,38,51,0.15)">+2.1°C</div>
     <div class="panel-sub" style="color:#FF2633">Thermal Cost</div>
   </div>
 </div>
@@ -115,14 +115,14 @@
 <div class="side-panel" id="rightPanel">
   <div class="panel-box" style="text-align:right">
     <div class="panel-header" style="justify-content:flex-end"><div class="name" style="color:rgba(0,212,255,0.35)">THERMAL</div><div class="accent" style="background:rgba(0,212,255,0.25)"></div></div>
-    <div class="panel-row"><div class="label" style="color:#FFC800">CPU</div><div class="val" style="color:#FFC800;text-shadow:0 0 3px rgba(255,200,0,0.7),0 0 10px rgba(255,200,0,0.3)">42.1°C</div></div>
-    <div class="panel-row"><div class="label" style="color:#FFC800">GPU</div><div class="val" style="color:#FFC800;text-shadow:0 0 3px rgba(255,200,0,0.7),0 0 10px rgba(255,200,0,0.3)">38.5°C</div></div>
-    <div class="panel-row"><div class="label" style="color:#00D4FF">ANE</div><div class="val" style="color:#00D4FF;text-shadow:0 0 3px rgba(0,212,255,0.7),0 0 10px rgba(0,212,255,0.3)">0.12W</div></div>
-    <div class="panel-row"><div class="label" style="color:#00D4FF">SWAP</div><div class="val" style="color:#00D4FF;text-shadow:0 0 3px rgba(0,212,255,0.7),0 0 10px rgba(0,212,255,0.3)">12%</div></div>
+    <div class="panel-row"><div class="label" style="color:#FFC800">CPU</div><div class="val" id="cpuTempVal" style="color:#FFC800;text-shadow:0 0 3px rgba(255,200,0,0.7),0 0 10px rgba(255,200,0,0.3)">42.1°C</div></div>
+    <div class="panel-row"><div class="label" style="color:#FFC800">GPU</div><div class="val" id="gpuTempVal" style="color:#FFC800;text-shadow:0 0 3px rgba(255,200,0,0.7),0 0 10px rgba(255,200,0,0.3)">38.5°C</div></div>
+    <div class="panel-row"><div class="label" style="color:#00D4FF">ANE</div><div class="val" id="aneVal" style="color:#00D4FF;text-shadow:0 0 3px rgba(0,212,255,0.7),0 0 10px rgba(0,212,255,0.3)">0.12W</div></div>
+    <div class="panel-row"><div class="label" style="color:#00D4FF">SWAP</div><div class="val" id="swapVal" style="color:#00D4FF;text-shadow:0 0 3px rgba(0,212,255,0.7),0 0 10px rgba(0,212,255,0.3)">12%</div></div>
   </div>
   <div class="panel-box" style="text-align:right">
     <div class="panel-header" style="justify-content:flex-end"><div class="name" style="color:rgba(0,212,255,0.35)">DRAM BW</div><div class="accent" style="background:rgba(0,212,255,0.25)"></div></div>
-    <div class="panel-value" style="color:#00D4FF;text-shadow:0 0 3px rgba(0,212,255,0.8),0 0 12px rgba(0,212,255,0.3)">24.8</div>
+    <div class="panel-value" id="dramVal" style="color:#00D4FF;text-shadow:0 0 3px rgba(0,212,255,0.8),0 0 12px rgba(0,212,255,0.3)">24.8</div>
     <div class="panel-sub" style="color:#00D4FF">GB/s READ</div>
   </div>
 </div>
@@ -143,6 +143,40 @@ const SIM = {
   pCores: [0.45,0.78,0.32,0.56,0.68,0.41,0.73,0.29,0.60,0.85,0.22,0.50],
   sCores: [0.22,0.45,0.67], gpu: 0.42
 };
+
+// Dynamic telemetry simulation — smoothly varying values
+function updateSIM(t) {
+  for (let i = 0; i < SIM.eCores.length; i++)
+    SIM.eCores[i] = 0.15 + 0.55 * (0.5 + 0.5 * Math.sin(t * 0.8 + i * 1.3));
+  for (let i = 0; i < SIM.pCores.length; i++)
+    SIM.pCores[i] = 0.20 + 0.60 * (0.5 + 0.5 * Math.sin(t * 0.6 + i * 0.9 + 2.1));
+  for (let i = 0; i < SIM.sCores.length; i++)
+    SIM.sCores[i] = 0.10 + 0.50 * (0.5 + 0.5 * Math.sin(t * 0.5 + i * 1.8 + 4.0));
+  SIM.gpu = 0.25 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.4 + 1.5));
+
+  // Update live panel values
+  const watts = (14 + 18 * (0.5 + 0.5 * Math.sin(t * 0.35))).toFixed(0);
+  const cpuTemp = (38 + 12 * (0.5 + 0.5 * Math.sin(t * 0.25))).toFixed(1);
+  const gpuTemp = (34 + 10 * (0.5 + 0.5 * Math.sin(t * 0.3 + 1.0))).toFixed(1);
+  const aneW = (0.05 + 0.20 * (0.5 + 0.5 * Math.sin(t * 0.4 + 2.0))).toFixed(2);
+  const swapPct = Math.round(5 + 15 * (0.5 + 0.5 * Math.sin(t * 0.15 + 3.0)));
+  const dramBW = (18 + 14 * (0.5 + 0.5 * Math.sin(t * 0.5 + 0.8))).toFixed(1);
+  const dvhop = (0.20 + 0.40 * (0.5 + 0.5 * Math.sin(t * 0.6 + 1.2))).toFixed(2);
+  const gumer = (0.80 + 1.00 * (0.5 + 0.5 * Math.sin(t * 0.45 + 2.5))).toFixed(2);
+  const cctc = (1.0 + 3.0 * (0.5 + 0.5 * Math.sin(t * 0.3 + 3.5))).toFixed(1);
+
+  const el = (id) => document.getElementById(id);
+  if (el('wattsVal')) el('wattsVal').textContent = watts;
+  if (el('botPower')) el('botPower').textContent = watts + 'W';
+  if (el('dvhopVal')) el('dvhopVal').textContent = dvhop + '%';
+  if (el('gumerVal')) el('gumerVal').textContent = gumer + ' MB/s';
+  if (el('cctcVal')) el('cctcVal').textContent = '+' + cctc + '°C';
+  if (el('cpuTempVal')) el('cpuTempVal').textContent = cpuTemp + '°C';
+  if (el('gpuTempVal')) el('gpuTempVal').textContent = gpuTemp + '°C';
+  if (el('aneVal')) el('aneVal').textContent = aneW + 'W';
+  if (el('swapVal')) el('swapVal').textContent = swapPct + '%';
+  if (el('dramVal')) el('dramVal').textContent = dramBW;
+}
 
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
@@ -605,6 +639,7 @@ function draw() {
   ctx.fillStyle = rgba(CYAN, 0.40);
   ctx.fillText('GPU', cx, cy - R * 0.915 - 14);
 
+  updateSIM(phase);
   phase += 1/60;
   requestAnimationFrame(draw);
 }

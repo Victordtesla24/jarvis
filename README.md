@@ -1,529 +1,412 @@
-# mactop
+  
+  
 
-[![Go Report Card](https://goreportcard.com/badge/github.com/metaspartan/mactop/v2)](https://goreportcard.com/report/github.com/metaspartan/mactop/v2)
-[![GoDoc](https://godoc.org/github.com/metaspartan/mactop?status.svg)](https://godoc.org/github.com/metaspartan/mactop/v2)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/metaspartan/mactop/total) ![GitHub Release](https://img.shields.io/github/v/release/metaspartan/mactop)
 
-[![Homebrew Badge](https://img.shields.io/badge/homebrew-%23FBB040.svg?style=for-the-badge&logo=homebrew&logoColor=black)](https://formulae.brew.sh/formula/mactop)
+```
+     ╔═══════════════════════════════════════════════════════════╗
+     ║                                                           ║
+     ║       ██╗ █████╗ ██████╗ ██╗   ██╗██╗███████╗             ║
+     ║       ██║██╔══██╗██╔══██╗██║   ██║██║██╔════╝             ║
+     ║       ██║███████║██████╔╝██║   ██║██║███████╗             ║
+     ║  ██   ██║██╔══██║██╔══██╗╚██╗ ██╔╝██║╚════██║             ║
+     ║  ╚█████╔╝██║  ██║██║  ██║ ╚████╔╝ ██║███████║             ║
+     ║   ╚════╝ ╚═╝  ╚═╝╚═╝  ╚═╝  ╚═══╝  ╚═╝╚══════╝             ║
+     ║                                                           ║
+     ║          Just A Rather Very Intelligent System            ║
+     ║                                                           ║
+     ╚═══════════════════════════════════════════════════════════╝
+```
 
-`mactop` is a terminal-based monitoring tool "top" designed to display real-time metrics for Apple Silicon chips written by Carsen Klock. It provides a simple and efficient way to monitor CPU and GPU usage, E-Cores and P-Cores, power consumption, GPU frequency, temperatures, and other system metrics directly from your terminal
+  
 
-![mactop](mactop.gif)
 
-## Compatibility
 
-- Apple Silicon Only (ARM64)
-- macOS Monterey 12.3+
 
-## Features
+  
+  
 
-- **No sudo required** - Uses native Apple APIs (SMC, IOReport, IOKit, IOHIDEventSystemClient)
-- Apple Silicon Monitor Top written in Go Lang and CGO
-- Real-time CPU, GPU, ANE, DRAM, and system power wattage usage display
-- GPU frequency and usage percentage display
-- CPU and GPU temperatures + Thermal State
-- **M5 Super Core (S-Core) Support**: Full support for Apple M5's new CPU architecture (E-cores, P-cores, S-cores)
-- **DRAM Bandwidth Monitoring**: Real-time DRAM read/write bandwidth (GB/s) — uses auto-calibrated power-based estimation on M5+ chips (no sudo required)
-- **Comprehensive Temperature Sensors**: All available SMC temperature sensors (CPU Die, GPU, Memory, SSD, Airflow, and more) with human-readable labels
-- **Fan Monitoring**: Real-time fan RPM, target speed, mode (Auto/Manual), and visual RPM bars
-- **Fan Speed Control**: Optional interactive fan speed control via `--fan-control` flag (writes to SMC)
-- Detailed native metrics for CPU cores (E-cores, P-cores, and S-cores on M5+) via Apple's Mach Kernel API
-- Memory usage and swap information
-- Network usage information (upload/download speeds)
-- **Thunderbolt bandwidth monitoring**: Real-time throughput for Thunderbolt Bridge interfaces
-- **Thunderbolt Device Tree**: Visual tree of connected Thunderbolt/USB4 devices and their speeds
-- **RDMA Support**: Detection of RDMA over Thunderbolt 5 availability
-- Disk I/O activity (read/write speeds)
-- Proportional per process GPU usage (experimental)
-- Multiple volume display (shows Mac HD + mounted external volumes)
-- Easy-to-read terminal UI
-- **18 Layouts**: (`l` to cycle layouts)
-- **Persistent Settings**: Remembers your Layout and Theme choice across restarts
-- Customizable UI color (green, red, blue, skyblue, magenta, yellow, gold, silver, white, lime, orange, violet, pink, and more) (`c` to cycle colors)
-- Customizable background color (`b` to cycle colors)
-- Customizable update interval (default is 1000ms) (`-` or `=` to speed up, `+` to slow down)
-- Process list matching htop format (VIRT in GB, CPU normalized by core count)
-- **Process Management**: Kill processes directly from the UI (F9) with safe confirmation.
-- **Process Filter**: Search and filter processes by name (`/`)
-- **Navigation**: Enhanced Vim-like navigation (`g` top, `G` bottom, `j`/`k` scroll)
-- **Headless Mode**: Output JSON metrics to stdout for scripting/logging (`--headless`)
-- **JSON Formatting**: Pretty print JSON output (`--pretty`) or set collection count (`--count <n>`)
-- **Output Formats**: JSON (default), YAML, XML, CSV, and [TOON](https://github.com/toon-format/toon) (`--format <format>`)
-- **Freeze**: Pause/Resume process list updates (`f`)
-- Party Mode (Randomly cycles through colors) (`p` to toggle)
-- Optional Prometheus Metrics server (default is disabled) (`-p <port>` or `--prometheus <port>`)
-  - Exports: CPU/GPU/ANE usage, E/P/S-core averages, per-core usage (labeled by type), power components, DRAM bandwidth (read/write/combined), memory, network, disk, fan RPM, temperature sensors, thermal state, and more
-- **macOS Menu Bar Mode**: Run as a native menu bar status item (`--menubar`) with sparkline charts, CPU/GPU/Memory gauges, power metrics, DRAM bandwidth, fan RPM, and full system stats
-- Support for all Apple Silicon models
-- **Auto-detect Light/Dark Mode**: Automatically adjusts UI colors based on your terminal's background color or system theme.
-- **Configurable Units**: Customize units for network, disk, and temperature display (`--unit-network`, `--unit-disk`, `--unit-temp`)
 
-## Install via Homebrew
+> *"Good evening, sir. I've prepared a full diagnostic of your system."*
 
-You can install [mactop](https://github.com/metaspartan/mactop) via Homebrew! <https://brew.sh>
+  
+
+
+
+
+  
+  
+
+
+---
+
+  
+
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  SYSTEM: ONLINE    REACTOR: NOMINAL    TELEMETRY: STREAMING │
+└─────────────────────────────────────────────────────────────┘
+```
+
+
+
+  
+
+
+## `> SYSTEM.OVERVIEW`
+
+**JARVIS Telemetry** is a cinema-grade macOS heads-up display that transforms your desktop into a real-time Iron Man–style reactor interface. It renders a full-screen arc reactor HUD at wallpaper level — sitting beneath all windows while streaming live Apple Silicon telemetry data from CPU, GPU, memory, and thermal sensors.
+
+Every ring, tick mark, bezel panel, and data arc is drawn at **60fps** in a SwiftUI `Canvas` — no images, no WebKit, no Electron. Pure GPU-accelerated vector rendering.
+
+  
+
+
+
+
+```
+╔═══════════════════════════════════════════════════════════════╗
+║                    ◆ CORE ARCHITECTURE ◆                      ║
+╠═══════════════════════════════════════════════════════════════╣
+║                                                               ║
+║  ┌──────────────┐    JSON Stream    ┌──────────────────────┐  ║
+║  │  Go Daemon   │ ───────────────── │  TelemetryBridge     │  ║
+║  │  (mactop)    │   stdout pipe     │  (Swift Combine)     │  ║
+║  └──────────────┘                   └──────────┬───────────┘  ║
+║                                                │              ║
+║                                     @Published │              ║
+║                                                ▼              ║
+║                                    ┌───────────────────────┐  ║
+║                                    │   TelemetryStore      │  ║
+║                                    │  (ObservableObject)   │  ║
+║                                    └──────────┬────────────┘  ║
+║                                               │               ║
+║                            ┌──────────────────┼────────┐      ║
+║                            ▼                  ▼        ▼      ║
+║                   ┌──────────────┐  ┌─────────────┐ ┌──────┐  ║
+║                   │ ReactorCanvas│  │ Side Panels │ │ Bars │  ║
+║                   │  (220 rings  │  │ (Gauges +   │ │(Time │  ║
+║                   │   + bezels   │  │  HoloPanels)│ │+Date)│  ║
+║                   │   + arcs)    │  │             │ │      │  ║
+║                   └──────────────┘  └─────────────┘ └──────┘  ║
+║                                                               ║
+║              All rendered in NSWindow @ desktopWindow level   ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
+```
+
+
+
+  
+
+
+## `> SUBSYSTEMS`
+
+  
+
+
+
+
+
+| Module          | File                       | Role                                                                |
+| --------------- | -------------------------- | ------------------------------------------------------------------- |
+| `◈ App Entry`   | `JarvisTelemetryApp.swift` | `@main` — delegates to `AppDelegate` for wallpaper window           |
+| `◈ Window Mgr`  | `AppDelegate.swift`        | Creates borderless `NSWindow` at `kCGDesktopWindowLevel` per screen |
+| `◈ Root View`   | `JarvisRootView.swift`     | Orchestrates preloader → HUD transition with phase animation        |
+| `◈ Preloader`   | `JarvisPreloader.swift`    | 3.2s SceneKit cinematic wireframe boot sequence                     |
+| `◈ HUD`         | `JarvisHUDView.swift`      | **1400+ lines** — Full reactor canvas, 15+ view structs             |
+| `◈ Canvas Host` | `AnimatedCanvasHost.swift` | `TimelineView` wrapper driving 60fps phase propagation              |
+| `◈ Bridge`      | `TelemetryBridge.swift`    | Async JSON stream reader from Go daemon via `Process` pipe          |
+| `◈ Store`       | `TelemetryStore.swift`     | `@Published` properties — CPU, GPU, memory, thermals                |
+| `◈ Daemon`      | `mactop/`                  | Go-based Apple Silicon telemetry collector (`--headless` mode)      |
+
+
+
+
+  
+
+
+## `> REACTOR.ANATOMY`
+
+The central reactor is built from **220+ concentric rings** with layered structural detail:
+
+```
+    ┌─────────────────────────────────────────────────────────┐
+    │                                                         │
+    │   1.08R ─── ▓▓▓ OUTER BEZEL (thick industrial steel) ▓▓▓
+    │   0.94R ─── ═══ Amber accent ring ═══                   │
+    │   0.93R ─── ~~~ Rotating glow arcs ~~~                  │
+    │   0.91R ─── ▬▬▬ GPU data arc ▬▬▬                        │
+    │   0.89R ─── ▓▓▓ INTERMEDIATE BEZEL 1 ▓▓▓                │
+    │   0.84R ─── ─── E-Core data ring (cyan) ───             │
+    │   0.78R ─── ▓▓▓ INTERMEDIATE BEZEL 2 ▓▓▓                │
+    │   0.74R ─── ─── P-Core data ring (amber) ───            │
+    │   0.68R ─── ~~~ Mid rotating arcs ~~~                   │
+    │   0.64R ─── ─── S-Core data ring (crimson) ───          │
+    │   0.58R ─── ~~~ Inner rotating arcs ~~~                 │
+    │   0.44R ─── ═══ Reactor boundary glow ═══               │
+    │   0.34R ─── ··· Deep core detail ···                    │
+    │   0.02R ─── ● Core pinpoint glow ●                      │
+    │                                                         │
+    │   + 150-tick outer ring (CW rotation)                   │
+    │   + 100-tick secondary ring (CCW rotation)              │
+    │   + 80/60/48/36/24 tick rings (various speeds)          │
+    │   + Radial spokes at every bezel boundary               │
+    │   + Radar sweep line with trailing glow wedge           │
+    │   + Degree markers at 45° intervals                     │
+    │   + Hex grid background + CRT scan lines                │
+    │                                                         │
+    └─────────────────────────────────────────────────────────┘
+```
+
+  
+
+
+## `> COLOR.PALETTE`
+
+
+
+
+| Swatch  | Name            | Hex       | Role                                            |
+| ------- | --------------- | --------- | ----------------------------------------------- |
+| #00D4FF | **Cyan**        | `#00D4FF` | Primary HUD color — rings, ticks, data arcs     |
+| #69F1F1 | **Cyan Bright** | `#69F1F1` | Highlights, central watt display, glow peaks    |
+| #008CB3 | **Cyan Dim**    | `#008CB3` | Subtle accents, background glow arcs            |
+| #FFC800 | **Amber**       | `#FFC800` | P-Core arcs, bezel accent ring, warm highlights |
+| #FF2633 | **Crimson**     | `#FF2633` | S-Core arcs, thermal alerts, warning state      |
+| #668494 | **Steel**       | `#668494` | Structural rings, bezels, tick marks, spokes    |
+| #050A14 | **Dark Blue**   | `#050A14` | Background — deep space black                   |
+| #00334D | **Grid Blue**   | `#00334D` | Hex grid pattern overlay                        |
+
+
+
+
+  
+
+
+## `> TELEMETRY.CHANNELS`
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ CHANNEL              SOURCE           UPDATE RATE       │
+├─────────────────────────────────────────────────────────┤
+│ CPU Usage (%)        IOKit/HID        1 Hz              │
+│ GPU Usage (%)        IOKit/HID        1 Hz              │
+│ E-Core Usage []      per-core HID     1 Hz              │
+│ P-Core Usage []      per-core HID     1 Hz              │
+│ S-Core Usage []      per-core HID     1 Hz              │
+│ CPU Power (W)        SMC sensors      1 Hz              │
+│ GPU Power (W)        SMC sensors      1 Hz              │
+│ Total Power (W)      SMC sensors      1 Hz              │
+│ SoC Temperature (°C) SMC sensors      1 Hz              │
+│ DRAM Read BW (GB/s)  IOKit counters   1 Hz              │
+│ DRAM Write BW (GB/s) IOKit counters   1 Hz              │
+│ Memory Used (GB)     host_statistics  1 Hz              │
+│ Thermal State        processorSpeed   1 Hz              │
+│ DVHOP CPU Tax (%)    custom metric    1 Hz              │
+│ GUMER UMA Rate (MB/s) custom metric  1 Hz               │
+│ CCTC Thermal Δ (°C)  custom metric    1 Hz              │
+└─────────────────────────────────────────────────────────┘
+```
+
+  
+
+
+## `> INSTALLATION`
+
+### Prerequisites
 
 ```bash
-brew install mactop
+# Required
+→ macOS 14.0+ (Sonoma or later)
+→ Apple Silicon (M1/M2/M3/M4)
+→ Xcode 15+ or Swift 5.9+ toolchain
+→ Go 1.21+ (for daemon compilation)
 ```
+
+### Build & Run
 
 ```bash
-mactop
+# ── 1. Clone ──────────────────────────────────────────────
+git clone https://github.com/Victordtesla24/jarvis.git
+cd jarvis
+
+# ── 2. Build the Go telemetry daemon ─────────────────────
+cd mactop
+go build -o ../JarvisTelemetry/Sources/JarvisTelemetry/Resources/jarvis-mactop-daemon .
+cd ..
+
+# ── 3. Build the Swift HUD application ───────────────────
+cd JarvisTelemetry
+swift build -c release
+
+# ── 4. Run (requires sudo for IOKit sensor access) ───────
+sudo .build/release/JarvisTelemetry
 ```
 
-## Updating via Homebrew
+### Launch at Login (Optional)
 
 ```bash
-brew update
+# Create a launchd plist for auto-start
+cat > ~/Library/LaunchAgents/com.jarvis.telemetry.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.jarvis.telemetry</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/sudo</string>
+        <string>/path/to/JarvisTelemetry</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+launchctl load ~/Library/LaunchAgents/com.jarvis.telemetry.plist
 ```
 
-```bash
-brew upgrade mactop
+  
+
+
+## `> RENDERING.PIPELINE`
+
+```
+┌──────────────┐      ┌──────────────┐     ┌───────────────────┐
+│  TimelineView │ ──► │ Phase Clock  │ ──► │ Canvas { ctx in   │
+│  (.animation) │     │ (continuous) │     │   // 220 rings    │
+└──────────────┘      └──────────────┘     │   // 8 tick sets  │
+                                           │   // 3 bezels     │
+                                           │   // 4 glow arcs  │
+                                           │   // 3 data rings │
+                                           │   // sweep + core │
+                                           │ }                 │
+                                           └───────────────────┘
+                                                    │
+                                                    ▼
+                                           GPU-composited frame
+                                           @ 60 fps per screen
 ```
 
-## Installation
+Every visual element is a `Path` stroke or fill — no `Image`, no `UIBezierPath`, no external textures. The `Canvas` renderer draws **700+ paths per frame** with layered bloom effects achieved through multiple strokes at decreasing opacity and increasing line width.
 
-To install `mactop`, follow these steps:
+  
 
-1. Ensure you have Go installed on your machine. If not, you can install it by following the instructions here: [Go Installation Guide](https://go.dev/doc/install).
 
-2. Clone the repository:
+## `> PROJECT.STRUCTURE`
 
-   ```bash
-   git clone https://github.com/metaspartan/mactop.git
-   cd mactop
-   ```
-
-3. Build the application:
-
-   ```bash
-   go build
-   ```
-
-4. Run the application:
-
-   ```bash
-   ./mactop
-   ```
-
-## Usage
-
-After installation, you can start `mactop` by simply running:
-
-```bash
-./mactop
+```
+jarvis/
+├── JarvisTelemetry/
+│   ├── Package.swift                          # SPM manifest (macOS 14+)
+│   └── Sources/JarvisTelemetry/
+│       ├── JarvisTelemetryApp.swift           # @main entry point
+│       ├── AppDelegate.swift                  # Wallpaper window manager
+│       ├── JarvisRootView.swift               # Preloader → HUD orchestrator
+│       ├── JarvisPreloader.swift              # SceneKit 3.2s boot sequence
+│       ├── AnimatedCanvasHost.swift           # 60fps TimelineView wrapper
+│       ├── JarvisHUDView.swift                # ◆ Full reactor + 15 view structs
+│       ├── TelemetryBridge.swift              # JSON stream from Go daemon
+│       ├── TelemetryStore.swift               # @Published telemetry properties
+│       └── Resources/
+│           └── jarvis-mactop-daemon           # Compiled Go binary (build artifact)
+├── mactop/                                     # Go telemetry daemon source
+│   ├── main.go
+│   ├── go.mod
+│   ├── go.sum
+│   ├── Makefile
+│   └── internal/                               # IOKit + SMC sensor readers
+├── jarvis-hud-preview.html                     # HTML Canvas mirror for previews
+├── hud-preview-screenshot.png                  # Latest rendered preview
+├── real-jarvis-01.jpg                          # Reference: Iron Man HUD
+├── real-jarvis-02.jpg                          # Reference: Iron Man HUD
+├── real-jarvis-03.jpg                          # Reference: Iron Man HUD
+└── README.md                                   # ◄ You are here
 ```
 
-Example with flags:
+  
 
-```bash
-mactop --interval 1000 --foreground green
+
+## `> DESIGN.PHILOSOPHY`
+
+```
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║    "The interface should feel like it was built by        ║
+║     Tony Stark — not rendered by a computer."             ║
+║                                                           ║
+║  ┌─ STEEL OVER NEON ──────────────────────────────────┐   ║
+║  │ Structural gray-steel dominates. Cyan is accent,   │   ║
+║  │ not protagonist. The bezel is dark and industrial. │   ║
+║  └────────────────────────────────────────────────────┘   ║
+║                                                           ║
+║  ┌─ PRECISION OVER GLOW ──────────────────────────────┐   ║
+║  │ Data arcs are thin (3px). Bloom is restrained.     │   ║
+║  │ Every line serves a purpose. No decorative excess. │   ║
+║  └────────────────────────────────────────────────────┘   ║
+║                                                           ║
+║  ┌─ DENSITY CREATES AUTHORITY ────────────────────────┐   ║
+║  │ 220 concentric rings. 700+ paths per frame.        │   ║
+║  │ The complexity IS the aesthetic.                   │   ║
+║  └────────────────────────────────────────────────────┘   ║
+║                                                           ║
+║  ┌─ REAL DATA, REAL TIME ────────────────────────────┐    ║
+║  │ Every colored arc maps to actual sensor data.     │    ║
+║  │ This is a monitoring tool, not a screensaver.     │    ║
+║  └───────────────────────────────────────────────────┘    ║
+║                                                           ║
+╚═══════════════════════════════════════════════════════════╝
 ```
 
-Custom Hex Colors:
+  
 
-```bash
-# Use Dracula theme colors
-mactop --foreground "#9580FF" --bg "#22212C"
+
+## `> REFERENCES`
+
+This project's visual language is inspired by the JARVIS/F.R.I.D.A.Y. interfaces from the **Iron Man** and **Avengers** film series by Marvel Studios, and draws from the open-source sci-fi UI ecosystem:
+
+- **[Arwes](https://arwes.dev/)** — Futuristic sci-fi UI framework (design philosophy reference)
+- **[mactop](https://github.com/context-labs/mactop)** — Apple Silicon telemetry backend
+- **[Encom Boardroom](https://github.com/arscan/enern-boardroom)** — TRON-inspired WebGL globe
+
+  
+
+
+
+
+---
+
+  
+
+
+```
+┌─────────────────────────────────────────────────┐
+│                                                 │
+│   S Y S T E M    S T A T U S :   O N L I N E    │
+│                                                 │
+│          ◈  All reactors nominal  ◈             │
+│          ◈  Telemetry streaming   ◈             │
+│          ◈  HUD rendering @ 60fps ◈             │
+│                                                 │
+└─────────────────────────────────────────────────┘
 ```
 
-Headless Mode (JSON Output):
+  
 
-```bash
-# Run once and exit (great for scripts)
-mactop --headless --count 1
 
-# Run continuously with pretty printing
-mactop --headless --pretty
 
-# Run with different output formats (json, yaml, xml, toon)
-mactop --headless --format toon
-```
 
-## mactop Flags
+  
+  
 
-- `--headless`: Run in headless mode (no TUI, output to stdout).
-- `--format`: Output format for headless mode (json, yaml, xml, toon). Default is json.
-- `--count`: Number of samples to collect in headless mode (0 = infinite).
-- `--pretty`: Pretty print JSON output in headless mode.
-- `--interval` or `-i`: Set the update interval in milliseconds. Default is 1000.
-- `--foreground`: Set the UI foreground color. Accepts named colors (green, red, blue, etc.) or hex colors (#9580FF).
-- `--bg` or `--background`: Set the UI background color. Accepts named colors (mocha-base, etc.) or hex colors (#22212C).
-- `--prometheus` or `-p`: Set and enable the local Prometheus metrics server on the given port. Default is disabled. (e.g. -p 2112 to enable Prometheus metrics on port 2112)
-- `--unit-network`: Network unit: auto, byte, kb, mb, gb (default: auto)
-- `--unit-disk`: Disk unit: auto, byte, kb, mb, gb (default: auto)
-- `--unit-temp`: Temperature unit: celsius, fahrenheit (default: celsius)
-- `--fan-control`: Enable interactive fan speed control (**⚠️ writes to SMC** — use with caution, may require sudo on some macOS versions)
-- `--menubar`: Run as a macOS menu bar status item alongside the TUI.
-- `--overlay`: Run as a floating overlay HUD window with FPS metrics.
-- `--version` or `-v`: Print the version of mactop.
-- `--help` or `-h`: Show a help message about these flags and how to run mactop.
 
-## Theme File Support
+*"Will that be all, sir?"*
 
-Create `~/.mactop/theme.json` to customize colors:
+  
 
-### Basic Colors
 
-```json
-{
-  "foreground": "#9580FF",
-  "background": "#22212C"
-}
-```
-
-### Per-Component Colors (Optional)
-
-Individual component colors that override the foreground:
-
-- `cpu`: CPU gauge, CPU cores widget, CPU history chart
-- `gpu`: GPU gauge, GPU sparkline, GPU history chart
-- `memory`: Memory gauge, Memory history chart
-- `ane`: ANE (Apple Neural Engine) gauge
-- `network`: Network box, Network sparklines
-- `power`: Power box, Power sparkline, Power history chart
-- `thunderbolt`: Thunderbolt/RDMA box
-- `processList`: Process list border and text color
-- `processListDim`: Non-current-user (root/system) process text color (default: grey)
-- `processListSelected`: Selected row foreground text color (default: auto contrast)
-- `systemInfo`: System info box color
-
-### Example: Colorful Theme
-
-```json
-{
-  "foreground": "#B0BEC5",
-  "background": "#212121",
-  "cpu": "#FF5252",
-  "gpu": "#448AFF",
-  "memory": "#69F0AE",
-  "ane": "#E040FB",
-  "network": "#FFAB40",
-  "power": "#FF6E40",
-  "thunderbolt": "#E91E63",
-  "processList": "#FFEB3B",
-  "processListDim": "#555555",
-  "processListSelected": "#FFFFFF",
-  "systemInfo": "#00BCD4"
-}
-```
-
-### Example: Dracula PRO Palette
-
-| Element    | Hex       |
-|------------|-----------|
-| Background | `#22212C` |
-| Foreground | `#F8F8F2` |
-| Purple     | `#9580FF` |
-| Cyan       | `#80FFEA` |
-| Green      | `#8AFF80` |
-| Pink       | `#FF80BF` |
-| Orange     | `#FFCA80` |
-| Red        | `#FF9580` |
-
-Priority order: CLI flags > theme.json > saved config.
-
-## mactop Commands
-
-Use the following keys to interact with the application while its running:
-
-- `q`: Quit the application.
-- `r`: Refresh the UI data manually.
-- `c`: Cycle through the color themes.
-- `b`: Cycle through the background colors.
-- `p`: Party Mode (Randomly cycles through colors)
-- `i`: Toggle Info layout (displays system info)
-- `F` (Shift+f): Toggle Fan & Thermals layout (fan monitoring + all temperature sensors)
-- `l`: Cycle through the 18 available layouts.
-- `+` or `=`: Increase update interval (slower updates).
-- `-`: Decrease update interval (faster updates).
-- `F9`: Kill the currently selected process (pauses updates while selecting).
-- `Arrow Keys` or `h/j/k/l`: Navigate the process list and select columns.
-- `g` / `G`: Jump to the top or bottom of the process list.
-- `/`: Search/Filter the process list by name (Esc to clear).
-- `Enter` or `Space`: Sort by the selected column.
-- `h` or `?`: Toggle the help menu.
-
-### Fan Control Keys (requires `--fan-control` flag, only active in Fan layout)
-
-- `+` or `=`: Increase fan speed (+100 RPM)
-- `-`: Decrease fan speed (-100 RPM)
-- `a`: Toggle auto/manual fan mode
-- `0`: Set all fans to minimum speed
-- `9`: Set all fans to maximum speed
-- `R` (Shift+r): Reset all fans to automatic control
-
-## Example Theme (Green) Screenshot (mactop -c green) on Advanced layout (Hit "l" key to toggle)
-
-![mactop theme](screenshota.png)
-
-## Example Headless Output (mactop --headless --count 1)
-
-```json
-[{
-  "timestamp": "2025-12-22T18:16:57-07:00",
-  "soc_metrics": {
-    "cpu_power": 2.1959999999999997,
-    "gpu_power": 5.38552801,
-    "ane_power": 0,
-    "dram_power": 5.702,
-    "gpu_sram_power": 0.158,
-    "system_power": 37.47166092432617,
-    "total_power": 50.91318893432617,
-    "gpu_freq_mhz": 643,
-    "soc_temp": 62.562572,
-    "cpu_temp": 62.562572,
-    "gpu_temp": 58.38886
-  },
-  "memory": {
-    "total": 137438953472,
-    "used": 74062512128,
-    "available": 63376441344,
-    "swap_total": 5368709120,
-    "swap_used": 4094689280
-  },
-  "net_disk": {
-    "out_packets_per_sec": 589.4371024829012,
-    "out_bytes_per_sec": 196028.18012655922,
-    "in_packets_per_sec": 593.3256375185223,
-    "in_bytes_per_sec": 74461.55739710879,
-    "read_ops_per_sec": 0.32404458630175986,
-    "write_ops_per_sec": 40.18152870141822,
-    "read_kbytes_per_sec": 1.2961783452070395,
-    "write_kbytes_per_sec": 308.4904461592754
-  },
-  "cpu_usage": 15.140564910346725,
-  "gpu_usage": 53.51970510465884,
-  "core_usages": [
-    42.244224422442244,
-    37.17105263157895,
-    55.26315789473685,
-    37.704918032786885,
-    27.21311475409836,
-    21.241830065359476,
-    14.563106796116504,
-    6.148867313915858,
-    4.193548387096775,
-    1.9417475728155338,
-    30.718954248366014,
-    20.846905537459286,
-    1.9417475728155338,
-    1.2944983818770228,
-    0.3236245954692557,
-    0,
-    0,
-    0,
-    0,
-    0
-  ],
-  "system_info": {
-    "name": "Apple M1 Ultra",
-    "core_count": 20,
-    "e_core_count": 4,
-    "p_core_count": 16,
-    "gpu_core_count": 64
-  },
-  "thermal_state": "Normal",
-  "thunderbolt_info": {
-    "buses": [
-      {
-        "name": "TB4 Bus 5",
-        "status": "Active (USB)",
-        "icon": "⏺",
-        "speed": "Up to 40 Gb/s",
-        "domain_uuid": "9FDBA52F-DF7C-425E-B67B-FB80F9E1DCD6",
-        "switch_uid": "0x05AC38BE5E390FE5",
-        "receptacle_id": "6",
-        "devices": [
-          {
-            "name": "ASM236X NVME",
-            "mode": "USB",
-            "info_string": "USB, SSD"
-          }
-        ],
-        "network_stats": {
-          "interface_name": "en7",
-          "bytes_in": 0,
-          "bytes_out": 0,
-          "bytes_in_per_sec": 0,
-          "bytes_out_per_sec": 0,
-          "packets_in": 0,
-          "packets_out": 0
-        }
-      },
-      {
-        "name": "TB4 Bus 4",
-        "status": "Inactive",
-        "icon": "○",
-        "speed": "Up to 40 Gb/s",
-        "domain_uuid": "5DD6DE43-051D-4B32-B044-23E57AA0EEC8",
-        "switch_uid": "0x05AC38BE5E390FE4",
-        "receptacle_id": "5",
-        "network_stats": {
-          "interface_name": "en6",
-          "bytes_in": 0,
-          "bytes_out": 0,
-          "bytes_in_per_sec": 0,
-          "bytes_out_per_sec": 0,
-          "packets_in": 0,
-          "packets_out": 0
-        }
-      },
-      {
-        "name": "TB4 @ TB3 Bus 3",
-        "status": "Active",
-        "icon": "ϟ",
-        "speed": "20 Gb/s",
-        "domain_uuid": "AF4CE493-9005-4E9D-8B8B-0198D27BABA3",
-        "switch_uid": "0x05AC38BE5E390FE3",
-        "receptacle_id": "4",
-        "devices": [
-          {
-            "name": "Studio Display",
-            "vendor": "Apple Inc.",
-            "vendor_id": "0x0001",
-            "mode": "TB3",
-            "switch_uid": "0x0001AFBD0C588A00",
-            "device_id": "0x801F",
-            "info_string": "Apple Inc., TB3"
-          }
-        ],
-        "network_stats": {
-          "interface_name": "en5",
-          "bytes_in": 0,
-          "bytes_out": 0,
-          "bytes_in_per_sec": 0,
-          "bytes_out_per_sec": 0,
-          "packets_in": 0,
-          "packets_out": 0
-        }
-      },
-      {
-        "name": "TB4 Bus 2",
-        "status": "Inactive",
-        "icon": "○",
-        "speed": "Up to 40 Gb/s",
-        "domain_uuid": "D589EEFE-98CF-42EC-A729-6C3E523AA321",
-        "switch_uid": "0x05AC38BE5E390FE2",
-        "receptacle_id": "3",
-        "network_stats": {
-          "interface_name": "en4",
-          "bytes_in": 0,
-          "bytes_out": 0,
-          "bytes_in_per_sec": 0,
-          "bytes_out_per_sec": 0,
-          "packets_in": 0,
-          "packets_out": 0
-        }
-      },
-      {
-        "name": "TB4 Bus 1",
-        "status": "Inactive",
-        "icon": "○",
-        "speed": "Up to 40 Gb/s",
-        "domain_uuid": "6DAC6FCD-E102-4CCD-9D01-A75540E660CA",
-        "switch_uid": "0x05AC38BE5E390FE1",
-        "receptacle_id": "2",
-        "network_stats": {
-          "interface_name": "en3",
-          "bytes_in": 0,
-          "bytes_out": 0,
-          "bytes_in_per_sec": 0,
-          "bytes_out_per_sec": 0,
-          "packets_in": 0,
-          "packets_out": 0
-        }
-      },
-      {
-        "name": "TB4 Bus 0",
-        "status": "Inactive",
-        "icon": "○",
-        "speed": "Up to 40 Gb/s",
-        "domain_uuid": "63A80A32-E70C-4F22-84BE-EDE632A5BA3E",
-        "switch_uid": "0x05AC38BE5E390FE0",
-        "receptacle_id": "1",
-        "network_stats": {
-          "interface_name": "en2",
-          "bytes_in": 0,
-          "bytes_out": 0,
-          "bytes_in_per_sec": 0,
-          "bytes_out_per_sec": 0,
-          "packets_in": 0,
-          "packets_out": 0
-        }
-      }
-    ]
-  },
-  "tb_net_total_bytes_in_per_sec": 0,
-  "tb_net_total_bytes_out_per_sec": 0,
-  "rdma_status": {
-    "available": false,
-    "status": "RDMA Disabled (use rdma_ctl enable in Recovery Mode)"
-  },
-  "cpu_temp": 62.562572,
-  "gpu_temp": 58.38886
-}
-]
-```
-
-## Confirmed tested working Apple Silicon chips
-
-- M1
-- M1 Pro
-- M1 Max
-- M1 Ultra
-- M2
-- M2 Pro
-- M2 Max
-- M2 Ultra
-- M3
-- M3 Pro
-- M3 Max
-- M3 Ultra
-- M4
-- M4 Pro
-- M4 Max
-- A18 Pro
-- M5
-- M5 Pro
-- M5 Max
-
-(If you have a confirmed working Apple Silicon chip that is not listed, please open an issue, so we may add it here!)
-
-## Contributing
-
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-1. Fork mactop
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## What does mactop use to get real-time data?
-
-- **Apple SMC**: For SoC temperature sensors, System Power (PSTR), fan speed monitoring (FNum, F*Ac/Mn/Mx/Tg/Md), fan speed control via SMCWrite, and comprehensive temperature sensor enumeration
-- **IOReport API**: For CPU, GPU, ANE, and DRAM power consumption (no sudo required) — DRAM power is also used for auto-calibrated bandwidth estimation on M5+ chips
-- **IOKit**: For GPU frequency table from `pmgr` device
-- **IOHIDEventSystemClient**: Fallback for SoC temperature sensors
-- **NSProcessInfo.thermalState**: For system thermal state (Nominal/Fair/Serious/Critical)
-- **Mach Kernel API** (`host_processor_info`): For CPU metrics (E-cores, P-cores, and S-cores on M5+) via CGO
-
-## License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
-## Author and Contact
-
-Carsen Klock - [@carsenklock](https://x.com/carsenklock)
-
-Project Link: [https://github.com/metaspartan/mactop](https://github.com/metaspartan/mactop)
-
-## Disclaimer
-
-This tool is not officially supported by Apple. It is provided as is, and may not work as expected. Use at your own risk.
-
-## Acknowledgements
-
-- [gotui](https://github.com/metaspartan/gotui) for the modern terminal UI framework.
-- [asitop](https://github.com/tlkh/asitop) for the original inspiration!
-- [htop](https://github.com/htop-dev/htop) for the process list and CPU cores inspiration!

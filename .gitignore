@@ -1,7 +1,25 @@
-/logs
-/mactop
-mactop
-dist
+# ── Build artifacts ──────────────────────────────────────
+.build/
+*.o
+*.d
+*.swp
+DerivedData/
+
+# ── macOS system files ──────────────────────────────────
 .DS_Store
+*.xcuserdata
+
+# ── IDE ─────────────────────────────────────────────────
+.vscode/
 .idea/
-.ai/
+*.xcworkspace/
+
+# ── Go daemon binary (build from source) ────────────────
+jarvis-mactop-daemon
+JarvisTelemetry/Sources/JarvisTelemetry/Resources/jarvis-mactop-daemon
+
+# ── mactop submodule build artifacts ────────────────────
+mactop/mactop
+mactop/.git
+mactop/mactop.gif
+mactop/screenshota.png
