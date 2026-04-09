@@ -11,6 +11,7 @@ struct JarvisHUDView: View {
     @EnvironmentObject var store: TelemetryStore
     @Environment(\.animationPhase) var phase
     @StateObject private var chatterEngine = ChatterEngine()
+    @StateObject private var awarenessEngine = AwarenessEngine()
 
     // ── Jarvis color palette (matched from reference screenshots) ────────
     private let cyan      = Color(red: 0.00, green: 0.83, blue: 1.00)   // #00D4FF — primary
@@ -115,10 +116,14 @@ struct JarvisHUDView: View {
                 ChatterStreamView(engine: chatterEngine, alignment: .right, phase: phase)
                     .frame(width: w * 0.18, alignment: .trailing)
                     .position(x: w * 0.88, y: h * 0.65)
+
+                // ── 11. AWARENESS PULSES ────────────────────────────────
+                AwarenessPulseOverlay(engine: awarenessEngine, cx: cx, cy: cy)
             }
             .holographicFlicker(phase: phase)
             .onAppear {
                 chatterEngine.bind(to: store)
+                awarenessEngine.bind(to: store)
             }
         }
     }
