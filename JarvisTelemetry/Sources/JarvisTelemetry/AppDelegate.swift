@@ -1,4 +1,5 @@
 // File: Sources/JarvisTelemetry/AppDelegate.swift
+
 import AppKit
 import SwiftUI
 
@@ -6,9 +7,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var wallpaperWindows: [NSWindow] = []
     private let bridge = TelemetryBridge()
+    private let phaseController = HUDPhaseController()
+    private var lifecycleObserver: ProcessLifecycleObserver?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory) // No Dock icon
+        NSApp.setActivationPolicy(.accessory)
+
+        lifecycleObserver = ProcessLifecycleObserver(
+            phaseController: phaseController,
+            bridge: bridge
+        )
 
         setupWallpaperWindows()
         bridge.start()
@@ -18,23 +26,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bridge.stop()
     }
 
-    // MARK: - Wallpaper Window Construction
-
     private func setupWallpaperWindows() {
-        // Remove existing wallpaper windows
-        for win in wallpaperWindows {
-            win.orderOut(nil)
-        }
+        for win in wallpaperWindows { win.orderOut(nil) }
         wallpaperWindows.removeAll()
 
-        // Enumerate all active screens and create one wallpaper window per screen
         for screen in NSScreen.screens {
             let win = buildWallpaperWindow(for: screen)
             win.makeKeyAndOrderFront(nil)
             wallpaperWindows.append(win)
         }
 
-        // Handle screen configuration changes (plug/unplug monitors)
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screensDidChange),
@@ -52,24 +53,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             screen:       screen
         )
 
-        // ── WALLPAPER LAYER ENFORCEMENT ──────────────────────────────────
-        // kCGDesktopWindowLevel renders the window BELOW Finder icons and
-        // all application windows. This is the canonical macOS wallpaper level.
         win.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopWindow)))
-
         win.backgroundColor     = .clear
         win.isOpaque            = false
         win.hasShadow           = false
-        win.ignoresMouseEvents  = true   // Desktop remains interactive
-        win.collectionBehavior  = [
-            .canJoinAllSpaces,
-            .stationary,
-            .ignoresCycle       // Cmd+Tab skips this window
-        ]
+        win.ignoresMouseEvents  = true
+        win.collectionBehavior  = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 
-        // ── ROOT VIEW ────────────────────────────────────────────────────
         let rootView = JarvisRootView()
             .environmentObject(bridge)
+            .environmentObject(phaseController)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         let hostingView = NSHostingView(rootView: rootView)
@@ -82,7 +75,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func screensDidChange() {
-        // Re-create windows for newly connected screens
         setupWallpaperWindows()
     }
 }
