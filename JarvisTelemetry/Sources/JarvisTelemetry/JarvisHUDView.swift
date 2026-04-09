@@ -90,33 +90,102 @@ struct JarvisHUDView: View {
                 CentralStatsView().environmentObject(store)
                     .position(x: cx, y: cy)
 
-                // ── 8. LEFT ARM — extends from reactor ─────────────────
-                JarvisArmPanel(
-                    side: .left,
-                    cx: cx, cy: cy, R: R,
-                    width: w, height: h,
-                    phase: phase,
-                    panels: [
-                        ArmPanelData(label: "GPU", value: String(format: "%.0f%%", store.gpuUsage * 100), sub: "UTILIZATION"),
-                        ArmPanelData(label: "DVHOP", value: String(format: "%.2f%%", store.dvhopCPUPct), sub: "HYPERVISOR TAX"),
-                        ArmPanelData(label: "GUMER", value: String(format: "%.2f", store.gumerMBs), sub: "MB/s EVICTION"),
-                        ArmPanelData(label: "CCTC", value: String(format: "+%.1f\u{00B0}C", store.cctcDeltaC), sub: "THERMAL COST"),
-                    ]
-                )
+                // ── 8. LEFT PANEL ───────────────────────────────────────
+                VStack(spacing: 10) {
+                    // Circular gauges row
+                    HStack(spacing: 8) {
+                        JarvisCircularGauge(
+                            value: min(store.cpuTemp / 100.0, 1.0),
+                            displayValue: String(format: "%.1f", store.cpuTemp),
+                            unit: "\u{00B0}C", label: "CPU TEMP",
+                            size: 56, phase: phase
+                        )
+                        JarvisCircularGauge(
+                            value: min(store.gpuTemp / 100.0, 1.0),
+                            displayValue: String(format: "%.1f", store.gpuTemp),
+                            unit: "\u{00B0}C", label: "GPU TEMP",
+                            size: 56, phase: phase
+                        )
+                    }
 
-                // ── 9. RIGHT ARM — extends from reactor ────────────────
-                JarvisArmPanel(
-                    side: .right,
-                    cx: cx, cy: cy, R: R,
-                    width: w, height: h,
-                    phase: phase,
-                    panels: [
-                        ArmPanelData(label: "CPU", value: String(format: "%.1f\u{00B0}C", store.cpuTemp), sub: "TEMPERATURE"),
-                        ArmPanelData(label: "GPU", value: String(format: "%.1f\u{00B0}C", store.gpuTemp), sub: "TEMPERATURE"),
-                        ArmPanelData(label: "MEMORY", value: String(format: "%.1f / %.0f GB", store.memoryUsedGB, store.memoryTotalGB), sub: "UNIFIED"),
-                        ArmPanelData(label: "DRAM", value: String(format: "%.1f GB/s", store.dramReadBW), sub: "BANDWIDTH"),
-                    ]
-                )
+                    // Data rows
+                    JarvisPanelBox {
+                        VStack(spacing: 4) {
+                            JarvisDataRow(label: "DVHOP", value: String(format: "%.2f%%", store.dvhopCPUPct))
+                            JarvisDataRow(label: "GUMER", value: String(format: "%.2f MB/s", store.gumerMBs))
+                            JarvisDataRow(label: "CCTC", value: String(format: "+%.1f\u{00B0}C", store.cctcDeltaC))
+                            JarvisDataRow(label: "ANE", value: String(format: "%.2fW", store.anePower))
+                        }
+                    }
+
+                    // Core bars
+                    JarvisPanelBox {
+                        VStack(spacing: 6) {
+                            JarvisCoreBarGauge(values: store.eCoreUsages, label: "E-CORES")
+                            JarvisCoreBarGauge(values: store.pCoreUsages, label: "P-CORES")
+                            if !store.sCoreUsages.isEmpty {
+                                JarvisCoreBarGauge(values: store.sCoreUsages, label: "S-CORES")
+                            }
+                        }
+                    }
+                }
+                .frame(width: w * 0.12)
+                .position(x: w * 0.07, y: h * 0.45)
+
+                // ── 9. RIGHT PANEL ──────────────────────────────────────
+                VStack(spacing: 10) {
+                    // GPU gauge — larger
+                    JarvisCircularGauge(
+                        value: store.gpuUsage,
+                        displayValue: String(format: "%.0f", store.gpuUsage * 100),
+                        unit: "%", label: "GPU USAGE",
+                        size: 68, phase: phase
+                    )
+
+                    // Data rows
+                    JarvisPanelBox {
+                        VStack(spacing: 4) {
+                            JarvisDataRow(label: "MEMORY", value: String(format: "%.1f / %.0f GB", store.memoryUsedGB, store.memoryTotalGB))
+                            JarvisDataRow(label: "SWAP", value: String(format: "%.0f%%", store.swapPressure * 100))
+                            JarvisDataRow(label: "DRAM RD", value: String(format: "%.1f GB/s", store.dramReadBW))
+                            JarvisDataRow(label: "DRAM WR", value: String(format: "%.1f GB/s", store.dramWriteBW))
+                        }
+                    }
+
+                    // Power bar
+                    JarvisPanelBox {
+                        VStack(alignment: .leading, spacing: 3) {
+                            JarvisDataRow(label: "POWER", value: String(format: "%.0fW", store.totalPower))
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(Color.white.opacity(0.06))
+                                        .frame(height: 4)
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(Color.white.opacity(0.60))
+                                        .frame(width: geo.size.width * min(store.totalPower / 60.0, 1.0), height: 4)
+                                    RoundedRectangle(cornerRadius: 1)
+                                        .fill(Color.white.opacity(0.08))
+                                        .frame(width: geo.size.width * min(store.totalPower / 60.0, 1.0), height: 10)
+                                        .blur(radius: 2)
+                                }
+                            }
+                            .frame(height: 10)
+
+                            HStack {
+                                Text("THERMAL")
+                                    .font(.custom("Menlo", size: 6)).tracking(2)
+                                    .foregroundColor(Color(red: 0.4, green: 0.45, blue: 0.5).opacity(0.70))
+                                Spacer()
+                                Text(store.thermalState.uppercased())
+                                    .font(.custom("Menlo", size: 8)).fontWeight(.medium)
+                                    .foregroundColor(Color.white.opacity(0.70))
+                            }
+                        }
+                    }
+                }
+                .frame(width: w * 0.13)
+                .position(x: w * 0.935, y: h * 0.45)
 
                 // ── 10. CHATTER STREAMS ─────────────────────────────────
                 ChatterStreamView(engine: chatterEngine, alignment: .left, phase: phase)
@@ -890,134 +959,143 @@ struct JarvisReactorCanvas: View {
 
 // MARK: - JARVIS Arm Panels ──────────────────────────────────────────────────
 
-enum ArmSide { case left, right }
+// MARK: - JarvisCircularGauge ────────────────────────────────────────────────
 
-struct ArmPanelData {
-    let label: String
-    let value: String
-    let sub: String
-}
-
-struct JarvisArmPanel: View {
-    let side: ArmSide
-    let cx: CGFloat, cy: CGFloat, R: CGFloat
-    let width: CGFloat, height: CGFloat
+struct JarvisCircularGauge: View {
+    let value: Double      // 0.0-1.0 normalized
+    let displayValue: String  // e.g. "42.1"
+    let unit: String       // e.g. "°C"
+    let label: String      // e.g. "CPU TEMP"
+    let size: CGFloat      // diameter
     let phase: Double
-    let panels: [ArmPanelData]
-
-    // Unified JARVIS palette
-    private let jarvisWhite = Color.white
-    private let jarvisSilver = Color(red: 0.85, green: 0.90, blue: 0.95)
-    private let jarvisDim = Color(red: 0.4, green: 0.45, blue: 0.5)
 
     var body: some View {
-        let isLeft = side == .left
-        let panelX = isLeft ? width * 0.06 : width * 0.94
-        let armOriginX = cx + (isLeft ? -R * 0.98 : R * 0.98)
-        let armOriginY = cy
-
         ZStack {
-            // ── CONNECTING ARM LINE from reactor to panel zone ──
-            Canvas { ctx, size in
-                // Main arm line — horizontal from reactor edge to panel
-                let startX = armOriginX
-                let endX = isLeft ? panelX + 70 : panelX - 70
+            // Track arc (270°)
+            Circle()
+                .trim(from: 0.125, to: 0.875)
+                .stroke(Color.white.opacity(0.08), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .frame(width: size, height: size)
 
-                // Arm with 90-degree bend
-                let bendY = armOriginY - CGFloat(panels.count) * 28
-                let armPath = Path { p in
-                    p.move(to: CGPoint(x: startX, y: armOriginY))
-                    p.addLine(to: CGPoint(x: endX, y: armOriginY))
-                    p.addLine(to: CGPoint(x: endX, y: bendY))
-                }
+            // Bloom behind fill
+            Circle()
+                .trim(from: 0.125, to: 0.125 + 0.75 * min(value, 1.0))
+                .stroke(Color.white.opacity(0.10), style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                .frame(width: size, height: size)
+                .blur(radius: 2)
 
-                // Bloom on arm line
-                ctx.stroke(armPath, with: .color(jarvisWhite.opacity(0.04)), style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round))
-                ctx.stroke(armPath, with: .color(jarvisWhite.opacity(0.10)), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
-                ctx.stroke(armPath, with: .color(jarvisWhite.opacity(0.40)), style: StrokeStyle(lineWidth: 1.0, lineCap: .round, lineJoin: .round))
+            // Fill arc
+            Circle()
+                .trim(from: 0.125, to: 0.125 + 0.75 * min(value, 1.0))
+                .stroke(Color.white.opacity(0.80), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .frame(width: size, height: size)
 
-                // Small node dot at reactor junction
-                let nodeDot = CGRect(x: startX - 3, y: armOriginY - 3, width: 6, height: 6)
-                ctx.fill(Path(ellipseIn: nodeDot), with: .color(jarvisWhite.opacity(0.60)))
-
-                // Branch lines to each panel
-                for (i, _) in panels.enumerated() {
-                    let panelY = armOriginY - 80 + CGFloat(i) * 56
-                    let branchStart = CGPoint(x: endX, y: panelY)
-                    let branchEnd = CGPoint(x: isLeft ? panelX + 8 : panelX - 8, y: panelY)
-
-                    let branchPath = Path { p in
-                        p.move(to: branchStart)
-                        p.addLine(to: branchEnd)
-                    }
-                    ctx.stroke(branchPath, with: .color(jarvisWhite.opacity(0.06)), style: StrokeStyle(lineWidth: 8))
-                    ctx.stroke(branchPath, with: .color(jarvisWhite.opacity(0.25)), style: StrokeStyle(lineWidth: 1.0))
-
-                    // Connector dot
-                    let dot = CGRect(x: branchEnd.x - 2, y: branchEnd.y - 2, width: 4, height: 4)
-                    ctx.fill(Path(ellipseIn: dot), with: .color(jarvisWhite.opacity(0.50)))
-                }
+            // 12 tick marks
+            ForEach(0..<12, id: \.self) { i in
+                let angle = 135.0 + Double(i) * (270.0 / 11.0)
+                Rectangle()
+                    .fill(Color.white.opacity(i % 3 == 0 ? 0.40 : 0.15))
+                    .frame(width: 0.5, height: i % 3 == 0 ? 5 : 3)
+                    .offset(y: -size / 2 + 2)
+                    .rotationEffect(.degrees(angle))
             }
-            .allowsHitTesting(false)
 
-            // ── PANEL CARDS ──
-            VStack(alignment: isLeft ? .leading : .trailing, spacing: 12) {
-                ForEach(Array(panels.enumerated()), id: \.offset) { _, panel in
-                    JarvisDataCard(
-                        label: panel.label,
-                        value: panel.value,
-                        sub: panel.sub,
-                        alignment: isLeft ? .leading : .trailing,
-                        phase: phase
-                    )
-                }
+            // Value + unit
+            VStack(spacing: 0) {
+                Text(displayValue)
+                    .font(.custom("Menlo", size: size * 0.28)).fontWeight(.bold)
+                    .foregroundColor(Color.white.opacity(0.85))
+                Text(unit)
+                    .font(.custom("Menlo", size: size * 0.12))
+                    .foregroundColor(Color.white.opacity(0.40))
             }
-            .frame(width: width * 0.13)
-            .position(x: panelX, y: cy - 10)
+        }
+        .frame(width: size, height: size)
+        .overlay(alignment: .bottom) {
+            Text(label)
+                .font(.custom("Menlo", size: 6)).tracking(2)
+                .foregroundColor(Color(red: 0.4, green: 0.45, blue: 0.5).opacity(0.70))
+                .offset(y: 8)
         }
     }
 }
 
-struct JarvisDataCard: View {
+// MARK: - JarvisDataRow ──────────────────────────────────────────────────────
+
+struct JarvisDataRow: View {
     let label: String
     let value: String
-    let sub: String
-    let alignment: HorizontalAlignment
-    let phase: Double
-
-    private let jarvisWhite = Color.white
-    private let jarvisSilver = Color(red: 0.85, green: 0.90, blue: 0.95)
-    private let jarvisDim = Color(red: 0.4, green: 0.45, blue: 0.5)
 
     var body: some View {
-        VStack(alignment: alignment, spacing: 2) {
-            // Label
+        HStack {
             Text(label)
-                .font(.custom("Menlo", size: 7)).tracking(3)
-                .foregroundColor(jarvisDim.opacity(0.70))
-
-            // Value — large, bright
+                .font(.custom("Menlo", size: 7)).tracking(2)
+                .foregroundColor(Color(red: 0.4, green: 0.45, blue: 0.5).opacity(0.70))
+            Spacer()
             Text(value)
-                .font(.custom("Menlo", size: 16)).fontWeight(.bold)
-                .foregroundColor(jarvisWhite.opacity(0.85))
-                .shadow(color: jarvisWhite.opacity(0.20), radius: 8)
-                .shadow(color: jarvisWhite.opacity(0.10), radius: 16)
-
-            // Sub-label
-            Text(sub)
-                .font(.custom("Menlo", size: 6)).tracking(2)
-                .foregroundColor(jarvisDim.opacity(0.45))
+                .font(.custom("Menlo", size: 10)).fontWeight(.medium)
+                .foregroundColor(Color.white.opacity(0.80))
+                .shadow(color: Color.white.opacity(0.15), radius: 4)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color.black.opacity(0.40))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 2)
-                .stroke(jarvisWhite.opacity(0.12), lineWidth: 0.5)
-        )
+    }
+}
+
+// MARK: - JarvisCoreBarGauge ─────────────────────────────────────────────────
+
+struct JarvisCoreBarGauge: View {
+    let values: [Double]
+    let label: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(.custom("Menlo", size: 6)).tracking(2)
+                .foregroundColor(Color(red: 0.4, green: 0.45, blue: 0.5).opacity(0.70))
+
+            HStack(spacing: 1.5) {
+                ForEach(Array(values.enumerated()), id: \.offset) { _, val in
+                    ZStack(alignment: .bottom) {
+                        // Track
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.white.opacity(0.06))
+                            .frame(width: 4, height: 24)
+                        // Fill
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.white.opacity(0.65))
+                            .frame(width: 4, height: max(1, CGFloat(val) * 24))
+                        // Bloom
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.white.opacity(0.10))
+                            .frame(width: 8, height: max(1, CGFloat(val) * 24))
+                            .blur(radius: 2)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - JarvisPanelBox ─────────────────────────────────────────────────────
+
+struct JarvisPanelBox<Content: View>: View {
+    let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.black.opacity(0.50))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 3)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 0.5)
+            )
     }
 }
 
