@@ -9,12 +9,13 @@ import SwiftUI
 struct AnimatedCanvasHost: View {
 
     @EnvironmentObject var store: TelemetryStore
+    @EnvironmentObject var phaseController: HUDPhaseController
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { timeline in
             JarvisHUDView()
                 .environmentObject(store)
-                // Pass timeline.date for per-frame phase offset animations
+                .environmentObject(phaseController)
                 .environment(\.animationPhase, timeline.date.timeIntervalSinceReferenceDate)
         }
     }
