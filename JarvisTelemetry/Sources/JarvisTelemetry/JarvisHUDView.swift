@@ -12,6 +12,7 @@ struct JarvisHUDView: View {
     @Environment(\.animationPhase) var phase
     @StateObject private var chatterEngine = ChatterEngine()
     @StateObject private var awarenessEngine = AwarenessEngine()
+    @StateObject private var floatingPanelManager = FloatingPanelManager()
 
     // ── Jarvis color palette (matched from reference screenshots) ────────
     private let cyan      = Color(red: 0.00, green: 0.83, blue: 1.00)   // #00D4FF — primary
@@ -119,11 +120,15 @@ struct JarvisHUDView: View {
 
                 // ── 11. AWARENESS PULSES ────────────────────────────────
                 AwarenessPulseOverlay(engine: awarenessEngine, cx: cx, cy: cy)
+
+                // ── 12. FLOATING DIAGNOSTIC PANELS ──────────────────────
+                FloatingPanelOverlay(manager: floatingPanelManager, cyan: cyan, amber: amber)
             }
             .holographicFlicker(phase: phase)
             .onAppear {
                 chatterEngine.bind(to: store)
                 awarenessEngine.bind(to: store)
+                floatingPanelManager.bind(to: store)
             }
         }
     }
