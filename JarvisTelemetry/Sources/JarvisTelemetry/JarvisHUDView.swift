@@ -123,6 +123,9 @@ struct JarvisHUDView: View {
 
                 // ── 12. FLOATING DIAGNOSTIC PANELS ──────────────────────
                 FloatingPanelOverlay(manager: floatingPanelManager, cyan: cyan, amber: amber)
+
+                // ── 13. SCANNER SWEEP ───────────────────────────────────
+                ScannerSweepOverlay(width: w, height: h, phase: phase, cyan: cyan)
             }
             .holographicFlicker(phase: phase)
             .onAppear {
