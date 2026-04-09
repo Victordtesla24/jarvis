@@ -90,26 +90,33 @@ struct JarvisHUDView: View {
                 CentralStatsView().environmentObject(store)
                     .position(x: cx, y: cy)
 
-                // ── 8. LEFT PANEL STACK ──────────────────────────────────
-                VStack(alignment: .leading, spacing: 16) {
-                    MiniArcGauge(value: store.gpuUsage, label: "GPU", color: cyan, phase: phase)
-                    HoloPanelView(name: "DVHOP", value: String(format: "%.2f%%", store.dvhopCPUPct), sub: "Hypervisor CPU Tax", color: amber, style: .left)
-                    HoloPanelView(name: "GUMER", value: String(format: "%.2f MB/s", store.gumerMBs), sub: "UMA Eviction Rate", color: cyan, style: .left)
-                    HoloPanelView(name: "CCTC", value: String(format: "+%.1f\u{00B0}C", store.cctcDeltaC), sub: "Thermal Cost", color: crimson, style: .left)
-                    VerticalBarGauge(values: store.eCoreUsages, label: "E-CORES", color: cyan, phase: phase)
-                }
-                .frame(width: w * 0.14)
-                .position(x: w * 0.085, y: h * 0.48)
+                // ── 8. LEFT ARM — extends from reactor ─────────────────
+                JarvisArmPanel(
+                    side: .left,
+                    cx: cx, cy: cy, R: R,
+                    width: w, height: h,
+                    phase: phase,
+                    panels: [
+                        ArmPanelData(label: "GPU", value: String(format: "%.0f%%", store.gpuUsage * 100), sub: "UTILIZATION"),
+                        ArmPanelData(label: "DVHOP", value: String(format: "%.2f%%", store.dvhopCPUPct), sub: "HYPERVISOR TAX"),
+                        ArmPanelData(label: "GUMER", value: String(format: "%.2f", store.gumerMBs), sub: "MB/s EVICTION"),
+                        ArmPanelData(label: "CCTC", value: String(format: "+%.1f\u{00B0}C", store.cctcDeltaC), sub: "THERMAL COST"),
+                    ]
+                )
 
-                // ── 9. RIGHT PANEL STACK ─────────────────────────────────
-                VStack(alignment: .trailing, spacing: 16) {
-                    MiniArcReactor(phase: phase, cyan: cyan, cyanBright: cyanBright)
-                    PowerThermalPanel().environmentObject(store)
-                    DRAMBandwidthPanel().environmentObject(store)
-                    VerticalBarGauge(values: store.pCoreUsages, label: "P-CORES", color: amber, phase: phase)
-                }
-                .frame(width: w * 0.16)
-                .position(x: w * 0.92, y: h * 0.48)
+                // ── 9. RIGHT ARM — extends from reactor ────────────────
+                JarvisArmPanel(
+                    side: .right,
+                    cx: cx, cy: cy, R: R,
+                    width: w, height: h,
+                    phase: phase,
+                    panels: [
+                        ArmPanelData(label: "CPU", value: String(format: "%.1f\u{00B0}C", store.cpuTemp), sub: "TEMPERATURE"),
+                        ArmPanelData(label: "GPU", value: String(format: "%.1f\u{00B0}C", store.gpuTemp), sub: "TEMPERATURE"),
+                        ArmPanelData(label: "MEMORY", value: String(format: "%.1f / %.0f GB", store.memoryUsedGB, store.memoryTotalGB), sub: "UNIFIED"),
+                        ArmPanelData(label: "DRAM", value: String(format: "%.1f GB/s", store.dramReadBW), sub: "BANDWIDTH"),
+                    ]
+                )
 
                 // ── 10. CHATTER STREAMS ─────────────────────────────────
                 ChatterStreamView(engine: chatterEngine, alignment: .left, phase: phase)
@@ -124,10 +131,10 @@ struct JarvisHUDView: View {
                 AwarenessPulseOverlay(engine: awarenessEngine, cx: cx, cy: cy)
 
                 // ── 12. FLOATING DIAGNOSTIC PANELS ──────────────────────
-                FloatingPanelOverlay(manager: floatingPanelManager, cyan: cyan, amber: amber)
+                FloatingPanelOverlay(manager: floatingPanelManager, cyan: Color.white, amber: Color(red: 0.85, green: 0.90, blue: 0.95))
 
                 // ── 13. SCANNER SWEEP ───────────────────────────────────
-                ScannerSweepOverlay(width: w, height: h, phase: phase, cyan: cyan)
+                ScannerSweepOverlay(width: w, height: h, phase: phase, cyan: Color.white)
             }
             .holographicFlicker(phase: phase)
             .onAppear {
@@ -330,10 +337,10 @@ struct TopBarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("macOS SILICON")
                         .font(.custom("Menlo", size: 10)).tracking(4)
-                        .foregroundColor(cyan.opacity(0.7))
+                        .foregroundColor(Color.white.opacity(0.60))
                     Text("JARVIS TELEMETRY v3.1")
                         .font(.custom("Menlo", size: 8)).tracking(3)
-                        .foregroundColor(cyan.opacity(0.45))
+                        .foregroundColor(Color(red: 0.85, green: 0.90, blue: 0.95).opacity(0.40))
                 }
 
                 Spacer()
@@ -341,10 +348,10 @@ struct TopBarView: View {
                 // Center: Time
                 Text(store.timeString)
                     .font(.custom("Menlo", size: 26)).fontWeight(.light)
-                    .foregroundColor(cyan)
-                    .shadow(color: cyan.opacity(0.9), radius: 4)
-                    .shadow(color: cyan.opacity(0.4), radius: 16)
-                    .shadow(color: cyan.opacity(0.15), radius: 40)
+                    .foregroundColor(Color.white)
+                    .shadow(color: Color.white.opacity(0.7), radius: 4)
+                    .shadow(color: Color.white.opacity(0.3), radius: 16)
+                    .shadow(color: Color.white.opacity(0.10), radius: 40)
 
                 Spacer()
 
@@ -352,11 +359,11 @@ struct TopBarView: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(currentDayOfMonth)
                         .font(.custom("Menlo", size: 32)).fontWeight(.bold)
-                        .foregroundColor(cyanBright)
-                        .shadow(color: cyan.opacity(0.8), radius: 6)
+                        .foregroundColor(Color.white.opacity(0.80))
+                        .shadow(color: Color.white.opacity(0.5), radius: 6)
                     Text(currentMonthYear)
                         .font(.custom("Menlo", size: 8)).tracking(3)
-                        .foregroundColor(cyan.opacity(0.4))
+                        .foregroundColor(Color.white.opacity(0.35))
                 }
             }
             .padding(.horizontal, 30)
@@ -396,25 +403,25 @@ struct BottomBarView: View {
                 // Left: chip name
                 Text(store.chipName)
                     .font(.custom("Menlo", size: 10)).tracking(3)
-                    .foregroundColor(cyan.opacity(0.6))
+                    .foregroundColor(Color.white.opacity(0.50))
 
                 Spacer()
 
                 // Center: large clock
                 Text(store.timeString)
                     .font(.custom("Menlo", size: 22)).fontWeight(.medium)
-                    .foregroundColor(cyanBright.opacity(0.7))
-                    .shadow(color: cyan.opacity(0.5), radius: 8)
+                    .foregroundColor(Color.white.opacity(0.60))
+                    .shadow(color: Color.white.opacity(0.3), radius: 8)
 
                 Spacer()
 
                 // Right: thermal + power summary
                 HStack(spacing: 12) {
                     Text(String(format: "%.0fW", store.totalPower))
-                        .font(.custom("Menlo", size: 11)).foregroundColor(cyan.opacity(0.7))
+                        .font(.custom("Menlo", size: 11)).foregroundColor(Color.white.opacity(0.55))
                     Text(store.thermalState.uppercased())
                         .font(.custom("Menlo", size: 9)).tracking(2)
-                        .foregroundColor(cyan.opacity(0.6))
+                        .foregroundColor(Color.white.opacity(0.45))
                 }
             }
             .padding(.horizontal, 30)
@@ -881,228 +888,136 @@ struct JarvisReactorCanvas: View {
     }
 }
 
-// MARK: - MiniArcGauge ────────────────────────────────────────────────────────
+// MARK: - JARVIS Arm Panels ──────────────────────────────────────────────────
 
-struct MiniArcGauge: View {
-    let value: Double
+enum ArmSide { case left, right }
+
+struct ArmPanelData {
     let label: String
-    let color: Color
-    let phase: Double
-
-    var body: some View {
-        VStack(spacing: 4) {
-            ZStack {
-                // Background track
-                Circle()
-                    .stroke(color.opacity(0.08), lineWidth: 4)
-                    .frame(width: 56, height: 56)
-
-                // Value arc
-                Circle()
-                    .trim(from: 0, to: min(value, 1.0))
-                    .stroke(
-                        AngularGradient(
-                            gradient: Gradient(colors: [color.opacity(0.3), color]),
-                            center: .center
-                        ),
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
-                    .frame(width: 56, height: 56)
-                    .rotationEffect(.degrees(-90))
-
-                // Glow
-                Circle()
-                    .trim(from: 0, to: min(value, 1.0))
-                    .stroke(color.opacity(0.15), style: StrokeStyle(lineWidth: 12, lineCap: .round))
-                    .frame(width: 56, height: 56)
-                    .rotationEffect(.degrees(-90))
-                    .blur(radius: 3)
-
-                // Percentage text
-                Text(String(format: "%.0f", min(value, 1.0) * 100))
-                    .font(.custom("Menlo", size: 14)).fontWeight(.bold)
-                    .foregroundColor(color)
-                    .shadow(color: color.opacity(0.6), radius: 4)
-
-                // Tick marks
-                ForEach(0..<12, id: \.self) { i in
-                    Rectangle()
-                        .fill(color.opacity(i % 3 == 0 ? 0.4 : 0.15))
-                        .frame(width: 0.5, height: i % 3 == 0 ? 5 : 3)
-                        .offset(y: -32)
-                        .rotationEffect(.degrees(Double(i) * 30))
-                }
-            }
-
-            Text(label)
-                .font(.custom("Menlo", size: 7)).tracking(3)
-                .foregroundColor(color.opacity(0.45))
-        }
-    }
-}
-
-// MARK: - MiniArcReactor ──────────────────────────────────────────────────────
-
-struct MiniArcReactor: View {
-    let phase: Double
-    let cyan: Color
-    let cyanBright: Color
-
-    var body: some View {
-        let pulse = 0.85 + sin(phase * 2.5) * 0.15
-
-        ZStack {
-            // Outer ring
-            Circle()
-                .stroke(cyan.opacity(0.20), lineWidth: 2)
-                .frame(width: 60, height: 60)
-
-            // Middle ring
-            Circle()
-                .stroke(cyan.opacity(0.30 * pulse), lineWidth: 1.5)
-                .frame(width: 48, height: 48)
-
-            // Inner ring
-            Circle()
-                .stroke(cyanBright.opacity(0.45 * pulse), lineWidth: 1)
-                .frame(width: 34, height: 34)
-
-            // Core glow
-            Circle()
-                .fill(
-                    RadialGradient(
-                        gradient: Gradient(colors: [
-                            Color.white.opacity(0.25 * pulse),
-                            cyan.opacity(0.30 * pulse),
-                            cyan.opacity(0.05),
-                            Color.clear
-                        ]),
-                        center: .center,
-                        startRadius: 2,
-                        endRadius: 26
-                    )
-                )
-                .frame(width: 52, height: 52)
-
-            // 3 rotating segment arcs
-            ForEach(0..<3, id: \.self) { i in
-                Circle()
-                    .trim(from: 0.0, to: 0.2)
-                    .stroke(cyan.opacity(0.50), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .frame(width: 42, height: 42)
-                    .rotationEffect(.degrees(Double(i) * 120 + phase * 30))
-            }
-
-            // Center dot
-            Circle()
-                .fill(Color.white.opacity(0.30 * pulse))
-                .frame(width: 6, height: 6)
-        }
-        .frame(width: 64, height: 64)
-    }
-}
-
-// MARK: - VerticalBarGauge ────────────────────────────────────────────────────
-
-struct VerticalBarGauge: View {
-    let values: [Double]
-    let label: String
-    let color: Color
-    let phase: Double
-
-    var body: some View {
-        VStack(spacing: 4) {
-            Text(label)
-                .font(.custom("Menlo", size: 7)).tracking(3)
-                .foregroundColor(color.opacity(0.4))
-
-            HStack(spacing: 2) {
-                ForEach(0..<min(values.count, 12), id: \.self) { i in
-                    let v = min(values[i], 1.0)
-                    VStack(spacing: 0) {
-                        Spacer()
-                        RoundedRectangle(cornerRadius: 1)
-                            .fill(color.opacity(0.15))
-                            .frame(width: 4, height: 40)
-                            .overlay(
-                                VStack {
-                                    Spacer()
-                                    RoundedRectangle(cornerRadius: 1)
-                                        .fill(color)
-                                        .frame(height: CGFloat(v) * 40)
-                                        .shadow(color: color.opacity(0.6), radius: 3)
-                                }
-                            )
-                    }
-                    .frame(height: 40)
-                }
-            }
-        }
-        .padding(8)
-        .background(
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Color.black.opacity(0.45))
-                .overlay(RoundedRectangle(cornerRadius: 3).stroke(color.opacity(0.15), lineWidth: 0.5))
-        )
-    }
-}
-
-// MARK: - HoloPanelView ──────────────────────────────────────────────────────
-
-enum HoloPanelStyle { case left, right }
-
-struct HoloPanelView: View {
-    let name: String
     let value: String
     let sub: String
-    let color: Color
-    var style: HoloPanelStyle = .left
+}
+
+struct JarvisArmPanel: View {
+    let side: ArmSide
+    let cx: CGFloat, cy: CGFloat, R: CGFloat
+    let width: CGFloat, height: CGFloat
+    let phase: Double
+    let panels: [ArmPanelData]
+
+    // Unified JARVIS palette
+    private let jarvisWhite = Color.white
+    private let jarvisSilver = Color(red: 0.85, green: 0.90, blue: 0.95)
+    private let jarvisDim = Color(red: 0.4, green: 0.45, blue: 0.5)
 
     var body: some View {
-        VStack(alignment: style == .left ? .leading : .trailing, spacing: 4) {
-            // Header with chamfered accent line
-            HStack(spacing: 6) {
-                if style == .left {
-                    Rectangle().fill(color.opacity(0.5)).frame(width: 3, height: 10)
+        let isLeft = side == .left
+        let panelX = isLeft ? width * 0.06 : width * 0.94
+        let armOriginX = cx + (isLeft ? -R * 0.98 : R * 0.98)
+        let armOriginY = cy
+
+        ZStack {
+            // ── CONNECTING ARM LINE from reactor to panel zone ──
+            Canvas { ctx, size in
+                // Main arm line — horizontal from reactor edge to panel
+                let startX = armOriginX
+                let endX = isLeft ? panelX + 70 : panelX - 70
+
+                // Arm with 90-degree bend
+                let bendY = armOriginY - CGFloat(panels.count) * 28
+                let armPath = Path { p in
+                    p.move(to: CGPoint(x: startX, y: armOriginY))
+                    p.addLine(to: CGPoint(x: endX, y: armOriginY))
+                    p.addLine(to: CGPoint(x: endX, y: bendY))
                 }
-                Text(name)
-                    .font(.custom("Menlo", size: 8)).tracking(3)
-                    .foregroundColor(color.opacity(0.55))
-                if style == .right {
-                    Rectangle().fill(color.opacity(0.5)).frame(width: 3, height: 10)
+
+                // Bloom on arm line
+                ctx.stroke(armPath, with: .color(jarvisWhite.opacity(0.04)), style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round))
+                ctx.stroke(armPath, with: .color(jarvisWhite.opacity(0.10)), style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                ctx.stroke(armPath, with: .color(jarvisWhite.opacity(0.40)), style: StrokeStyle(lineWidth: 1.0, lineCap: .round, lineJoin: .round))
+
+                // Small node dot at reactor junction
+                let nodeDot = CGRect(x: startX - 3, y: armOriginY - 3, width: 6, height: 6)
+                ctx.fill(Path(ellipseIn: nodeDot), with: .color(jarvisWhite.opacity(0.60)))
+
+                // Branch lines to each panel
+                for (i, _) in panels.enumerated() {
+                    let panelY = armOriginY - 80 + CGFloat(i) * 56
+                    let branchStart = CGPoint(x: endX, y: panelY)
+                    let branchEnd = CGPoint(x: isLeft ? panelX + 8 : panelX - 8, y: panelY)
+
+                    let branchPath = Path { p in
+                        p.move(to: branchStart)
+                        p.addLine(to: branchEnd)
+                    }
+                    ctx.stroke(branchPath, with: .color(jarvisWhite.opacity(0.06)), style: StrokeStyle(lineWidth: 8))
+                    ctx.stroke(branchPath, with: .color(jarvisWhite.opacity(0.25)), style: StrokeStyle(lineWidth: 1.0))
+
+                    // Connector dot
+                    let dot = CGRect(x: branchEnd.x - 2, y: branchEnd.y - 2, width: 4, height: 4)
+                    ctx.fill(Path(ellipseIn: dot), with: .color(jarvisWhite.opacity(0.50)))
                 }
             }
+            .allowsHitTesting(false)
 
+            // ── PANEL CARDS ──
+            VStack(alignment: isLeft ? .leading : .trailing, spacing: 12) {
+                ForEach(Array(panels.enumerated()), id: \.offset) { _, panel in
+                    JarvisDataCard(
+                        label: panel.label,
+                        value: panel.value,
+                        sub: panel.sub,
+                        alignment: isLeft ? .leading : .trailing,
+                        phase: phase
+                    )
+                }
+            }
+            .frame(width: width * 0.13)
+            .position(x: panelX, y: cy - 10)
+        }
+    }
+}
+
+struct JarvisDataCard: View {
+    let label: String
+    let value: String
+    let sub: String
+    let alignment: HorizontalAlignment
+    let phase: Double
+
+    private let jarvisWhite = Color.white
+    private let jarvisSilver = Color(red: 0.85, green: 0.90, blue: 0.95)
+    private let jarvisDim = Color(red: 0.4, green: 0.45, blue: 0.5)
+
+    var body: some View {
+        VStack(alignment: alignment, spacing: 2) {
+            // Label
+            Text(label)
+                .font(.custom("Menlo", size: 7)).tracking(3)
+                .foregroundColor(jarvisDim.opacity(0.70))
+
+            // Value — large, bright
             Text(value)
-                .font(.custom("Menlo", size: 20)).fontWeight(.bold)
-                .foregroundColor(color)
-                .shadow(color: color.opacity(0.9), radius: 3)
-                .shadow(color: color.opacity(0.4), radius: 10)
-                .shadow(color: color.opacity(0.15), radius: 25)
+                .font(.custom("Menlo", size: 16)).fontWeight(.bold)
+                .foregroundColor(jarvisWhite.opacity(0.85))
+                .shadow(color: jarvisWhite.opacity(0.20), radius: 8)
+                .shadow(color: jarvisWhite.opacity(0.10), radius: 16)
 
+            // Sub-label
             Text(sub)
                 .font(.custom("Menlo", size: 6)).tracking(2)
-                .foregroundColor(color.opacity(0.30))
+                .foregroundColor(jarvisDim.opacity(0.45))
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         .background(
-            ZStack {
-                // Glass fill
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.black.opacity(0.55))
-                // Chamfered border with corner accents
-                RoundedRectangle(cornerRadius: 3)
-                    .stroke(color.opacity(0.25), lineWidth: 0.5)
-                // Top edge highlight
-                VStack {
-                    Rectangle().fill(color.opacity(0.15)).frame(height: 0.5)
-                    Spacer()
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 3))
-            }
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color.black.opacity(0.40))
         )
-        .shadow(color: color.opacity(0.10), radius: 10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 2)
+                .stroke(jarvisWhite.opacity(0.12), lineWidth: 0.5)
+        )
     }
 }
 
@@ -1110,34 +1025,32 @@ struct HoloPanelView: View {
 
 struct CentralStatsView: View {
     @EnvironmentObject var store: TelemetryStore
-    private let cyan = Color(red: 0.00, green: 0.83, blue: 1.00)
-    private let cyanBright = Color(red: 0.41, green: 0.95, blue: 0.95)
 
     var body: some View {
         VStack(spacing: 6) {
             Text(store.chipName)
                 .font(.custom("Menlo", size: 9)).tracking(4)
-                .foregroundColor(cyan.opacity(0.40))
+                .foregroundColor(Color.white.opacity(0.35))
 
             DigitCipherText(
                 value: String(format: "%.0f", store.totalPower),
                 font: .custom("Menlo", size: 72).weight(.bold),
-                color: Color(red: 0.41, green: 0.95, blue: 0.95)
+                color: Color.white
             )
-                .shadow(color: cyan.opacity(0.95), radius: 4)
-                .shadow(color: cyan.opacity(0.60), radius: 16)
-                .shadow(color: cyan.opacity(0.35), radius: 40)
-                .shadow(color: cyan.opacity(0.15), radius: 80)
+                .shadow(color: Color.white.opacity(0.80), radius: 4)
+                .shadow(color: Color.white.opacity(0.50), radius: 16)
+                .shadow(color: Color.white.opacity(0.25), radius: 40)
+                .shadow(color: Color.white.opacity(0.10), radius: 80)
 
             Text("WATTS")
                 .font(.custom("Menlo", size: 7)).tracking(5)
-                .foregroundColor(cyan.opacity(0.55))
+                .foregroundColor(Color.white.opacity(0.45))
 
             // Divider with glow
             Rectangle()
-                .fill(cyan.opacity(0.40))
+                .fill(Color.white.opacity(0.30))
                 .frame(width: 80, height: 0.5)
-                .shadow(color: cyan.opacity(0.3), radius: 6)
+                .shadow(color: Color.white.opacity(0.2), radius: 6)
 
             Text(store.thermalState.uppercased())
                 .font(.custom("Menlo", size: 9)).tracking(3)
@@ -1148,7 +1061,7 @@ struct CentralStatsView: View {
 
     private var thermalColor: Color {
         switch store.thermalState.lowercased() {
-        case "nominal", "normal": return cyan
+        case "nominal", "normal": return .white
         case "fair": return Color(red: 1.0, green: 0.8, blue: 0.0)
         case "serious": return Color(red: 1.0, green: 0.3, blue: 0.0)
         case "critical": return Color(red: 1.0, green: 0.0, blue: 0.0)
@@ -1157,55 +1070,6 @@ struct CentralStatsView: View {
     }
 }
 
-// MARK: - PowerThermalPanel ──────────────────────────────────────────────────
-
-struct PowerThermalPanel: View {
-    @EnvironmentObject var store: TelemetryStore
-    private let cyan = Color(red: 0.00, green: 0.83, blue: 1.00)
-    private let amber = Color(red: 1.0, green: 0.78, blue: 0.0)
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("THERMAL")
-                    .font(.custom("Menlo", size: 7)).tracking(3)
-                    .foregroundColor(cyan.opacity(0.35))
-                Rectangle().fill(cyan.opacity(0.25)).frame(width: 3, height: 8)
-            }
-            row("CPU", String(format: "%.1f\u{00B0}C", store.cpuTemp), amber)
-            row("GPU", String(format: "%.1f\u{00B0}C", store.gpuTemp), amber)
-            row("ANE", String(format: "%.2fW", store.anePower), cyan)
-            row("SWAP", String(format: "%.0f%%", store.swapPressure * 100), store.swapPressure > 0.8 ? .red : cyan)
-        }
-        .padding(10)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 3).fill(Color.black.opacity(0.55))
-                RoundedRectangle(cornerRadius: 3).stroke(cyan.opacity(0.25), lineWidth: 0.5)
-                VStack {
-                    Rectangle().fill(cyan.opacity(0.12)).frame(height: 0.5)
-                    Spacer()
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 3))
-            }
-        )
-        .shadow(color: cyan.opacity(0.10), radius: 8)
-    }
-
-    private func row(_ l: String, _ v: String, _ c: Color) -> some View {
-        HStack(spacing: 8) {
-            Text(l)
-                .font(.custom("Menlo", size: 8)).tracking(2)
-                .foregroundColor(c.opacity(0.45))
-                .frame(width: 32, alignment: .trailing)
-            Text(v)
-                .font(.custom("Menlo", size: 16)).fontWeight(.bold)
-                .foregroundColor(c)
-                .shadow(color: c.opacity(0.7), radius: 3)
-                .shadow(color: c.opacity(0.3), radius: 10)
-        }
-    }
-}
 
 // MARK: - HorizontalStatusBar ─────────────────────────────────────────────────
 
@@ -1216,43 +1080,46 @@ struct HorizontalStatusBar: View {
     let amber: Color
     let phase: Double
 
+    private let barWhite = Color.white
+    private let barSilver = Color(red: 0.85, green: 0.90, blue: 0.95)
+
     var body: some View {
         VStack(spacing: 6) {
             // CPU usage bar
             HStack(spacing: 8) {
                 Text("CPU")
                     .font(.custom("Menlo", size: 7)).tracking(2)
-                    .foregroundColor(cyan.opacity(0.40))
+                    .foregroundColor(barWhite.opacity(0.40))
                     .frame(width: 28, alignment: .trailing)
 
                 ZStack(alignment: .leading) {
                     // Track
                     RoundedRectangle(cornerRadius: 1.5)
-                        .fill(cyan.opacity(0.06))
+                        .fill(barWhite.opacity(0.06))
                         .frame(width: width * 0.7, height: 6)
 
                     // Fill
                     RoundedRectangle(cornerRadius: 1.5)
                         .fill(
                             LinearGradient(
-                                colors: [cyan.opacity(0.4), cyan],
+                                colors: [barWhite.opacity(0.4), barWhite],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
                         .frame(width: width * 0.7 * min(averageCPU, 1.0), height: 6)
-                        .shadow(color: cyan.opacity(0.5), radius: 4)
+                        .shadow(color: barWhite.opacity(0.5), radius: 4)
 
                     // Glow
                     RoundedRectangle(cornerRadius: 1.5)
-                        .fill(cyan.opacity(0.08))
+                        .fill(barWhite.opacity(0.08))
                         .frame(width: width * 0.7 * min(averageCPU, 1.0), height: 14)
                         .blur(radius: 4)
                 }
 
                 Text(String(format: "%.0f%%", averageCPU * 100))
                     .font(.custom("Menlo", size: 8)).fontWeight(.bold)
-                    .foregroundColor(cyan.opacity(0.6))
+                    .foregroundColor(barWhite.opacity(0.6))
                     .frame(width: 32)
             }
 
@@ -1260,29 +1127,29 @@ struct HorizontalStatusBar: View {
             HStack(spacing: 8) {
                 Text("MEM")
                     .font(.custom("Menlo", size: 7)).tracking(2)
-                    .foregroundColor(amber.opacity(0.40))
+                    .foregroundColor(barSilver.opacity(0.40))
                     .frame(width: 28, alignment: .trailing)
 
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 1.5)
-                        .fill(amber.opacity(0.06))
+                        .fill(barSilver.opacity(0.06))
                         .frame(width: width * 0.7, height: 6)
 
                     RoundedRectangle(cornerRadius: 1.5)
                         .fill(
                             LinearGradient(
-                                colors: [amber.opacity(0.4), amber],
+                                colors: [barSilver.opacity(0.4), barSilver],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
                         .frame(width: width * 0.7 * min(store.swapPressure, 1.0), height: 6)
-                        .shadow(color: amber.opacity(0.5), radius: 4)
+                        .shadow(color: barSilver.opacity(0.5), radius: 4)
                 }
 
                 Text(String(format: "%.0f%%", store.swapPressure * 100))
                     .font(.custom("Menlo", size: 8)).fontWeight(.bold)
-                    .foregroundColor(amber.opacity(0.6))
+                    .foregroundColor(barSilver.opacity(0.6))
                     .frame(width: 32)
             }
         }
@@ -1291,7 +1158,7 @@ struct HorizontalStatusBar: View {
         .background(
             RoundedRectangle(cornerRadius: 3)
                 .fill(Color.black.opacity(0.40))
-                .overlay(RoundedRectangle(cornerRadius: 3).stroke(cyan.opacity(0.12), lineWidth: 0.5))
+                .overlay(RoundedRectangle(cornerRadius: 3).stroke(barWhite.opacity(0.12), lineWidth: 0.5))
         )
     }
 
@@ -1302,41 +1169,3 @@ struct HorizontalStatusBar: View {
     }
 }
 
-// MARK: - DRAMBandwidthPanel ─────────────────────────────────────────────────
-
-struct DRAMBandwidthPanel: View {
-    @EnvironmentObject var store: TelemetryStore
-    private let cyan = Color(red: 0.00, green: 0.83, blue: 1.00)
-
-    var body: some View {
-        VStack(alignment: .trailing, spacing: 5) {
-            HStack(spacing: 6) {
-                Text("DRAM BW")
-                    .font(.custom("Menlo", size: 7)).tracking(3)
-                    .foregroundColor(cyan.opacity(0.35))
-                Rectangle().fill(cyan.opacity(0.25)).frame(width: 3, height: 8)
-            }
-            Text(String(format: "%.1f", store.dramReadBW))
-                .font(.custom("Menlo", size: 22)).fontWeight(.bold)
-                .foregroundColor(cyan)
-                .shadow(color: cyan.opacity(0.8), radius: 3)
-                .shadow(color: cyan.opacity(0.3), radius: 12)
-            Text("GB/s READ")
-                .font(.custom("Menlo", size: 7)).tracking(3)
-                .foregroundColor(cyan.opacity(0.35))
-        }
-        .padding(10)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 3).fill(Color.black.opacity(0.55))
-                RoundedRectangle(cornerRadius: 3).stroke(cyan.opacity(0.25), lineWidth: 0.5)
-                VStack {
-                    Rectangle().fill(cyan.opacity(0.12)).frame(height: 0.5)
-                    Spacer()
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 3))
-            }
-        )
-        .shadow(color: cyan.opacity(0.10), radius: 8)
-    }
-}
