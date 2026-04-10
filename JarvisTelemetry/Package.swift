@@ -5,10 +5,15 @@ import PackageDescription
 let package = Package(
     name: "JarvisTelemetry",
     platforms: [.macOS(.v14)],
+    dependencies: [
+        .package(url: "https://github.com/beltex/SMCKit.git", from: "0.3.0")
+    ],
     targets: [
         .executableTarget(
             name: "JarvisTelemetry",
-            dependencies: [],
+            dependencies: [
+                .product(name: "SMCKit", package: "SMCKit")
+            ],
             path: "Sources/JarvisTelemetry",
             resources: [
                 // Bundle the compiled Go daemon inside the app
