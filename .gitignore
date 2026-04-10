@@ -47,3 +47,9 @@ jarvis-mactop-daemon
 
 LICENSE
 CLAUDE.md
+
+node_modules/
+package-lock.json
+package.json
+
+mcp.json
