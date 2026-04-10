@@ -6,7 +6,7 @@ let package = Package(
     name: "JarvisTelemetry",
     platforms: [.macOS(.v14)],
     dependencies: [
-        .package(url: "https://github.com/beltex/SMCKit.git", from: "0.3.0")
+        .package(url: "https://github.com/beltex/SMCKit.git", branch: "master")
     ],
     targets: [
         .executableTarget(
