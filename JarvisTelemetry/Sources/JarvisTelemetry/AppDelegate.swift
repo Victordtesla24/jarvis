@@ -2,6 +2,7 @@
 
 import AppKit
 import SwiftUI
+import CoreImage
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
@@ -69,6 +70,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hostingView.frame = screen.frame
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+
+        // ── GAP-15: Global Bloom Shader ─────────────────────────────────
+        // CIBloom post-processing pass makes every cyan element glow simultaneously
+        if let bloomFilter = CIFilter(name: "CIBloom", parameters: [
+            kCIInputRadiusKey: 8.0,
+            kCIInputIntensityKey: 0.85
+        ]) {
+            hostingView.layer?.filters = [bloomFilter]
+        }
 
         win.contentView = hostingView
         return win

@@ -19,7 +19,9 @@ let package = Package(
                 .linkedFramework("SwiftUI"),
                 .linkedFramework("SceneKit"),
                 .linkedFramework("CoreGraphics"),
-                .linkedFramework("Combine")
+                .linkedFramework("Combine"),
+                .linkedFramework("Metal"),
+                .linkedFramework("MetalKit")
             ]
         )
     ]
