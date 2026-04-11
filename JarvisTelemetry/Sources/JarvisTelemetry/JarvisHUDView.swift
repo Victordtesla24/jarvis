@@ -30,7 +30,12 @@ struct JarvisHUDView: View {
             let h = geo.size.height
             let cx = w / 2
             let cy = h / 2
-            let R  = min(w, h) * 0.42  // Reactor radius (slightly smaller to leave room for side panels)
+            // Reactor radius shrunk to 0.34 × min(w,h) so the left/right
+            // panels (widened to 320pt in JarvisLeftPanel / JarvisRightPanel)
+            // have real breathing room on wide displays, matching the
+            // reference Kartik's-system layout with prominent panels and
+            // full telemetric data visible at the captured resolution.
+            let R  = min(w, h) * 0.34
 
             ZStack {
                 // ── 1. BACKGROUND: dark blue-black (shifts crimson under thermal threat) ──

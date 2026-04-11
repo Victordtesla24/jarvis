@@ -20,15 +20,15 @@ struct JarvisLeftPanel: View {
 
     var body: some View {
         HStack {
-            VStack(spacing: 14) {
+            VStack(spacing: 18) {
                 ClockRingWidget(cyan: cyan, panelBg: panelBg)
                 StorageWidget(cyan: cyan, panelBg: panelBg)
                 PowerArcGauge(cyan: cyan, panelBg: panelBg)
                     .environmentObject(store)
                 RadarWidget(cyan: cyan, panelBg: panelBg, phase: phase)
             }
-            .frame(width: 220)
-            .padding(20)
+            .frame(width: 320)
+            .padding(24)
 
             Spacer()
         }

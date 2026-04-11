@@ -78,7 +78,7 @@ struct JarvisRightPanel: View {
         HStack {
             Spacer()
 
-            VStack(spacing: 16) {
+            VStack(spacing: 20) {
                 Spacer()
 
                 DirectoriesWidget(cyan: cyan, panelBg: panelBg)
@@ -89,8 +89,8 @@ struct JarvisRightPanel: View {
 
                 Spacer()
             }
-            .frame(width: 220)
-            .padding(20)
+            .frame(width: 320)
+            .padding(24)
         }
         .allowsHitTesting(true)
     }
