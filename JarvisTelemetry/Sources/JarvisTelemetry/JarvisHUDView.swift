@@ -154,6 +154,12 @@ struct JarvisHUDView: View {
 
                 // ── 13. SCANNER SWEEP ───────────────────────────────────
                 ScannerSweepOverlay(width: w, height: h, phase: phase, cyan: cyan)
+
+                // ── 14. R-02 REACTIVE EVENT OVERLAY (topmost layer) ─────
+                //  Telemetry-driven transient text events: CPU spike,
+                //  GPU surge, memory pressure, thermal warn, disk I/O, etc.
+                //  Enabled by ReactorAnimationController.activeOverlays.
+                ReactiveOverlayView()
             }
             .holographicFlicker(phase: phase)
             .onAppear {
@@ -480,6 +486,9 @@ struct BottomBarView: View {
 // MARK: - JarvisReactorCanvas ─────────────────────────────────────────────────
 
 struct JarvisReactorCanvas: View {
+    // R-02: injected automatically via SwiftUI environment — ReactorAnimationController
+    // is published by JarvisRootView and propagates through every descendant view.
+    @EnvironmentObject var reactorController: ReactorAnimationController
     let store: TelemetryStore
     let phase: Double
     let center: CGPoint
@@ -516,8 +525,12 @@ struct JarvisReactorCanvas: View {
             let gpuLoad = store.gpuUsage
             let aggregateLoad = cpuAvg * 0.6 + gpuLoad * 0.3 + store.swapPressure * 0.1
 
-            // Dynamic speed — rings accelerate with system load
-            let speedMul = 1.0 + aggregateLoad * 0.8
+            // Dynamic speed — rings accelerate with system load.
+            // R-02: multiply in the reactive controller's ringSpeedMultiplier so
+            // CPU spikes (>1), idle slowdown (<1), and thermal throttling can
+            // all adjust the ring rotation rate in real time alongside the
+            // aggregate-load ramp.
+            let speedMul = (1.0 + aggregateLoad * 0.8) * reactorController.ringSpeedMultiplier
             let ph = phase * speedMul
 
             // Dynamic bloom intensity — glow brightens with load
@@ -542,9 +555,20 @@ struct JarvisReactorCanvas: View {
             let jarvisSilver = thermalThreat
                 ? Color(red: 0.85, green: 0.75, blue: 0.70)
                 : Color(red: 0.70, green: 0.85, blue: 0.92)
-            let jarvisCyan = thermalThreat
+            // R-02: let the reactive controller shift ring hue via RGB lerp.
+            // hueShift = 0 keeps the existing cyan (or thermal-threat amber
+            // path), hueShift = 1 pushes toward pure amber regardless.
+            let baseJarvisCyan = thermalThreat
                 ? Color(red: 1.00, green: 0.50, blue: 0.15)   // shifts to amber-orange
                 : Color(red: 0.00, green: 0.83, blue: 1.00)   // #00D4FF — primary
+            let hueShift = reactorController.ringHueShift
+            let jarvisCyan: Color = hueShift < 0.01
+                ? baseJarvisCyan
+                : Color(
+                    red:   0.00 * (1 - hueShift) + 1.00 * hueShift,
+                    green: 0.83 * (1 - hueShift) + 0.78 * hueShift,
+                    blue:  1.00 * (1 - hueShift) + 0.00 * hueShift
+                )
             let jarvisDim = Color(red: 0.25, green: 0.40, blue: 0.50)
 
             // ═══════════════════════════════════════════════════════════
@@ -850,6 +874,54 @@ struct JarvisReactorCanvas: View {
             }
 
             // ══════════════════════════════════════════════════════════════
+            //  R-02 · REACTIVE SHOCKWAVE + BATTERY RING
+            // ══════════════════════════════════════════════════════════════
+
+            // Expanding cyan shockwave: fires on CPU spikes and thermal
+            // critical. Progress ramps 0→1 over 1.2s from the controller.
+            if reactorController.shockwaveActive {
+                let prog = reactorController.shockwaveProgress
+                let shockR = prog * ring1R
+                let alpha = 1.0 - prog
+                let sp = Path { p in
+                    p.addArc(center: c, radius: shockR, startAngle: .zero,
+                             endAngle: .radians(pi2), clockwise: false)
+                }
+                ctx.stroke(sp, with: .color(jarvisCyan.opacity(alpha * 0.25)),
+                           style: StrokeStyle(lineWidth: 14))
+                ctx.stroke(sp, with: .color(jarvisCyan.opacity(alpha)),
+                           style: StrokeStyle(lineWidth: 2.0))
+            }
+
+            // Battery ring at R × 0.92 — sweep length = current charge level,
+            // colour lerps amber → green via HSV hue.
+            let batRingR = R * 0.92
+            let batSweep = reactorController.batteryRingProgress * pi2
+            let batColor = Color(
+                hue: reactorController.batteryRingHue,
+                saturation: 0.9,
+                brightness: 0.9
+            )
+            let batTrack = Path { p in
+                p.addArc(center: c, radius: batRingR, startAngle: .zero,
+                         endAngle: .radians(pi2), clockwise: false)
+            }
+            ctx.stroke(batTrack, with: .color(batColor.opacity(0.12)),
+                       style: StrokeStyle(lineWidth: 1.0))
+            if batSweep > 0.001 {
+                let batFill = Path { p in
+                    p.addArc(center: c, radius: batRingR,
+                             startAngle: .radians(top),
+                             endAngle: .radians(top + batSweep),
+                             clockwise: false)
+                }
+                ctx.stroke(batFill, with: .color(batColor.opacity(0.25)),
+                           style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                ctx.stroke(batFill, with: .color(batColor),
+                           style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+            }
+
+            // ══════════════════════════════════════════════════════════════
             //  TIME & DATE ARC TEXT at ring boundary
             // ══════════════════════════════════════════════════════════════
             let hudNow = Date()
@@ -867,7 +939,19 @@ struct JarvisReactorCanvas: View {
             // ══════════════════════════════════════════════════════════════
             //  GAP-01: ARC-REACTOR CORE 3D CAPSULE
             //  Outer metallic ring → segmented arc → inner glow → capsule
+            //  R-02: thermal distortion applies a small translate to this
+            //  region only; reversed after the core finishes drawing.
             // ══════════════════════════════════════════════════════════════
+
+            var coreJitterX: Double = 0
+            var coreJitterY: Double = 0
+            if reactorController.thermalDistortionActive {
+                let amount = reactorController.thermalDistortionAmount
+                let t = Date().timeIntervalSince1970
+                coreJitterX = sin(t * 30) * amount * 3.0
+                coreJitterY = cos(t * 28) * amount * 2.0
+                ctx.translateBy(x: coreJitterX, y: coreJitterY)
+            }
 
             // Outer metallic ring (dark grey radial gradient, 120pt diameter equiv ≈ 0.18R)
             let metallicR = R * 0.18
@@ -901,8 +985,10 @@ struct JarvisReactorCanvas: View {
 
             // Inner glow: radial gradient #FFFFFF → #00D4FF → transparent
             let innerGlowR = metallicR * 0.5
-            // Pulsing scale (1.0 → 1.12 → 1.0, 2.4s period)
-            let glowPulse = 1.0 + 0.12 * sin(ph * (pi2 / 2.4))
+            // Pulsing scale (1.0 → 1.12 → 1.0, 2.4s period).
+            // R-02: coreIntensity multiplier lets the controller breathe
+            // the glow during idle and dim it during thermal-critical.
+            let glowPulse = (1.0 + 0.12 * sin(ph * (pi2 / 2.4))) * reactorController.coreIntensity
             let glowR = innerGlowR * glowPulse
             let glowRect = CGRect(x: c.x - glowR, y: c.y - glowR, width: glowR * 2, height: glowR * 2)
             ctx.fill(Path(ellipseIn: glowRect), with: .radialGradient(
@@ -934,6 +1020,12 @@ struct JarvisReactorCanvas: View {
                     .foregroundColor(jarvisCyan),
                 at: c
             )
+
+            // R-02: undo thermal distortion translate so the rest of the HUD
+            // (radar sweep, degree markers, etc.) renders at the stable centre.
+            if reactorController.thermalDistortionActive {
+                ctx.translateBy(x: -coreJitterX, y: -coreJitterY)
+            }
 
             // ══════════════════════════════════════════════════════════════
             //  RADAR SWEEP — retained from original

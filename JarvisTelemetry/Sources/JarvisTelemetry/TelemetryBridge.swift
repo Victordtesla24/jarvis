@@ -54,6 +54,31 @@ struct MemoryMetrics: Codable {
     }
 }
 
+/// Network + disk rate metrics from the daemon `net_disk` object.
+/// All packet/ops fields are optional because older daemon builds may not
+/// emit them; byte rates are required for any network/disk spike detection.
+struct NetDiskMetrics: Codable {
+    let outBytesPerSec:     Double
+    let inBytesPerSec:      Double
+    let readKBytesPerSec:   Double
+    let writeKBytesPerSec:  Double
+    let outPacketsPerSec:   Double?
+    let inPacketsPerSec:    Double?
+    let readOpsPerSec:      Double?
+    let writeOpsPerSec:     Double?
+
+    enum CodingKeys: String, CodingKey {
+        case outBytesPerSec    = "out_bytes_per_sec"
+        case inBytesPerSec     = "in_bytes_per_sec"
+        case readKBytesPerSec  = "read_kbytes_per_sec"
+        case writeKBytesPerSec = "write_kbytes_per_sec"
+        case outPacketsPerSec  = "out_packets_per_sec"
+        case inPacketsPerSec   = "in_packets_per_sec"
+        case readOpsPerSec     = "read_ops_per_sec"
+        case writeOpsPerSec    = "write_ops_per_sec"
+    }
+}
+
 struct SystemInfo: Codable {
     let name:        String
     let coreCount:   Int
@@ -81,6 +106,9 @@ struct TelemetrySnapshot: Codable {
     let coreUsages:   [Double]
     let thermalState: String
     let systemInfo:   SystemInfo
+    // Optional network + disk sub-object. Older snapshots without this field
+    // will decode cleanly as nil so nothing in the harness breaks.
+    let netDisk:      NetDiskMetrics?
     // Custom AI/Dev metrics
     let dvhopCPUPct:  Double
     let gumerMBs:     Double
@@ -95,6 +123,7 @@ struct TelemetrySnapshot: Codable {
         case coreUsages   = "core_usages"
         case thermalState = "thermal_state"
         case systemInfo   = "system_info"
+        case netDisk      = "net_disk"
         case dvhopCPUPct  = "dvhop_cpu_pct"
         case gumerMBs     = "gumer_mb_per_s"
         case cctcDeltaC   = "cctc_delta_celsius"

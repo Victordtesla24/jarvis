@@ -17,6 +17,16 @@ enum DeltaSeverity {
     case info, warning, critical
 }
 
+/// Three-level classifier used by the reactive animation controller for
+/// memory-pressure-driven visuals. `.nominal` => no reaction, `.warning` =>
+/// soft hue shift + breathing slowdown, `.critical` => shockwave + red overlay.
+enum MemoryPressureLevel { case nominal, warning, critical }
+
+/// Three-level classifier used by the reactive animation controller for
+/// thermal-driven visuals. Reads `thermalState` first (daemon-classified),
+/// then falls back to `cpuTemp` thresholds.
+enum ThermalStateLevel { case nominal, warning, critical }
+
 final class TelemetryStore: ObservableObject {
 
     // Normalized 0.0-1.0 ring values
@@ -57,6 +67,15 @@ final class TelemetryStore: ObservableObject {
     // Aggregate metrics
     @Published var cpuUsagePercent: Double = 0
     @Published var gpuFreqMHz:     Double = 0
+
+    // Network + disk rate metrics (bytes per second). Optional so snapshots
+    // that predate the net_disk decoder (or daemon builds that don't emit it)
+    // leave these as nil instead of zero — the spike classifiers below treat
+    // nil and zero identically, so downstream consumers don't need to care.
+    @Published var netInBytesPerSec:     Double? = nil
+    @Published var netOutBytesPerSec:    Double? = nil
+    @Published var diskReadBytesPerSec:  Double? = nil
+    @Published var diskWriteBytesPerSec: Double? = nil
 
     // Delta events (consumed by ChatterEngine)
     @Published var latestDeltas: [TelemetryDelta] = []
@@ -117,6 +136,20 @@ final class TelemetryStore: ObservableObject {
         memoryUsedGB  = Double(snap.memory.used) / 1_073_741_824.0
         memoryTotalGB = Double(snap.memory.total) / 1_073_741_824.0
         swapUsedGB    = swapUsed / 1_073_741_824.0
+
+        // Net/disk rates: daemon reports disk in KBytes/sec, convert to
+        // bytes/sec so the spike thresholds below can use byte units uniformly.
+        if let nd = snap.netDisk {
+            netInBytesPerSec     = nd.inBytesPerSec
+            netOutBytesPerSec    = nd.outBytesPerSec
+            diskReadBytesPerSec  = nd.readKBytesPerSec * 1024.0
+            diskWriteBytesPerSec = nd.writeKBytesPerSec * 1024.0
+        } else {
+            netInBytesPerSec     = nil
+            netOutBytesPerSec    = nil
+            diskReadBytesPerSec  = nil
+            diskWriteBytesPerSec = nil
+        }
 
         dvhopCPUPct  = snap.dvhopCPUPct
         gumerMBs     = snap.gumerMBs
@@ -186,5 +219,74 @@ final class TelemetryStore: ObservableObject {
         prevCpuTemp = cpuTemp
         prevGpuTemp = gpuTemp
         prevSwapPressure = swapPressure
+    }
+
+    // MARK: - Reactive Event Classifiers
+    //
+    // These computed properties read the current @Published state and return
+    // discrete "event active" booleans / level enums that the reactive
+    // animation controller polls to decide when to fire overlays, hue shifts,
+    // shockwaves, and ring-speed changes. Thresholds are chosen so only
+    // genuine user-visible events trip them.
+
+    /// Any P-core > 80% utilisation — triggers shockwave + amber arc surge.
+    var cpuPCoreSpikeActive: Bool {
+        (pCoreUsages.max() ?? 0) > 0.80
+    }
+
+    /// Any E-core > 60% utilisation — triggers inner cyan arc pulse.
+    var cpuECoreSpikeActive: Bool {
+        (eCoreUsages.max() ?? 0) > 0.60
+    }
+
+    /// GPU > 70% — triggers particle density surge + blue-white corona.
+    var gpuSurgeActive: Bool {
+        gpuUsage > 0.70
+    }
+
+    /// Ratio of used to total unified memory expressed as a three-level
+    /// classifier. Uses memoryTotalGB as the denominator (live from daemon).
+    var memoryPressureLevel: MemoryPressureLevel {
+        guard memoryTotalGB > 0 else { return .nominal }
+        let ratio = memoryUsedGB / memoryTotalGB
+        if ratio > 0.90 { return .critical }
+        if ratio > 0.75 { return .warning }
+        return .nominal
+    }
+
+    /// Thermal severity classifier. Prefers the daemon's `thermal_state`
+    /// string (which already folds in multiple sensors) and falls back to
+    /// raw `cpuTemp` thresholds when the string is "Normal"/"Nominal".
+    var thermalStateLevel: ThermalStateLevel {
+        let s = thermalState.lowercased()
+        if s.contains("critical") { return .critical }
+        if s.contains("serious") || s.contains("fair") { return .warning }
+        if cpuTemp > 95 { return .critical }
+        if cpuTemp > 80 { return .warning }
+        return .nominal
+    }
+
+    /// Network upload > 5 MB/s — triggers amber tx overlay + radar acceleration.
+    var networkTxSpikeActive: Bool {
+        (netOutBytesPerSec ?? 0) > 5_000_000
+    }
+
+    /// Network download > 10 MB/s — triggers cyan rx overlay + radar acceleration.
+    var networkRxSpikeActive: Bool {
+        (netInBytesPerSec ?? 0) > 10_000_000
+    }
+
+    /// Combined disk read + write > 200 MB/s — triggers scan strobe.
+    var diskIOSpikeActive: Bool {
+        let r = diskReadBytesPerSec ?? 0
+        let w = diskWriteBytesPerSec ?? 0
+        return (r + w) > 200_000_000
+    }
+
+    /// All cores < 5% — triggers idle breathing pulse + slow rotation.
+    var systemIdleActive: Bool {
+        let allCores = pCoreUsages + eCoreUsages + sCoreUsages
+        guard !allCores.isEmpty else { return false }
+        return (allCores.max() ?? 1.0) < 0.05
     }
 }
