@@ -76,6 +76,18 @@ final class ProcessLifecycleObserver {
                 self?.phaseController.exitLockScreen()
             }
         }
+        // JARVIS_AUTO_SHUTDOWN_AFTER_MS schedules a one-shot transition to
+        // .shutdown phase so the integration test can capture frames of
+        // ShutdownSequenceView as part of the seamless boot → live → lock
+        // → shutdown demo sequence. The shutdown animation itself runs for
+        // JARVISNominalState.shutdownDuration (7s) and then the app terminates.
+        if let raw = ProcessInfo.processInfo.environment["JARVIS_AUTO_SHUTDOWN_AFTER_MS"],
+           let ms = Int(raw), ms > 0 {
+            NSLog("[ProcessLifecycleObserver] JARVIS_AUTO_SHUTDOWN_AFTER_MS=\(ms) — scheduling shutdown")
+            DispatchQueue.main.asyncAfter(deadline: .now() + Double(ms) / 1000.0) { [weak self] in
+                self?.phaseController.startShutdown()
+            }
+        }
     }
 
     private func setupSignalHandlers() {

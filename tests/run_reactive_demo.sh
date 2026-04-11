@@ -34,23 +34,28 @@ mkdir -p "$REACTIVE_DIR"
 find "$REACTIVE_DIR" -maxdepth 1 -name 'frame_*.png' -delete 2>/dev/null || true
 
 # ---- Launch JarvisTelemetry ------------------------------------------------
-# Three env vars coordinate the seamless reactor → lock-screen → reactor demo:
-#   JARVIS_DISABLE_LOCKSCREEN=1   — suppress session-resign subscriptions so
-#       the HUD doesn't flip to .lockScreen when the capture process steals
-#       focus or the session idles. We drive the phase ourselves below.
-#   JARVIS_AUTO_LOCK_AFTER_MS=25000   — call phaseController.enterLockScreen()
-#       25s after launch. That's ~8 capture frames into the run, giving the
-#       reactor stress phase time to be visible first.
-#   JARVIS_AUTO_UNLOCK_AFTER_MS=65000 — call phaseController.exitLockScreen()
-#       65s after launch. That's ~24 frames in, leaving 12 frames (frames
-#       25-36) to capture post-unlock reactor recovery.
-log "Launching JarvisTelemetry with auto-lock/unlock timers"
-log "  JARVIS_DISABLE_LOCKSCREEN=1 (spontaneous session-resign suppressed)"
-log "  JARVIS_AUTO_LOCK_AFTER_MS=25000  (lock at t=25s, ~frame 9)"
-log "  JARVIS_AUTO_UNLOCK_AFTER_MS=65000 (unlock at t=65s, ~frame 25)"
+# Four env vars coordinate the seamless boot → live → lock → recovery → shutdown
+# capture. The capture starts 2 s after launch (during boot) and runs for 100 s
+# total, crossing all four phase transitions. Frame budget (2.5 s interval):
+#   frames 01-04  (t=02-12s)  boot sequence
+#   frames 05-11  (t=12-27s)  live reactor + stress (nominal state)
+#   frames 12-22  (t=27-52s)  lock screen cinematic animations
+#   frames 23-30  (t=52-75s)  unlock + live reactor recovery
+#   frames 31-40  (t=75-100s) shutdown sequence
+#
+#   JARVIS_DISABLE_LOCKSCREEN=1      — suppress session-resign subscription
+#   JARVIS_AUTO_LOCK_AFTER_MS=15000   — lock at t=15s (~frame 6, just after boot)
+#   JARVIS_AUTO_UNLOCK_AFTER_MS=45000 — unlock at t=45s (~frame 18, 30s of lock)
+#   JARVIS_AUTO_SHUTDOWN_AFTER_MS=75000 — shutdown at t=75s (~frame 30)
+log "Launching JarvisTelemetry with auto phase timers"
+log "  JARVIS_DISABLE_LOCKSCREEN=1"
+log "  JARVIS_AUTO_LOCK_AFTER_MS=15000     (lock at t=15s,   ~frame 6)"
+log "  JARVIS_AUTO_UNLOCK_AFTER_MS=45000   (unlock at t=45s, ~frame 18)"
+log "  JARVIS_AUTO_SHUTDOWN_AFTER_MS=75000 (shutdown at t=75s, ~frame 30)"
 JARVIS_DISABLE_LOCKSCREEN=1 \
-JARVIS_AUTO_LOCK_AFTER_MS=25000 \
-JARVIS_AUTO_UNLOCK_AFTER_MS=65000 \
+JARVIS_AUTO_LOCK_AFTER_MS=15000 \
+JARVIS_AUTO_UNLOCK_AFTER_MS=45000 \
+JARVIS_AUTO_SHUTDOWN_AFTER_MS=75000 \
   "$SWIFT_BINARY" >"$REACTIVE_DIR/jarvis_stderr.log" 2>&1 &
 APP_PID=$!
 echo "$APP_PID" > "$PID_FILE"
@@ -72,8 +77,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-log "Waiting 5s for boot sequence + HUD nominal"
-sleep 5
+log "Waiting 2s so the first captured frame lands inside the boot sequence"
+sleep 2
 
 if ! kill -0 "$APP_PID" 2>/dev/null; then
   die "JarvisTelemetry died during boot. stderr tail:
@@ -127,7 +132,7 @@ log "Capturing 36 frames at 2.5s intervals (90s total) via Quartz window targeti
 source "$TESTS_DIR/.venv/bin/activate"
 
 python3 "$TESTS_DIR/capture_window.py" \
-  --count 36 \
+  --count 40 \
   --interval 2.5 \
   --owner JarvisTelemetry \
   --out-dir "$REACTIVE_DIR" \
@@ -141,22 +146,30 @@ wait "$MEM_PID" 2>/dev/null || true
 kill "$NET_PID" 2>/dev/null || true
 
 # ---- Stop app cleanly ------------------------------------------------------
-log "Stopping JarvisTelemetry via SIGTERM"
-kill -TERM "$APP_PID" 2>/dev/null || true
-# Wait up to 10s — the SwiftUI shutdown sequence animation runs for ~7s, plus
-# daemon child teardown. Script's old 2s wait was too tight under stress load.
-DEADLINE=$((SECONDS + 10))
-SHUTDOWN_STATUS="Clean shutdown confirmed"
-while (( SECONDS < DEADLINE )); do
-  if ! kill -0 "$APP_PID" 2>/dev/null; then
-    break
-  fi
-  sleep 0.5
-done
+# JARVIS_AUTO_SHUTDOWN_AFTER_MS already fired startShutdown() 20s before the
+# last capture frame, so the ShutdownSequenceView is mid-playback or finished
+# by now. Check whether the process self-terminated (after the shutdown
+# animation plus applicationWillTerminate), and SIGTERM only if it's still up.
+log "Checking if app self-terminated via scheduled shutdown sequence"
 if kill -0 "$APP_PID" 2>/dev/null; then
-  log "SIGTERM ignored for 10s — escalating to SIGKILL"
-  kill -9 "$APP_PID" 2>/dev/null || true
-  SHUTDOWN_STATUS="SIGKILL required"
+    log "Still running — sending SIGTERM"
+    kill -TERM "$APP_PID" 2>/dev/null || true
+    DEADLINE=$((SECONDS + 10))
+    SHUTDOWN_STATUS="Clean shutdown via SIGTERM"
+    while (( SECONDS < DEADLINE )); do
+        if ! kill -0 "$APP_PID" 2>/dev/null; then
+            break
+        fi
+        sleep 0.5
+    done
+    if kill -0 "$APP_PID" 2>/dev/null; then
+        log "SIGTERM ignored for 10s — escalating to SIGKILL"
+        kill -9 "$APP_PID" 2>/dev/null || true
+        SHUTDOWN_STATUS="SIGKILL required"
+    fi
+else
+    log "App already terminated via scheduled shutdown sequence"
+    SHUTDOWN_STATUS="Clean shutdown via JARVIS_AUTO_SHUTDOWN_AFTER_MS"
 fi
 rm -f "$PID_FILE"
 
@@ -169,11 +182,11 @@ FRAME_COUNT=$(find "$REACTIVE_DIR" -maxdepth 1 -name 'frame_*.png' | wc -l | tr 
 log "  Frames captured:           $FRAME_COUNT / 36"
 log "  Shutdown:                  $SHUTDOWN_STATUS"
 log ""
-log "  [ ] frames 01-04: boot → reactor nominal state"
-log "  [ ] frames 05-08: reactor under stress (CPU burn + memory + network)"
-log "  [ ] frames 09-24: lock screen cinematic animations"
-log "                    (ParticleWireframeSphere + RadialTextMenu + MonochromeArrows)"
-log "  [ ] frames 25-36: reactor recovery after unlock"
+log "  [ ] frames 01-04: BOOT sequence (BootSequenceView)"
+log "  [ ] frames 05-11: LIVE reactor + stress (nominal + reactive animations)"
+log "  [ ] frames 12-22: LOCK screen cinematic animations"
+log "  [ ] frames 23-30: UNLOCK + reactor recovery"
+log "  [ ] frames 31-40: SHUTDOWN sequence (ShutdownSequenceView)"
 log ""
 log "Frames: $REACTIVE_DIR"
 log "App log: $REACTIVE_DIR/jarvis_stderr.log"
