@@ -24,9 +24,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var telemetryBridge: TelemetryBridge?
     private var telemetryCancellable: AnyCancellable?
 
-    // Right-side trigger panel — normal window level (visible on desktop, behind apps)
-    private var sidePanelWindow: NSPanel?
-    private var sidePanelWebView: WKWebView?
+    // Transparent click-catcher overlay for #jt-root in the main HTML.
+    // Centred at the bottom of the screen (above the Dock).
+    // Level = kCGDesktopWindowLevel+1 — above wallpaper, below every normal app.
+    // Sized to cover only the toggle button (collapsed) or full panel (expanded).
+    private var triggerOverlayWindow: NSPanel?
+    private var triggerOverlayWebView: WKWebView?
+    private var _triggerPanelOpen = false
     private var _daemonLive = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -53,7 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startBatteryTelemetry()
         startFullTelemetry()
         installSessionNotifications()
-        buildSidePanel()
+        buildTriggerOverlay()
     }
 
     func applicationWillTerminate(_ notification: Notification) {}
@@ -147,10 +151,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func screensDidChange() {
         setupWallpaperWindows()
-        sidePanelWindow?.close()
-        sidePanelWindow  = nil
-        sidePanelWebView = nil
-        buildSidePanel()
+        triggerOverlayWindow?.close()
+        triggerOverlayWindow  = nil
+        triggerOverlayWebView = nil
+        _triggerPanelOpen     = false
+        buildTriggerOverlay()
     }
 
     // MARK: - Full Daemon Telemetry (1 Hz)
@@ -218,11 +223,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSLog("[AppDelegate] telemetry injected: cpu=%.0f%% gpu=%.0f%% mem=%.1f/%.0fGB temp=%.0f°C",
               snap.cpuUsage, snap.gpuUsage, memUsedGB, memTotalGB, snap.socMetrics.cpuTemp)
-        // Notify the side panel that live telemetry is flowing (one-shot)
-        if !_daemonLive {
-            _daemonLive = true
-            sidePanelWebView?.evaluateJavaScript("if(typeof setLive==='function'){setLive(true)}") { _, _ in }
-        }
+        // #jt-status badge lives in the main HTML — updateTelemetry() drives it directly.
+        // No separate panel needs notifying.
     }
 
     // MARK: - Lock / Unlock Session Notifications
@@ -289,250 +291,121 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Trigger Side Panel
+    // MARK: - Trigger Overlay (transparent click-catcher)
 
-    /// Builds a partial-height transparent NSPanel anchored at the bottom-right of the
-    /// main screen.  Window level = kCGDesktopWindowLevel + 1 so it is:
-    ///   • Rendered directly above the JARVIS wallpaper — visually part of the animation
-    ///   • BELOW every normal app window (level 0+) — can NEVER overlap other windows
-    ///   • Clickable when the desktop is exposed (ignoresMouseEvents = false)
-    /// Clicks on the buttons post WKScriptMessages → Swift forwards via evaluateJavaScript
-    /// to the main wallpaper WKWebViews where JT.trigger() runs inside the animation.
-    private func buildSidePanel() {
+    /// Builds a tiny transparent NSPanel centred at the bottom of the screen.
+    /// Visual trigger buttons live in jarvis-full-animation.html at #jt-root (bottom:90px).
+    /// This overlay is an INVISIBLE click-catcher directly on top of those HTML buttons.
+    /// • Level = kCGDesktopWindowLevel+1 — above wallpaper, below every app window.
+    /// • Never overlaps any JARVIS data panel (centre-bottom area is clear).
+    /// • Starts sized to toggle button only (160×40); expands to 340×280 when open.
+    private func buildTriggerOverlay() {
         guard let screen = NSScreen.main else { return }
-
-        let panelW: CGFloat = 232
-        let visible = screen.visibleFrame          // rect above Dock, below menu bar
-
-        // Cap height at 530 pt so the panel only occupies the bottom-right corner.
-        // This prevents it from covering the JARVIS right data panels in the top-right area.
-        let panelH: CGFloat = min(530, visible.height * 0.40)
+        // Sized to the toggle button only (collapsed). Expands when user opens panel.
+        let panelW: CGFloat = 160
+        let panelH: CGFloat = 40
         let panelRect = NSRect(
-            x: visible.maxX - panelW,
-            y: visible.minY,          // anchored at bottom of visible area (above Dock)
+            x: (screen.frame.width - panelW) / 2,
+            y: 90,   // 90pt above bottom edge — aligns with #jt-root bottom:90px in HTML
             width:  panelW,
             height: panelH
         )
-
         let panel = NSPanel(
             contentRect: panelRect,
             styleMask:   [.borderless, .nonactivatingPanel],
             backing:     .buffered,
             defer:       false
         )
-        // Desktop window level + 1: renders directly above the JARVIS wallpaper
-        // but BELOW every normal app window (level 0+). The panel is visually
-        // part of the main animation and can never overlap other windows.
         panel.level              = NSWindow.Level(Int(CGWindowLevelForKey(.desktopWindow)) + 1)
         panel.backgroundColor    = .clear
         panel.isOpaque           = false
         panel.hasShadow          = false
         panel.ignoresMouseEvents = false
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-        panel.isFloatingPanel    = true          // no key-window steal on click
-
+        panel.isFloatingPanel    = true
         let config = WKWebViewConfiguration()
         let ucc    = WKUserContentController()
         ucc.add(self, name: "jarvisAction")
         config.userContentController = ucc
         config.defaultWebpagePreferences.allowsContentJavaScript = true
-
-        let wv = WKWebView(frame: NSRect(origin: .zero, size: panelRect.size),
-                           configuration: config)
+        let wv = WKWebView(frame: NSRect(origin: .zero, size: panelRect.size), configuration: config)
         wv.autoresizingMask = [.width, .height]
         wv.setValue(false, forKey: "drawsBackground")
-        wv.loadHTMLString(triggerSidePanelHTML(), baseURL: nil)
-
+        wv.loadHTMLString(triggerOverlayHTML(), baseURL: nil)
         panel.contentView = wv
-        panel.orderFront(nil)                    // don't makeKey — don't steal focus
-        sidePanelWindow  = panel
-        sidePanelWebView = wv
-        NSLog("[AppDelegate] trigger side panel %.0fx%.0f at x=%.0f (bottom-right only)",
-              panelW, panelH, panelRect.minX)
+        panel.orderFront(nil)
+        triggerOverlayWindow  = panel
+        triggerOverlayWebView = wv
+        NSLog("[AppDelegate] trigger overlay 160x40 center-bottom y=90 (collapsed)")
     }
 
-    // swiftlint:disable function_body_length
-    private func triggerSidePanelHTML() -> String {
+    private func resizeTriggerOverlay(open: Bool) {
+        guard let screen = NSScreen.main, let panel = triggerOverlayWindow else { return }
+        let w: CGFloat = open ? 340 : 160
+        let h: CGFloat = open ? 280 : 40
+        let x = (screen.frame.width - w) / 2
+        panel.setFrame(NSRect(x: x, y: 90, width: w, height: h), display: true, animate: false)
+        NSLog("[AppDelegate] trigger overlay %.0fx%.0f (open=%@)", w, h, open ? "true" : "false")
+    }
+
+    private func triggerOverlayHTML() -> String {
+        // Invisible click-catcher that mirrors the #jt-root layout in the main HTML.
+        // All elements are fully transparent — the visual buttons are drawn by the
+        // main HTML at #jt-root. This overlay just captures clicks and forwards them.
         """
-        <!DOCTYPE html>
-        <html>
-        <head>
-        <meta charset="utf-8">
+        <!DOCTYPE html><html><head><meta charset="utf-8">
         <style>
           *{margin:0;padding:0;box-sizing:border-box;}
-          html,body{
-            width:100%;height:100%;
-            background:rgba(2,5,15,0.96);
-            overflow:hidden;
-            -webkit-user-select:none;user-select:none;
-            border-left:1px solid rgba(26,230,245,0.20);
-          }
-          #panel{
-            display:flex;flex-direction:column;
-            height:100%;padding:14px 10px 10px;gap:5px;
-            overflow-y:auto;overflow-x:hidden;
-          }
-          #panel::-webkit-scrollbar{width:3px;}
-          #panel::-webkit-scrollbar-track{background:transparent;}
-          #panel::-webkit-scrollbar-thumb{background:rgba(26,230,245,0.20);border-radius:2px;}
-          .logo{
-            font-family:'Courier New',monospace;
-            font-size:11px;letter-spacing:4px;
-            color:#1AE6F5;text-align:center;padding-bottom:2px;
-          }
-          .sub{
-            font-family:'Courier New',monospace;
-            font-size:6.5px;letter-spacing:2.5px;
-            color:rgba(26,230,245,0.38);text-align:center;
-            text-transform:uppercase;margin-bottom:2px;
-          }
-          .status-row{
-            display:flex;align-items:center;justify-content:center;
-            gap:6px;margin-bottom:3px;
-          }
-          .dot{
-            width:6px;height:6px;border-radius:50%;
-            background:#1AE6F5;box-shadow:0 0 6px #1AE6F5;
-            animation:dp 2s ease-in-out infinite;
-          }
-          .dot.sim{background:#668494;box-shadow:0 0 4px #668494;animation:none;}
-          @keyframes dp{0%,100%{opacity:0.4;}50%{opacity:1;}}
-          .stxt{
-            font-family:'Courier New',monospace;
-            font-size:7px;letter-spacing:2px;
-            color:rgba(26,230,245,0.55);
-          }
-          .div{height:1px;background:rgba(26,230,245,0.11);margin:1px 0;}
-          .sec{
-            font-family:'Courier New',monospace;
-            font-size:6.5px;letter-spacing:2px;
-            color:rgba(26,230,245,0.28);text-transform:uppercase;
-            padding:3px 0 2px;
-          }
-          button{
-            width:100%;
-            background:rgba(26,230,245,0.06);
-            border:1px solid rgba(26,230,245,0.20);
-            color:rgba(26,230,245,0.72);
-            font-family:'Courier New',monospace;
-            font-size:8.5px;letter-spacing:1.4px;
-            padding:7px 8px;border-radius:2px;
-            cursor:pointer;text-transform:uppercase;
-            text-align:left;display:flex;align-items:center;gap:7px;
-            position:relative;overflow:hidden;transition:all 0.15s;
-          }
-          button:hover{
-            background:rgba(26,230,245,0.14);
-            border-color:rgba(26,230,245,0.55);
-            color:#1AE6F5;box-shadow:0 0 8px rgba(26,230,245,0.15);
-          }
-          button.amber{
-            border-color:rgba(255,200,0,0.20);
-            color:rgba(255,200,0,0.72);background:rgba(255,200,0,0.06);
-          }
-          button.amber:hover{
-            background:rgba(255,200,0,0.14);
-            border-color:rgba(255,200,0,0.55);color:#FFC800;
-          }
-          button.crimson{
-            border-color:rgba(255,38,51,0.20);
-            color:rgba(255,38,51,0.72);background:rgba(255,38,51,0.06);
-          }
-          button.crimson:hover{
-            background:rgba(255,38,51,0.14);
-            border-color:rgba(255,38,51,0.55);color:#FF2633;
-          }
-          button.active{animation:bl 0.65s ease-in-out infinite alternate;}
-          @keyframes bl{from{opacity:0.60;}to{opacity:1;}}
-          button.active::after{
-            content:'';position:absolute;bottom:0;left:0;
-            height:2px;width:100%;background:currentColor;
-            transform-origin:left;animation:cd 4s linear forwards;
-          }
-          @keyframes cd{from{transform:scaleX(1);}to{transform:scaleX(0);}}
-          .ico{font-size:10px;flex-shrink:0;}
-          .lbl{flex:1;}
-        </style>
-        </head>
-        <body>
-        <div id="panel">
-          <div class="logo">⚡ JARVIS</div>
-          <div class="sub">REACTIVE TRIGGERS</div>
-          <div class="status-row">
-            <div id="dot" class="dot sim"></div>
-            <span id="stxt" class="stxt">SIM</span>
+          html,body{width:100%;height:100%;background:transparent;overflow:hidden;
+                    -webkit-user-select:none;}
+          #ov-root{position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+                   display:flex;flex-direction:column;align-items:center;gap:5px;}
+          #ov-toggle{background:rgba(0,0,0,0.01);border:none;color:transparent;
+                     width:140px;height:30px;cursor:pointer;}
+          #ov-panel{display:none;flex-direction:column;gap:5px;align-items:stretch;
+                    padding:10px 12px 8px;background:rgba(0,0,0,0.01);min-width:310px;}
+          #ov-panel.open{display:flex;}
+          .ov-row{display:flex;gap:5px;}
+          .ov-btn{flex:1;background:rgba(0,0,0,0.01);border:none;color:transparent;
+                  padding:6px 8px 8px;cursor:pointer;min-height:26px;}
+          .ov-lbl{height:20px;pointer-events:none;}
+        </style></head><body>
+        <div id="ov-root">
+          <div id="ov-panel">
+            <div class="ov-lbl"></div>
+            <div class="ov-row">
+              <button class="ov-btn" onclick="T('cpu')"> </button>
+              <button class="ov-btn" onclick="T('gpu')"> </button>
+              <button class="ov-btn" onclick="T('thermal')"> </button>
+            </div>
+            <div class="ov-row">
+              <button class="ov-btn" onclick="T('power')"> </button>
+              <button class="ov-btn" onclick="T('charge')"> </button>
+              <button class="ov-btn" onclick="T('memory')"> </button>
+            </div>
+            <div class="ov-row">
+              <button class="ov-btn" onclick="T('network')"> </button>
+              <button class="ov-btn" onclick="T('disk')"> </button>
+            </div>
+            <div class="ov-lbl"></div>
+            <div class="ov-row">
+              <button class="ov-btn" onclick="P('booting')"> </button>
+              <button class="ov-btn" onclick="P('lock')"> </button>
+              <button class="ov-btn" onclick="P('shutdown')"> </button>
+            </div>
           </div>
-          <div class="div"></div>
-
-          <div class="sec">[ system animation demos ]</div>
-          <button id="b-cpu"     class="amber"
-            onclick="trig('cpu')"><span class="ico">▲</span><span class="lbl">CPU SPIKE</span></button>
-          <button id="b-gpu"     class="amber"
-            onclick="trig('gpu')"><span class="ico">▲</span><span class="lbl">GPU SURGE</span></button>
-          <button id="b-thermal" class="crimson"
-            onclick="trig('thermal')"><span class="ico">🌡</span><span class="lbl">THERMAL</span></button>
-          <button id="b-power"
-            onclick="trig('power')"><span class="ico">⚡</span><span class="lbl">POWER SURGE</span></button>
-          <button id="b-charge"
-            onclick="trig('charge')"><span class="ico">🔋</span><span class="lbl">CHARGE SURGE</span></button>
-          <button id="b-memory"  class="amber"
-            onclick="trig('memory')"><span class="ico">▲</span><span class="lbl">MEM PRESSURE</span></button>
-          <button id="b-network"
-            onclick="trig('network')"><span class="ico">◈</span><span class="lbl">NET BURST</span></button>
-          <button id="b-disk"
-            onclick="trig('disk')"><span class="ico">◉</span><span class="lbl">DISK I/O</span></button>
-
-          <div class="div"></div>
-          <div class="sec">[ phase transitions ]</div>
-          <button id="b-boot"
-            onclick="phase('booting')"><span class="ico">⚡</span><span class="lbl">BOOT</span></button>
-          <button id="b-lock"
-            onclick="phase('lock')"><span class="ico">🔒</span><span class="lbl">LOCK  (6s demo)</span></button>
-          <button id="b-shut" class="crimson"
-            onclick="phase('shutdown')"><span class="ico">💀</span><span class="lbl">SHUTDOWN (8s)</span></button>
+          <button id="ov-toggle" onclick="G()"> </button>
         </div>
         <script>
-        var _t={};
-        function setLive(v){
-          document.getElementById('dot').className='dot'+(v?'':' sim');
-          document.getElementById('stxt').textContent=v?'LIVE':'SIM';
-        }
-        function trig(k){
-          var b=document.getElementById('b-'+k);
-          if(_t[k]){
-            clearTimeout(_t[k]);delete _t[k];
-            if(b)b.classList.remove('active');
-            window.webkit.messageHandlers.jarvisAction.postMessage({action:'cancel',key:k});
-            return;
-          }
-          window.webkit.messageHandlers.jarvisAction.postMessage({action:'trigger',key:k});
-          if(b){
-            b.classList.add('active');
-            _t[k]=setTimeout(function(){b.classList.remove('active');delete _t[k];},4000);
-          }
-        }
-        function phase(ph){
-          window.webkit.messageHandlers.jarvisAction.postMessage({action:'phase',phase:ph});
-          // Grey out phase buttons briefly while demo plays
-          var dur=ph==='shutdown'?8500:ph==='lock'?6500:3000;
-          var bids=['b-boot','b-lock','b-shut'];
-          bids.forEach(function(id){
-            var el=document.getElementById(id);
-            if(el){el.disabled=true;el.style.opacity='0.35';}
-          });
-          setTimeout(function(){
-            bids.forEach(function(id){
-              var el=document.getElementById(id);
-              if(el){el.disabled=false;el.style.opacity='';}
-            });
-          },dur);
-        }
+          function G(){window.webkit.messageHandlers.jarvisAction.postMessage({action:'toggle'});}
+          function setOpen(v){var p=document.getElementById('ov-panel');
+            if(v)p.classList.add('open');else p.classList.remove('open');}
+          function T(k){window.webkit.messageHandlers.jarvisAction.postMessage({action:'trigger',key:k});}
+          function P(ph){window.webkit.messageHandlers.jarvisAction.postMessage({action:'phase',phase:ph});}
         </script>
-        </body>
-        </html>
+        </body></html>
         """
     }
-    // swiftlint:enable function_body_length
 
     // MARK: - Signal Handling
 
@@ -635,6 +508,16 @@ extension AppDelegate: WKScriptMessageHandler {
             default:
                 break
             }
+
+        case "toggle":
+            _triggerPanelOpen = !_triggerPanelOpen
+            let open = _triggerPanelOpen
+            triggerOverlayWebView?.evaluateJavaScript("setOpen(\(open ? "true" : "false"))") { _, _ in }
+            resizeTriggerOverlay(open: open)
+            webViews.forEach {
+                $0.evaluateJavaScript("if(typeof JT!=='undefined'){JT.toggle()}") { _, _ in }
+            }
+            NSLog("[AppDelegate] toggle → overlay %@", open ? "open" : "closed")
 
         default:
             break
