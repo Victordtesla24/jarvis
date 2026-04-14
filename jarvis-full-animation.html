@@ -1215,7 +1215,7 @@
   ═══════════════════════════════════════════════════════════════════ */
   #jt-root {
     position: fixed;
-    bottom: 90px;      /* raised above macOS Dock (~65 pt) so it is always visible */
+    bottom: 94px;      /* raised above macOS Dock (~65 pt) so it is always visible */
     left: 50%;
     transform: translateX(-50%);
     z-index: 20;
@@ -1227,26 +1227,33 @@
     font-family: 'Rajdhani', sans-serif;
   }
   #jt-toggle {
-    background: rgba(5,10,20,0.82);
-    border: 1px solid rgba(26,230,245,0.32);
-    color: rgba(26,230,245,0.72);
+    background: rgba(2,8,18,0.92);
+    border: 1.5px solid rgba(26,230,245,0.80);
+    color: #1AE6F5;
     font-family: 'Rajdhani', sans-serif;
-    font-size: 10.5px;
-    letter-spacing: 2.5px;
-    font-weight: 600;
-    padding: 5px 16px;
+    font-size: 13px;
+    letter-spacing: 3px;
+    font-weight: 700;
+    padding: 8px 22px;
     border-radius: 2px;
     cursor: pointer;
     text-transform: uppercase;
     transition: all 0.18s;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 0 18px rgba(26,230,245,0.40), inset 0 0 12px rgba(26,230,245,0.06);
+    animation: jtTogglePulse 3s ease-in-out infinite;
+  }
+  @keyframes jtTogglePulse {
+    0%,100% { box-shadow: 0 0 12px rgba(26,230,245,0.30), inset 0 0 8px rgba(26,230,245,0.04); border-color: rgba(26,230,245,0.60); }
+    50%      { box-shadow: 0 0 32px rgba(26,230,245,0.65), inset 0 0 18px rgba(26,230,245,0.10); border-color: rgba(26,230,245,1.00); }
   }
   #jt-toggle:hover {
     border-color: var(--cy);
-    color: var(--cy);
-    box-shadow: 0 0 14px rgba(26,230,245,0.28);
-    background: rgba(26,230,245,0.05);
+    color: #ffffff;
+    box-shadow: 0 0 40px rgba(26,230,245,0.75);
+    background: rgba(26,230,245,0.12);
+    animation: none;
   }
   #jt-panel {
     display: none;

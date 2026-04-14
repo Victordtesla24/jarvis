@@ -306,7 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let panelH: CGFloat = 40
         let panelRect = NSRect(
             x: (screen.frame.width - panelW) / 2,
-            y: 90,   // 90pt above bottom edge — aligns with #jt-root bottom:90px in HTML
+            y: 94,   // 94pt above bottom edge — aligns with #jt-root bottom:94px in HTML
             width:  panelW,
             height: panelH
         )
