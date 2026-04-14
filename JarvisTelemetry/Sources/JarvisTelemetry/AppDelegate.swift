@@ -294,7 +294,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Trigger Overlay (transparent click-catcher)
 
     /// Builds a tiny transparent NSPanel centred at the bottom of the screen.
-    /// Visual trigger buttons live in jarvis-full-animation.html at #jt-root (bottom:90px).
+    /// Visual trigger buttons live in jarvis-full-animation.html at #jt-root (bottom:94px).
     /// This overlay is an INVISIBLE click-catcher directly on top of those HTML buttons.
     /// • Level = kCGDesktopWindowLevel+1 — above wallpaper, below every app window.
     /// • Never overlaps any JARVIS data panel (centre-bottom area is clear).
@@ -336,7 +336,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.orderFront(nil)
         triggerOverlayWindow  = panel
         triggerOverlayWebView = wv
-        NSLog("[AppDelegate] trigger overlay 160x40 center-bottom y=90 (collapsed)")
+        NSLog("[AppDelegate] trigger overlay 160x40 center-bottom y=94 (collapsed)")
     }
 
     private func resizeTriggerOverlay(open: Bool) {
@@ -344,7 +344,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let w: CGFloat = open ? 340 : 160
         let h: CGFloat = open ? 280 : 40
         let x = (screen.frame.width - w) / 2
-        panel.setFrame(NSRect(x: x, y: 90, width: w, height: h), display: true, animate: false)
+        panel.setFrame(NSRect(x: x, y: 94, width: w, height: h), display: true, animate: false)
         NSLog("[AppDelegate] trigger overlay %.0fx%.0f (open=%@)", w, h, open ? "true" : "false")
     }
 
