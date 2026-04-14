@@ -7,6 +7,17 @@
 import SwiftUI
 import Combine
 
+/// An expanding energy ripple drawn as a concentric ring on the reactor.
+/// Triggered by sudden load spikes, each ripple expands from core to
+/// outer ring over ~1.0s with fading opacity.
+struct EnergyRipple: Identifiable {
+    let id = UUID()
+    var progress: Double = 0.0   // 0→1 expansion
+    let intensity: Double        // birth brightness (0.3–1.0)
+    let birthTime: Date = Date()
+    let duration: Double = 1.0   // seconds to fully expand
+}
+
 /// Reactor animation states
 enum ReactorState: Equatable {
     /// Normal operating state — parameters at JARVISNominalState values
@@ -118,7 +129,7 @@ final class ReactorAnimationController: ObservableObject {
     /// CPU/GPU spike → >1, idle → <1.
     @Published var ringSpeedMultiplier: Double = 1.0
 
-    /// 0 = cyan (#00D4FF), 1 = amber (#FFC800). Linearly shifts all ring
+    /// 0 = cyan (#1AE6F5), 1 = amber (#FFC800). Linearly shifts all ring
     /// fill colours via HSV hue lerp.
     @Published var ringHueShift: Double = 0.0
 
@@ -154,12 +165,58 @@ final class ReactorAnimationController: ObservableObject {
     /// Active overlay events, displayed by ReactiveOverlayView. Capped at 2.
     @Published var activeOverlays: [ReactiveOverlayEvent] = []
 
+    // MARK: - Continuous Reactive State (Marvel-grade)
+    //
+    // These properties are updated EVERY telemetry tick (1 Hz) with smooth
+    // interpolation so the reactor feels organically alive — not just
+    // firing discrete events but continuously breathing with the machine.
+
+    /// Smoothed aggregate system load (0.0–1.0). Blends CPU + GPU + memory
+    /// with momentum so sudden spikes ramp up fast (attack ~200ms) and
+    /// decay slowly (release ~1.5s) — like a real arc reactor's energy field.
+    @Published var reactorLoad: Double = 0.0
+
+    /// Instantaneous flare intensity (0.0–1.0). Spikes to ~1.0 on sudden
+    /// load deltas (>15% jump between ticks), then decays exponentially
+    /// over ~0.8s. Drives core white-hot flash and ring brightness surge.
+    @Published var coreFlare: Double = 0.0
+
+    /// Per-ring-layer reactive intensity multipliers (0.0–2.0).
+    /// Each ring responds to different telemetry: ring1 (outer) = GPU,
+    /// ring2 = E-cores, ring3 = P-cores, ring4 = S-cores, ring5 = memory.
+    @Published var ringIntensities: [Double] = [1.0, 1.0, 1.0, 1.0, 1.0]
+
+    /// Energy ripple queue — expanding concentric rings triggered by load
+    /// spikes. Each ripple has progress (0→1) and birth intensity.
+    @Published var energyRipples: [EnergyRipple] = []
+
+    /// Idle breathing phase (0→2π, continuous). When system is idle, drives
+    /// a slow sine-wave modulation on core glow and ring opacity.
+    @Published var breathingPhase: Double = 0.0
+
+    /// Power flow intensity — tracks total system power draw normalized
+    /// to chip TDP. Drives the brightness of structural ring bloom.
+    @Published var powerFlowIntensity: Double = 0.0
+
+    /// Spec §3.1 Ring Harmonics: 0 = normal differentiated speeds, 1 = all rings
+    /// briefly synchronized. Ramps 0→1→0 over a ~2s window every 45-60s.
+    /// Used by JarvisReactorCanvas to lerp per-ring `rot` multipliers toward 0.
+    @Published var harmonicBlend: Double = 0.0
+
     // MARK: - Private
 
     private var cancellables = Set<AnyCancellable>()
     private var chargingWakeTimer: AnyCancellable?
+    private var harmonicTimer: AnyCancellable?
+    private var harmonicAnimTimer: AnyCancellable?
     private var dyingTimer: AnyCancellable?
     private var shakeTimer: AnyCancellable?
+    private var continuousTimer: AnyCancellable?
+
+    /// Previous aggregate load for delta detection (internal for testing)
+    var prevReactorLoad: Double = 0.0
+    /// Timestamp of last continuous update for dt calculation (internal for testing)
+    var lastContinuousUpdate: Date = Date()
 
     // MARK: - Reactive Event State (debounce + in-flight tracking)
     //
@@ -176,6 +233,7 @@ final class ReactorAnimationController: ObservableObject {
 
     /// Bind to telemetry sources and begin reactive updates
     func bind(to store: TelemetryStore, battery: BatteryMonitor) {
+        startHarmonicsScheduler()
         // React to battery state changes
         battery.$isDying
             .removeDuplicates()
@@ -240,6 +298,17 @@ final class ReactorAnimationController: ObservableObject {
                 self.reactToTelemetry(store: store, battery: battery)
             }
             .store(in: &cancellables)
+
+        // ── Continuous 60fps reactive update loop ──────────────────────────
+        // This drives smooth interpolation of reactorLoad, coreFlare,
+        // breathing, and energy ripples independent of the 1Hz telemetry tick.
+        lastContinuousUpdate = Date()
+        continuousTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self, weak store] _ in
+                guard let self, let store else { return }
+                self.continuousReactiveUpdate(store: store)
+            }
 
         // Battery ring progress follows BatteryMonitor directly so the R×0.92
         // ring on the Canvas always reflects the current charge level, even
@@ -446,6 +515,88 @@ final class ReactorAnimationController: ObservableObject {
 
         // Prune expired overlays
         pruneOverlays()
+    }
+
+    // MARK: - Continuous Reactive Update (60fps)
+    //
+    // Smooth interpolation engine that makes the reactor feel alive.
+    // Attack/decay asymmetry: spikes ramp fast, decay is slow and organic.
+
+    /// Internal for testability — called at 60fps by the continuous timer.
+    func continuousReactiveUpdate(store: TelemetryStore) {
+        let now = Date()
+        let dt = min(now.timeIntervalSince(lastContinuousUpdate), 0.1) // cap at 100ms
+        lastContinuousUpdate = now
+
+        guard currentState != .dying && currentState != .chargingWake else { return }
+
+        // ── 1. Compute instantaneous aggregate load ────────────────────────
+        let allCores = store.eCoreUsages + store.pCoreUsages + store.sCoreUsages
+        let cpuAvg = allCores.isEmpty ? 0.0 : allCores.reduce(0, +) / Double(allCores.count)
+        let gpuLoad = store.gpuUsage
+        let memPressure = store.memoryTotalGB > 0 ? store.memoryUsedGB / store.memoryTotalGB : 0
+        let instantLoad = min(cpuAvg * 0.50 + gpuLoad * 0.35 + memPressure * 0.15, 1.0)
+
+        // ── 2. Asymmetric smoothing: fast attack, slow decay ───────────────
+        // Attack: lerp toward target in ~200ms (factor ~12/s)
+        // Decay:  lerp toward target in ~1.5s (factor ~2/s)
+        let attackRate = 12.0 * dt
+        let decayRate  = 2.0 * dt
+        let rate = instantLoad > reactorLoad ? attackRate : decayRate
+        reactorLoad += (instantLoad - reactorLoad) * min(rate, 1.0)
+
+        // ── 3. Flare detection — sudden delta triggers white-hot flash ─────
+        let loadDelta = instantLoad - prevReactorLoad
+        if loadDelta > 0.12 {
+            // Spike detected — flare proportional to the jump magnitude
+            coreFlare = min(loadDelta * 4.0, 1.0)
+
+            // Spawn an energy ripple if delta is significant
+            if loadDelta > 0.18 && energyRipples.count < 3 {
+                energyRipples.append(EnergyRipple(intensity: min(loadDelta * 3.0, 1.0)))
+            }
+        }
+        // Decay flare exponentially (~0.8s half-life)
+        coreFlare *= pow(0.1, dt / 0.8)
+        if coreFlare < 0.01 { coreFlare = 0 }
+        prevReactorLoad = instantLoad
+
+        // ── 4. Per-ring intensity — each ring tracks its telemetry source ──
+        let eMax = store.eCoreUsages.max() ?? 0
+        let pMax = store.pCoreUsages.max() ?? 0
+        let sMax = store.sCoreUsages.max() ?? 0
+        let targetIntensities: [Double] = [
+            0.6 + gpuLoad * 1.4,           // Ring 1 (outer): GPU
+            0.6 + eMax * 1.4,              // Ring 2: E-cores
+            0.6 + pMax * 1.4,              // Ring 3: P-cores
+            0.6 + sMax * 1.4,              // Ring 4: S-cores
+            0.6 + memPressure * 1.4        // Ring 5 (inner): memory
+        ]
+        for i in 0..<5 {
+            let target = targetIntensities[i]
+            let r = target > ringIntensities[i] ? attackRate : decayRate
+            ringIntensities[i] += (target - ringIntensities[i]) * min(r, 1.0)
+        }
+
+        // ── 5. Power flow — normalized to ~60W TDP estimate ────────────────
+        let targetPower = min(store.totalPower / 60.0, 1.0)
+        let pRate = targetPower > powerFlowIntensity ? attackRate : decayRate
+        powerFlowIntensity += (targetPower - powerFlowIntensity) * min(pRate, 1.0)
+
+        // ── 6. Breathing phase — continuous sine for idle/low-load states ──
+        // Speed slows as load increases (3s period at idle, 8s under load)
+        let breathPeriod = 3.0 + reactorLoad * 5.0
+        breathingPhase += (Double.pi * 2.0 / breathPeriod) * dt
+        if breathingPhase > Double.pi * 2.0 { breathingPhase -= Double.pi * 2.0 }
+
+        // ── 7. Advance + prune energy ripples ──────────────────────────────
+        for i in energyRipples.indices.reversed() {
+            let elapsed = now.timeIntervalSince(energyRipples[i].birthTime)
+            energyRipples[i].progress = min(elapsed / energyRipples[i].duration, 1.0)
+            if energyRipples[i].progress >= 1.0 {
+                energyRipples.remove(at: i)
+            }
+        }
     }
 
     // MARK: - R-02 · Event firing helpers
@@ -701,6 +852,58 @@ final class ReactorAnimationController: ObservableObject {
                     self.reactorShakeOffset = keyframes[index]
                 }
                 index += 1
+            }
+    }
+
+    // MARK: - Ring Harmonics (Spec §3.1)
+
+    /// Schedules periodic ring-sync events every 45-60s as per spec §3.1.
+    /// During each event, `harmonicBlend` ramps 0→1 (0.5s), holds 1-2s, ramps 1→0 (0.5s).
+    /// JarvisReactorCanvas uses this to lerp per-ring rotation offsets toward 0
+    /// so all rings briefly spin in near-unison — a visual "resonance chord."
+    private func startHarmonicsScheduler() {
+        let interval = Double.random(in: 45...60)
+        harmonicTimer = Timer.publish(every: interval, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.triggerHarmonicSync()
+                // Reschedule with a new random interval
+                self.harmonicTimer?.cancel()
+                let nextInterval = Double.random(in: 45...60)
+                self.harmonicTimer = Timer.publish(every: nextInterval, on: .main, in: .common)
+                    .autoconnect()
+                    .sink { [weak self] _ in self?.triggerHarmonicSync() }
+            }
+    }
+
+    private func triggerHarmonicSync() {
+        let rampDuration = 0.5       // s — blend-in and blend-out
+        let holdDuration = Double.random(in: 1.0...2.0)
+        let totalFrames  = 60        // steps at ~60 fps
+        let rampFrames   = Int(rampDuration * 60)
+        let holdFrames   = Int(holdDuration * 60)
+        var frame = 0
+
+        harmonicAnimTimer?.cancel()
+        harmonicAnimTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                _ = totalFrames  // suppress unused warning
+                if frame < rampFrames {
+                    self.harmonicBlend = Double(frame) / Double(rampFrames)
+                } else if frame < rampFrames + holdFrames {
+                    self.harmonicBlend = 1.0
+                } else {
+                    let fadeFrame = frame - rampFrames - holdFrames
+                    self.harmonicBlend = max(0.0, 1.0 - Double(fadeFrame) / Double(rampFrames))
+                    if self.harmonicBlend <= 0 {
+                        self.harmonicBlend = 0
+                        self.harmonicAnimTimer?.cancel()
+                    }
+                }
+                frame += 1
             }
     }
 

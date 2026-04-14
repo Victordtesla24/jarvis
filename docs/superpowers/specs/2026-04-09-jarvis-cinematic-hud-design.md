@@ -508,9 +508,9 @@ TelemetryStore (normalize + @Published)
 
 | Hex | Role | Usage |
 |-----|------|-------|
-| `#00D4FF` | Primary cyan | Rings, ticks, data arcs, chatter text, particles |
-| `#69F1F1` | Bright cyan | Hero readouts, highlights, core glow |
-| `#008CB3` | Dim cyan | Subtle accents, far-depth elements |
+| `#1AE6F5` | Primary teal-cyan | Rings, ticks, data arcs, chatter text, particles |
+| `#8CFAFE` | Bright teal-cyan | Hero readouts, highlights, core glow |
+| `#0E90A8` | Dim teal-cyan | Subtle accents, far-depth elements |
 | `#FFC800` | Amber | P-Core arcs, thermal warnings, elevated mood |
 | `#FF2633` | Crimson | S-Core arcs, critical alerts, threat escalation |
 | `#668494` | Steel | Structural rings, bezels, degree markers |

@@ -15,7 +15,7 @@ struct JarvisLeftPanel: View {
     @EnvironmentObject var store: TelemetryStore
     @Environment(\.animationPhase) var phase: Double
 
-    private let cyan      = Color(red: 0.00, green: 0.83, blue: 1.00)   // #00D4FF
+    private let cyan      = Color(red: 0.102, green: 0.902, blue: 0.961)   // #1AE6F5
     private let panelBg   = Color(red: 0.004, green: 0.059, blue: 0.118) // #010F1E
 
     var body: some View {
@@ -53,7 +53,7 @@ private struct HUDPanel<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Title: SF Mono Bold 9pt, #00D4FF, ALL CAPS, tracking 2pt
+            // Title: SF Mono Bold 9pt, #1AE6F5, ALL CAPS, tracking 2pt
             Text(title)
                 .font(.system(size: 9, design: .monospaced).bold())
                 .tracking(2)
@@ -88,12 +88,12 @@ private struct PanelDataRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            // Leading cyan dot (Circle 4pt, fill #00D4FF)
+            // Leading cyan dot (Circle 4pt, fill #1AE6F5)
             Circle()
                 .fill(cyan)
                 .frame(width: 4, height: 4)
 
-            // Data: SF Mono Regular 8pt, #00D4FF.opacity(0.8)
+            // Data: SF Mono Regular 8pt, #1AE6F5.opacity(0.8)
             Text(text)
                 .font(.system(size: 8, design: .monospaced))
                 .foregroundColor(cyan.opacity(0.8))
@@ -127,7 +127,7 @@ private struct ClockRingWidget: View {
                 HStack(spacing: 12) {
                     // Circular ring widget wrapping date
                     ZStack {
-                        // Outer ring: Circle stroke #00D4FF, lineWidth 2pt, ~140pt diameter (scaled)
+                        // Outer ring: Circle stroke #1AE6F5, lineWidth 2pt, ~140pt diameter (scaled)
                         Circle()
                             .stroke(cyan, lineWidth: 2)
                             .frame(width: 90, height: 90)
@@ -229,7 +229,7 @@ private struct PowerArcGauge: View {
 
     private var gaugeColor: Color {
         let pct = powerPercent
-        if pct > 20 { return cyan }             // #00D4FF > 20%
+        if pct > 20 { return cyan }             // #1AE6F5 > 20%
         if pct > 10 { return Color(red: 1.0, green: 0.584, blue: 0.0) }  // #FF9500
         return Color(red: 1.0, green: 0.231, blue: 0.188)  // #FF3B30
     }
@@ -328,7 +328,7 @@ private struct RadarWidget: View {
                     .stroke(cyan.opacity(0.1), lineWidth: 0.5)
                     .frame(width: 80, height: 80)
 
-                    // Rotating sweep line: gradient #00D4FF.opacity(0.8)→transparent
+                    // Rotating sweep line: gradient #1AE6F5.opacity(0.8)→transparent
                     // 4s rotation period
                     let sweepAngle = phase.truncatingRemainder(dividingBy: 4.0) / 4.0 * 360.0
                     Path { p in

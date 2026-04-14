@@ -53,3 +53,6 @@ package-lock.json
 package.json
 
 mcp.json
+
+# ── Harness API keys — NEVER commit ─────────────────────
+tests/api_keys.env

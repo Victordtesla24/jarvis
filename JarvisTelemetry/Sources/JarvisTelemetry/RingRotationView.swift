@@ -71,9 +71,9 @@ final class RingRotationNSView: NSView {
         let cy = bounds.midY
         let R = min(bounds.width, bounds.height) * 0.42
 
-        // #00D4FF in linear sRGB
+        // #1AE6F5 in linear sRGB
         let cyanCG = CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(),
-                             components: [0.0, 0.831, 1.0, 1.0])!
+                             components: [0.102, 0.902, 0.961, 1.0])!
 
         for spec in specs {
             let radius = R * spec.radiusFraction

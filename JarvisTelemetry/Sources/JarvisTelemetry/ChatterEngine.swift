@@ -19,7 +19,7 @@ final class ChatterEngine: ObservableObject {
     private var ambientTimer: AnyCancellable?
     private var lastAmbientIndex = 0
     private let maxLines = 15
-    private let cyan = Color(red: 0.00, green: 0.83, blue: 1.00)
+    private let cyan = Color(red: 0.102, green: 0.902, blue: 0.961)
     private let amber = Color(red: 1.00, green: 0.78, blue: 0.00)
     private let crimson = Color(red: 1.00, green: 0.15, blue: 0.20)
 
@@ -55,7 +55,7 @@ final class ChatterEngine: ObservableObject {
         }
     }
 
-    private func addSecondary(_ text: String, color: Color = Color(red: 0, green: 0.83, blue: 1.0)) {
+    private func addSecondary(_ text: String, color: Color = Color(red: 0.102, green: 0.902, blue: 0.961)) {
         let line = ChatterLine(text: text, color: color, timestamp: Date(), severity: .info)
         secondaryLines.append(line)
         if secondaryLines.count > 10 {

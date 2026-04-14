@@ -13,11 +13,12 @@ struct JarvisHUDView: View {
     @StateObject private var chatterEngine = ChatterEngine()
     @StateObject private var awarenessEngine = AwarenessEngine()
     @StateObject private var floatingPanelManager = FloatingPanelManager()
+    @StateObject private var wireEngine = ConnectiveWireEngine()
 
     // ── Jarvis color palette (matched from reference screenshots) ────────
-    private let cyan      = Color(red: 0.00, green: 0.83, blue: 1.00)   // #00D4FF — primary
-    private let cyanBright = Color(red: 0.41, green: 0.95, blue: 0.95)  // #69F1F1 — highlights
-    private let cyanDim   = Color(red: 0.00, green: 0.55, blue: 0.70)   // #008CB3 — subtle
+    private let cyan      = Color(red: 0.102, green: 0.902, blue: 0.961)   // #1AE6F5 — primary
+    private let cyanBright = Color(red: 0.549, green: 0.980, blue: 0.996)  // #8CFAFE — highlights
+    private let cyanDim   = Color(red: 0.055, green: 0.565, blue: 0.659)   // #0E90A8 — subtle
     private let amber     = Color(red: 1.00, green: 0.78, blue: 0.00)   // #FFC800
     private let crimson   = Color(red: 1.00, green: 0.15, blue: 0.20)   // #FF2633
     private let steel     = Color(red: 0.40, green: 0.52, blue: 0.58)   // #668494
@@ -43,7 +44,7 @@ struct JarvisHUDView: View {
                 let bgColor = thermalThreat ? Color(red: 0.04, green: 0.02, blue: 0.03) : Color.black
                 bgColor.ignoresSafeArea()
 
-                // Hex grid: 52pt, #00D4FF @0.07, 0.2°/s rotation
+                // Hex grid: 52pt, #1AE6F5 @0.07, 0.2°/s rotation
                 HexGridCanvas(width: w, height: h, phase: phase, color: cyan)
 
                 // ── REACTOR AMBIENT BLOOM — volumetric room light ──────
@@ -141,7 +142,7 @@ struct JarvisHUDView: View {
 
                 // ── 3b. REACTOR PARTICLE EMITTER (CAEmitterLayer) ───────
                 // birthRate=12, lifetime=2.8s, velocity=140, emissionRange=2π
-                // color=#00D4FF, scale=0.04 — centred on reactor core
+                // color=#1AE6F5, scale=0.04 — centred on reactor core
                 ReactorParticleEmitter()
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
@@ -186,6 +187,9 @@ struct JarvisHUDView: View {
                     .frame(width: w * 0.20, alignment: .trailing)
                     .position(x: w * 0.87, y: h * 0.78)
 
+                // ── 10b. CONNECTIVE WIRE FLASHES (spec §3.7) ────────────
+                ConnectiveWireOverlay(engine: wireEngine, cyan: cyan)
+
                 // ── 11. AWARENESS PULSES ────────────────────────────────
                 AwarenessPulseOverlay(engine: awarenessEngine, cx: cx, cy: cy)
 
@@ -206,13 +210,18 @@ struct JarvisHUDView: View {
                 chatterEngine.bind(to: store)
                 awarenessEngine.bind(to: store)
                 floatingPanelManager.bind(to: store)
+                wireEngine.bind(to: store)
+                // Supply reactor geometry so wires originate from correct ring zones
+                wireEngine.reactorCenter = CGPoint(x: cx, y: cy)
+                wireEngine.reactorRadius = R
+                wireEngine.screenSize    = CGSize(width: w, height: h)
             }
         }
     }
 
     private func thermalTextColor(_ state: String) -> Color {
         switch state.lowercased() {
-        case "nominal", "normal": return Color(red: 0.0, green: 0.83, blue: 1.0)
+        case "nominal", "normal": return Color(red: 0.102, green: 0.902, blue: 0.961)
         case "fair": return Color(red: 1.0, green: 0.78, blue: 0.0)
         case "serious": return Color(red: 1.0, green: 0.4, blue: 0.0)
         case "critical": return Color(red: 1.0, green: 0.15, blue: 0.20)
@@ -231,7 +240,7 @@ struct HexGridCanvas: View {
 
     var body: some View {
         Canvas { ctx, size in
-            // ── Spec: 52pt spacing, #00D4FF stroke at opacity 0.07, 0.2°/s rotation
+            // ── Spec: 52pt spacing, #1AE6F5 stroke at opacity 0.07, 0.2°/s rotation
             let spacing: CGFloat = 52
             let hexR: CGFloat    = 26   // inner radius = spacing / 2
             let cols = Int(width / (spacing * 0.866)) + 3
@@ -278,7 +287,7 @@ struct HexGridCanvas: View {
                         else       { hex.addLine(to: CGPoint(x: px, y: py)) }
                     }
                     hex.closeSubpath()
-                    // color is passed as cyan (#00D4FF) from call site
+                    // color is passed as cyan (#1AE6F5) from call site
                     ctx.stroke(hex, with: .color(color.opacity(opacity)),
                                style: StrokeStyle(lineWidth: 0.6))
                 }
@@ -536,6 +545,9 @@ struct JarvisReactorCanvas: View {
     let cyan: Color, cyanBright: Color, cyanDim: Color
     let amber: Color, crimson: Color, steel: Color
 
+    // Spec §3.11 — Ghost trail phase history (5-frame ring buffer)
+    @StateObject private var ghostBuffer = GhostPhaseBuffer()
+
     // Static formatters for arc text (cheap: allocated once)
     private static let hudTimeFmt: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "h:mm a"; return f
@@ -574,13 +586,14 @@ struct JarvisReactorCanvas: View {
             let rBreath = reactorController.breathingPhase  // 0–2π continuous
             let rPower = reactorController.powerFlowIntensity // 0–1 power draw
             let rIntensities = reactorController.ringIntensities // per-ring
+            // Spec §3.1 Ring Harmonics: 0 = normal differentiated, 1 = synced
+            let hBlend = reactorController.harmonicBlend
 
-            // Dynamic speed — rings accelerate with system load.
-            // R-02: multiply in the reactive controller's ringSpeedMultiplier so
-            // CPU spikes (>1), idle slowdown (<1), and thermal throttling can
-            // all adjust the ring rotation rate in real time alongside the
-            // aggregate-load ramp.
-            let speedMul = (1.0 + rLoad * 1.2) * reactorController.ringSpeedMultiplier
+            // REQ-B4: base transfer function is exactly `1.0 + cpuLoad * 0.5`
+            // — 50% max speed increase at full load. The reactive controller's
+            // ringSpeedMultiplier layers thermal/spike modulation on top, but the
+            // base ramp stays spec-compliant so SC-B4 can be measured cleanly.
+            let speedMul = (1.0 + rLoad * 0.5) * reactorController.ringSpeedMultiplier
             let ph = phase * speedMul
 
             // Dynamic bloom intensity — glow brightens with load + flare spikes
@@ -613,14 +626,14 @@ struct JarvisReactorCanvas: View {
             // path), hueShift = 1 pushes toward pure amber regardless.
             let baseJarvisCyan = thermalThreat
                 ? Color(red: 1.00, green: 0.50, blue: 0.15)   // shifts to amber-orange
-                : Color(red: 0.00, green: 0.83, blue: 1.00)   // #00D4FF — primary
+                : Color(red: 0.102, green: 0.902, blue: 0.961)   // #1AE6F5 — primary
             let hueShift = reactorController.ringHueShift
             let jarvisCyan: Color = hueShift < 0.01
                 ? baseJarvisCyan
                 : Color(
-                    red:   0.00 * (1 - hueShift) + 1.00 * hueShift,
-                    green: 0.83 * (1 - hueShift) + 0.78 * hueShift,
-                    blue:  1.00 * (1 - hueShift) + 0.00 * hueShift
+                    red:   0.102 * (1 - hueShift) + 1.00 * hueShift,
+                    green: 0.902 * (1 - hueShift) + 0.78 * hueShift,
+                    blue:  0.961 * (1 - hueShift) + 0.00 * hueShift
                 )
             let jarvisDim = Color(red: 0.25, green: 0.40, blue: 0.50)
 
@@ -806,6 +819,35 @@ struct JarvisReactorCanvas: View {
             }
 
             // ══════════════════════════════════════════════════════════════
+            //  SPEC §3.11: GHOST TRAILS — trailing copies of Ring 1
+            //  Drawn before main rings so main rings paint on top.
+            //  Speed-weighted: invisible at idle, prominent at high load.
+            // ══════════════════════════════════════════════════════════════
+            let ghostTrails = ghostBuffer.trails(speedMultiplier: speedMul)
+            if !ghostTrails.isEmpty {
+                let ring1Ghost = R * 0.95
+                let segArcG  = pi2 / 48.0
+                let gapFracG = 0.15
+                for (trailPhase, trailOpacity) in ghostTrails {
+                    let ghostPh = trailPhase * speedMul
+                    for i in 0..<48 {
+                        let segStart = Double(i) * segArcG + top + ghostPh * (pi2 / 100.0)
+                        let segEnd   = segStart + segArcG * (1.0 - gapFracG)
+                        let midAngle = (segStart + segEnd) / 2
+                        if isInNotch(midAngle) { continue }
+                        let gp = Path { p in
+                            p.addArc(center: c, radius: ring1Ghost,
+                                     startAngle: .radians(segStart),
+                                     endAngle:   .radians(segEnd),
+                                     clockwise: false)
+                        }
+                        ctx.stroke(gp, with: .color(jarvisCyan.opacity(trailOpacity)),
+                                   style: StrokeStyle(lineWidth: 8, lineCap: .butt))
+                    }
+                }
+            }
+
+            // ══════════════════════════════════════════════════════════════
             //  RING 1: OUTERMOST — 48 segmented dash tiles (28×8pt)
             //  GAP-02: Double-shadow bloom on every cyan segment
             //  Marvel-grade: per-ring GPU-reactive intensity + power flow
@@ -852,7 +894,7 @@ struct JarvisReactorCanvas: View {
             // E-core data arcs at ring2R
             dataArc(store.eCoreUsages, ring2R, 10.0, jarvisCyan)
             // Ticks at outer edge of ring 2
-            ticks(R * 0.88, 60, 6, jarvisDim.opacity(0.50), 0.8, rot: 0.01)
+            ticks(R * 0.88, 60, 6, jarvisDim.opacity(0.50), 0.8, rot: 0.01 * (1.0 - hBlend))
 
             // ══════════════════════════════════════════════════════════════
             //  RING 3: LABEL ANNOTATION RING (0.62R)
@@ -887,7 +929,7 @@ struct JarvisReactorCanvas: View {
 
             // P-core data arcs at 0.65R — amber
             dataArc(store.pCoreUsages, R * 0.65, 10.0, amber)
-            chevrons(R * 0.63, jarvisWhite.opacity(0.50), 8, 4, rot: -0.06)
+            chevrons(R * 0.63, jarvisWhite.opacity(0.50), 8, 4, rot: -0.06 * (1.0 - hBlend))
 
             // ══════════════════════════════════════════════════════════════
             //  RING 4: SECONDARY TELEMETRY ARC (0.48R)
@@ -1073,9 +1115,9 @@ struct JarvisReactorCanvas: View {
             let heartPhase = (ph.truncatingRemainder(dividingBy: heartRate)) / heartRate
             let tempNorm = max(0, min(1, (store.cpuTemp - 30.0) / 60.0))
             let coreTint = Color(
-                red:   0.00 + tempNorm * 1.00,
-                green: 0.83 - tempNorm * 0.68,
-                blue:  1.00 - tempNorm * 0.88
+                red:   0.102 + tempNorm * 0.898,
+                green: 0.902 - tempNorm * 0.752,
+                blue:  0.961 - tempNorm * 0.961
             )
             let glowPulse = (1.0 + 0.18 * sin(ph * (pi2 / heartRate)) + bm * 0.8) * reactorController.coreIntensity
             let flarePulse = 1.0 + rFlare * 0.35
@@ -1111,26 +1153,53 @@ struct JarvisReactorCanvas: View {
                 center: c, startRadius: 0, endRadius: haloR
             ))
 
-            // ── LAYER 2: Outer metallic containment ring ─────────────────
-            // Bigger than before (0.22R) — the "housing" that contains the energy
+            // ── LAYER 2: Arc-reactor metallic housing ────────────────────
+            // MCU arc reactor: no dark fill over the core — just a thin
+            // machined-metal ring at R*0.22 that catches the bloom light on
+            // its rim. Filling a disc here buried the inner glow, which is
+            // why the reactor read as a radar instead of an arc reactor.
             let metallicR = R * 0.22
             let metallicRect = CGRect(x: c.x - metallicR, y: c.y - metallicR,
                                        width: metallicR * 2, height: metallicR * 2)
-            ctx.fill(Path(ellipseIn: metallicRect), with: .radialGradient(
-                Gradient(colors: [
-                    Color(red: 0.30, green: 0.34, blue: 0.38),
-                    Color(red: 0.18, green: 0.20, blue: 0.24),
-                    Color(red: 0.08, green: 0.09, blue: 0.12)
-                ]),
-                center: c, startRadius: metallicR * 0.3, endRadius: metallicR
-            ))
-            // Edge highlight — catches the bloom light on the rim
+            // Soft dark rim underlay (only a thin edge, not a filled disc)
             ctx.stroke(Path(ellipseIn: metallicRect),
-                       with: .color(jarvisCyan.opacity(0.12 + rPower * 0.08)),
-                       style: StrokeStyle(lineWidth: 1.5))
+                       with: .color(Color(red: 0.08, green: 0.10, blue: 0.13).opacity(0.85)),
+                       style: StrokeStyle(lineWidth: 4.0))
             ctx.stroke(Path(ellipseIn: metallicRect),
-                       with: .color(jarvisDim.opacity(0.40)),
-                       style: StrokeStyle(lineWidth: 2.5))
+                       with: .color(jarvisDim.opacity(0.55)),
+                       style: StrokeStyle(lineWidth: 2.0))
+            // Bright cyan highlight on the inner lip — the "bloom catch"
+            ctx.stroke(Path(ellipseIn: metallicRect),
+                       with: .color(jarvisCyan.opacity(0.45 + rPower * 0.20)),
+                       style: StrokeStyle(lineWidth: 0.8))
+
+            // ── LAYER 2a: Primary glow ring — the "reactor breathe" ─────
+            // A thick bright cyan ring at R * 0.44 that breathes with the
+            // heartbeat. Mirrors jarvis-full-animation.html line 918:
+            //   glowRing(ctx, R * 0.44 * breathe, CYAN, 2.0, 12)
+            // This is one of the three defining features of the HTML core.
+            let breathe = 0.92 + 0.08 * sin(ph * (pi2 / heartRate))
+            let primaryGlowR = R * 0.44 * breathe
+            let primaryPath = Path { p in
+                p.addArc(center: c, radius: primaryGlowR,
+                         startAngle: .zero, endAngle: .radians(pi2), clockwise: false)
+            }
+            // 3-pass glow: fat transparent halo → medium cyan → bright core
+            ctx.stroke(primaryPath, with: .color(jarvisCyan.opacity(0.18 + rPower * 0.08)),
+                       style: StrokeStyle(lineWidth: 12, lineCap: .round))
+            ctx.stroke(primaryPath, with: .color(jarvisCyan.opacity(0.55 + rPower * 0.15)),
+                       style: StrokeStyle(lineWidth: 3.5, lineCap: .round))
+            ctx.stroke(primaryPath, with: .color(Color.white.opacity(0.75 + rFlare * 0.15)),
+                       style: StrokeStyle(lineWidth: 1.2, lineCap: .round))
+            // Soft secondary echo at R * 0.34 (from HTML line 751)
+            let secondaryPath = Path { p in
+                p.addArc(center: c, radius: R * 0.34,
+                         startAngle: .zero, endAngle: .radians(pi2), clockwise: false)
+            }
+            ctx.stroke(secondaryPath, with: .color(jarvisCyan.opacity(0.10 + rPower * 0.05)),
+                       style: StrokeStyle(lineWidth: 5))
+            ctx.stroke(secondaryPath, with: .color(jarvisCyan.opacity(0.25)),
+                       style: StrokeStyle(lineWidth: 0.8))
 
             // ── LAYER 3: 12 segmented arcs (white fill, bloom behind) ────
             let segRingR = metallicR * 0.78
@@ -1147,54 +1216,69 @@ struct JarvisReactorCanvas: View {
                            style: StrokeStyle(lineWidth: 3, lineCap: .butt))
             }
 
-            // ── LAYER 4: Inner white-hot glow ────────────────────────────
-            // THE core light source. Multiple gradient layers for depth.
-            let innerGlowR = metallicR * 0.60
-            let glowR = innerGlowR * glowPulse * flarePulse
-            let glowRect = CGRect(x: c.x - glowR, y: c.y - glowR, width: glowR * 2, height: glowR * 2)
+            // ── LAYER 4: Volumetric core stack (HTML baseline parity) ────
+            // Direct port of jarvis-full-animation.html lines 988-1027. The
+            // HTML prototype builds the core out of three pieces:
+            //   1. 16-layer radial stack — concentric circles from ~0R out
+            //      to ~80px with opacity falling off as (1 - layer/16)^1.5
+            //   2. White-hot nucleus — 5-stop radial gradient at ~0.04R
+            //   3. Wider second hot layer — 3-stop radial at ~0.08R
+            // Additive transparency across the stack builds the "reactor is
+            // alive" volumetric glow. energy/cPulse both scale with the
+            // heartbeat so it breathes with live telemetry.
+            let cPulse = (0.85 + 0.15 * sin(ph * (pi2 / heartRate))) * reactorController.coreIntensity
+            let energy = (0.80 + 0.20 * sin(ph * 2.5)) * flarePulse
 
-            // Sub-layer A: Outer soft glow
-            let outerGlowR = glowR * 1.6
-            let outerGlowRect = CGRect(x: c.x - outerGlowR, y: c.y - outerGlowR,
-                                        width: outerGlowR * 2, height: outerGlowR * 2)
-            ctx.fill(Path(ellipseIn: outerGlowRect), with: .radialGradient(
-                Gradient(colors: [
-                    jarvisCyan.opacity(0.15 + rPower * 0.10),
-                    jarvisCyan.opacity(0.04),
-                    Color.clear
-                ]),
-                center: c, startRadius: glowR * 0.5, endRadius: outerGlowR
-            ))
+            // Sub-layer A: 16-layer concentric glow stack ────────────────
+            for layer in 0..<16 {
+                let lr = R * 0.005 + Double(layer) * 5.0
+                let falloff = pow(1.0 - Double(layer) / 16.0, 1.5)
+                let lo = 0.15 * cPulse * energy * falloff
+                let rect = CGRect(x: c.x - lr, y: c.y - lr, width: lr * 2, height: lr * 2)
+                ctx.fill(Path(ellipseIn: rect), with: .color(jarvisCyan.opacity(min(lo, 1.0))))
+            }
 
-            // Sub-layer B: Bright core gradient
-            let coreWhiteOp = 0.75 + rPower * 0.20 + rFlare * 0.05
-            let coreCyanOp = 0.55 + rPower * 0.15 + rFlare * 0.10
-            ctx.fill(Path(ellipseIn: glowRect), with: .radialGradient(
-                Gradient(colors: [
-                    Color.white.opacity(min(coreWhiteOp, 1.0)),
-                    Color.white.opacity(min(coreWhiteOp * 0.6, 0.80)),
-                    jarvisCyan.opacity(min(coreCyanOp, 0.85)),
-                    jarvisCyan.opacity(0.15 + rPower * 0.08),
-                    Color.clear
-                ]),
-                center: c, startRadius: 0, endRadius: glowR
-            ))
-
-            // Sub-layer C: White-hot pinpoint centre — thermal-tinted, scales
-            // with power draw. Under hot CPU temps the pinpoint shifts toward
-            // amber/red via coreTint so the "running hot" state is immediately
-            // visible in the most saturated part of the reactor.
-            let hotR = glowR * (0.25 + rPower * 0.12)
+            // Sub-layer B: White-hot nucleus — 5-stop radial gradient ────
+            let hotR = R * 0.04 * cPulse * (1.0 + rPower * 0.12)
             let hotRect = CGRect(x: c.x - hotR, y: c.y - hotR, width: hotR * 2, height: hotR * 2)
+            let hotWhiteOp = min(0.70 * cPulse * energy + rFlare * 0.15, 1.0)
             ctx.fill(Path(ellipseIn: hotRect), with: .radialGradient(
-                Gradient(colors: [
-                    Color.white.opacity(min(0.95, 0.85 + rFlare * 0.10)),
-                    coreTint.opacity(0.65),
-                    coreTint.opacity(0.15),
-                    Color.clear
+                Gradient(stops: [
+                    .init(color: Color.white.opacity(hotWhiteOp),                           location: 0.00),
+                    .init(color: Color(red: 0.90, green: 1.0, blue: 1.0).opacity(hotWhiteOp * 0.64), location: 0.15),
+                    .init(color: Color(red: 0.41, green: 0.94, blue: 0.94).opacity(0.25 * cPulse),    location: 0.35),
+                    .init(color: coreTint.opacity(0.08 * cPulse),                             location: 0.65),
+                    .init(color: Color(red: 0.055, green: 0.565, blue: 0.659).opacity(0.0),      location: 1.00)
                 ]),
                 center: c, startRadius: 0, endRadius: hotR
             ))
+
+            // Sub-layer C: Second hot layer — wider softer 0.08R glow ────
+            let hotR2 = R * 0.08 * cPulse
+            let hotRect2 = CGRect(x: c.x - hotR2, y: c.y - hotR2, width: hotR2 * 2, height: hotR2 * 2)
+            ctx.fill(Path(ellipseIn: hotRect2), with: .radialGradient(
+                Gradient(stops: [
+                    .init(color: Color(red: 0.41, green: 0.94, blue: 0.94).opacity(0.18 * cPulse * energy), location: 0.00),
+                    .init(color: jarvisCyan.opacity(0.06 * cPulse * energy),                                location: 0.50),
+                    .init(color: Color(red: 0.055, green: 0.565, blue: 0.659).opacity(0.0),                     location: 1.00)
+                ]),
+                center: c, startRadius: 0, endRadius: hotR2
+            ))
+
+            // Sub-layer D: Chromatic aberration — red/blue fringe pair ───
+            // Mimics a camera lens looking at an over-exposed light source.
+            // HTML lines 1019-1023.
+            let chroR = hotR * 0.7
+            let chroRectL = CGRect(x: c.x - 1.5 - chroR, y: c.y - chroR, width: chroR * 2, height: chroR * 2)
+            let chroRectR = CGRect(x: c.x + 1.5 - chroR, y: c.y - chroR, width: chroR * 2, height: chroR * 2)
+            ctx.fill(Path(ellipseIn: chroRectL), with: .color(Color(red: 1.0, green: 0.39, blue: 0.31).opacity(0.04 * cPulse)))
+            ctx.fill(Path(ellipseIn: chroRectR), with: .color(Color(red: 0.31, green: 0.39, blue: 1.0).opacity(0.04 * cPulse)))
+
+            // glowR — the effective "core glow radius" used by downstream
+            // layers (flare corona, heartbeat impulse ring). Derived from
+            // the HTML baseline's wider hot layer so the downstream scales
+            // still feel proportional.
+            let glowR = hotR2 * flarePulse
 
             // ── LAYER 5: Flare corona (spikes only) ─────────────────────
             if rFlare > 0.03 {
@@ -1235,27 +1319,14 @@ struct JarvisReactorCanvas: View {
                            style: StrokeStyle(lineWidth: 0.6, lineCap: .round))
             }
 
-            // ── LAYER 6: Core capsule + hour text ────────────────────────
-            // Capsule size pulses with the heartbeat and swells slightly
-            // with power draw so the centrepiece tracks live telemetry.
-            let capsScale = glowPulse * (1.0 + rPower * 0.12)
-            let capsW: Double = R * 0.050 * capsScale
-            let capsH: Double = R * 0.085 * capsScale
-            let capsRect = CGRect(x: c.x - capsW/2, y: c.y - capsH/2, width: capsW, height: capsH)
-            let capsPath = Path(roundedRect: capsRect, cornerRadius: capsW/2)
-            ctx.fill(capsPath, with: .color(Color(red: 0.08, green: 0.08, blue: 0.16)))
-            // Capsule catches core light
-            ctx.fill(capsPath, with: .color(Color.white.opacity(0.12 * glowPulse)))
-            ctx.stroke(capsPath, with: .color(jarvisCyan.opacity(0.40)),
-                       style: StrokeStyle(lineWidth: 0.8))
-
-            let coreHour = Calendar.current.component(.hour, from: Date())
-            ctx.draw(
-                Text("\(coreHour)")
-                    .font(.system(size: 24, design: .monospaced).bold())
-                    .foregroundColor(jarvisCyan),
-                at: c
-            )
+            // ── LAYER 6: Core white-hot pinpoint ─────────────────────────
+            // Final brightest pixel at the geometric centre — a tiny,
+            // almost-solid white dot that sits inside the hexagonal core.
+            // No text, no capsule: the MCU arc reactor never has a clock
+            // inside it. The time lives in the TopBarView.
+            let pinR: Double = 2.4 + rFlare * 1.2
+            let pinRect = CGRect(x: c.x - pinR, y: c.y - pinR, width: pinR * 2, height: pinR * 2)
+            ctx.fill(Path(ellipseIn: pinRect), with: .color(Color.white))
 
             // R-02: undo thermal distortion translate
             if reactorController.thermalDistortionActive {
@@ -1389,6 +1460,10 @@ struct JarvisReactorCanvas: View {
                     .position(x: center.x, y: center.y - R * 0.84 - 14)
             }
         )
+        .onChange(of: phase) {
+            // Spec §3.11 — feed ghost trail ring buffer every rendered frame
+            ghostBuffer.record(phase)
+        }
     }
 }
 
@@ -1403,7 +1478,7 @@ struct JarvisCircularGauge: View {
     let label: String
     let size: CGFloat
     let phase: Double
-    var accentColor: Color = Color(red: 0.0, green: 0.83, blue: 1.0)
+    var accentColor: Color = Color(red: 0.102, green: 0.902, blue: 0.961)
 
     var body: some View {
         ZStack {
@@ -1477,7 +1552,7 @@ enum JarvisAccentColor {
 
     var color: Color {
         switch self {
-        case .cyan: return Color(red: 0.0, green: 0.83, blue: 1.0)
+        case .cyan: return Color(red: 0.102, green: 0.902, blue: 0.961)
         case .amber: return Color(red: 1.0, green: 0.78, blue: 0.0)
         case .crimson: return Color(red: 1.0, green: 0.15, blue: 0.20)
         }
@@ -1508,7 +1583,7 @@ struct JarvisDataRow: View {
 struct JarvisCoreBarGauge: View {
     let values: [Double]
     let label: String
-    var barColor: Color = Color(red: 0.0, green: 0.83, blue: 1.0)
+    var barColor: Color = Color(red: 0.102, green: 0.902, blue: 0.961)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -1557,7 +1632,7 @@ struct JarvisPanelBox<Content: View>: View {
         self.content = content()
     }
 
-    private let panelCyan = Color(red: 0.0, green: 0.83, blue: 1.0)
+    private let panelCyan = Color(red: 0.102, green: 0.902, blue: 0.961)
 
     var body: some View {
         content

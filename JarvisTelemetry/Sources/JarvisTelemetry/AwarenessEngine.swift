@@ -17,7 +17,7 @@ final class AwarenessEngine: ObservableObject {
     private var lastPulseTime = Date.distantPast
     private let cooldown: TimeInterval = 5.0
 
-    private let cyan = Color(red: 0.00, green: 0.83, blue: 1.00)
+    private let cyan = Color(red: 0.102, green: 0.902, blue: 0.961)
     private let amber = Color(red: 1.00, green: 0.78, blue: 0.00)
 
     private var prevTempBucket = 0

@@ -144,12 +144,14 @@ struct JARVISLockScreenView: View {
         let start = Date()
         let duration = JARVISNominalState.unlockDuration
 
-        Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { timer in
+        Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [reactorController] timer in
             let elapsed = Date().timeIntervalSince(start)
             unlockProgress = min(elapsed / duration, 1.0)
             if unlockProgress >= 1.0 {
                 timer.invalidate()
-                reactorController.returnToNominal()
+                Task { @MainActor in
+                    reactorController.returnToNominal()
+                }
             }
         }
     }

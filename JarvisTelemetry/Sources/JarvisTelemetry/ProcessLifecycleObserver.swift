@@ -16,7 +16,6 @@ final class ProcessLifecycleObserver {
         self.phaseController = phaseController
         self.bridge = bridge
         setupNotifications()
-        setupSignalHandlers()
     }
 
     private func setupNotifications() {
@@ -90,36 +89,6 @@ final class ProcessLifecycleObserver {
         }
     }
 
-    private func setupSignalHandlers() {
-        // SIGTERM — graceful shutdown
-        signal(SIGTERM) { _ in
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .jarvisGracefulShutdown, object: nil)
-            }
-        }
-
-        // SIGINT — graceful shutdown
-        signal(SIGINT) { _ in
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .jarvisGracefulShutdown, object: nil)
-            }
-        }
-
-        // Handle the graceful shutdown notification
-        NotificationCenter.default.publisher(for: .jarvisGracefulShutdown)
-            .first()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                self.phaseController.startShutdown()
-                // Delay exit to allow shutdown animation to complete
-                DispatchQueue.main.asyncAfter(deadline: .now() + JARVISNominalState.shutdownDuration + 1.0) {
-                    self.bridge.stop()
-                    NSApp.terminate(nil)
-                }
-            }
-            .store(in: &cancellables)
-    }
 }
 
 extension Notification.Name {

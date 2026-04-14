@@ -41,7 +41,7 @@ final class LockScreenManager {
         let w = CGFloat(width), h = CGFloat(height)
         let cx = w / 2, cy = h / 2, R = min(w, h) * 0.42
         let steel = NSColor(red: 0.40, green: 0.52, blue: 0.58, alpha: 1.0)
-        let cyanColor = NSColor(red: 0.00, green: 0.83, blue: 1.00, alpha: 1.0)
+        let cyanColor = NSColor(red: 0.102, green: 0.902, blue: 0.961, alpha: 1.0)
 
         ctx.setFillColor(NSColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1.0).cgColor)
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))

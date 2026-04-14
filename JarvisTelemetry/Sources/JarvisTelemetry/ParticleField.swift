@@ -11,11 +11,9 @@ struct ParticleFieldView: View {
     let speedMultiplier: Double
     let cyan: Color
 
-    // Ambient dust particles — drift across screen
-    private let ambientCount = 80
-    // Orbital particles — circle the reactor at various radii
-    private let orbitalCount = 60
-    // Radial particles — emanate outward from core
+    // REQ-B10: 30-50 ambient drifters. §7 caps all particle arrays at 50.
+    private let ambientCount = 45
+    private let orbitalCount = 40
     private let radialCount = 25
 
     var body: some View {

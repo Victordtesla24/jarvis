@@ -62,7 +62,7 @@ struct FlickerBandView: View {
             ZStack {
                 // Cyan tinted band
                 Rectangle()
-                    .fill(Color(red: 0, green: 0.83, blue: 1.0).opacity(0.04))
+                    .fill(Color(red: 0.102, green: 0.902, blue: 0.961).opacity(0.04))
                     .frame(height: bandH)
                     .offset(x: sin(phase * 200) * 5, y: bandY)
 

@@ -104,17 +104,32 @@ Every ring, tick mark, bezel panel, and data arc is drawn at **60fps** in a Swif
 
 
 
-| Module          | File                       | Role                                                                |
-| --------------- | -------------------------- | ------------------------------------------------------------------- |
-| `◈ App Entry`   | `JarvisTelemetryApp.swift` | `@main` — delegates to `AppDelegate` for wallpaper window           |
-| `◈ Window Mgr`  | `AppDelegate.swift`        | Creates borderless `NSWindow` at `kCGDesktopWindowLevel` per screen |
-| `◈ Root View`   | `JarvisRootView.swift`     | Orchestrates preloader → HUD transition with phase animation        |
-| `◈ Preloader`   | `JarvisPreloader.swift`    | 3.2s SceneKit cinematic wireframe boot sequence                     |
-| `◈ HUD`         | `JarvisHUDView.swift`      | **1400+ lines** — Full reactor canvas, 15+ view structs             |
-| `◈ Canvas Host` | `AnimatedCanvasHost.swift` | `TimelineView` wrapper driving 60fps phase propagation              |
-| `◈ Bridge`      | `TelemetryBridge.swift`    | Async JSON stream reader from Go daemon via `Process` pipe          |
-| `◈ Store`       | `TelemetryStore.swift`     | `@Published` properties — CPU, GPU, memory, thermals                |
-| `◈ Daemon`      | `mactop/`                  | Go-based Apple Silicon telemetry collector (`--headless` mode)      |
+| Module          | File                              | Role                                                                |
+| --------------- | --------------------------------- | ------------------------------------------------------------------- |
+| `◈ App Entry`   | `JarvisTelemetryApp.swift`        | `@main` — delegates to `AppDelegate` for wallpaper window           |
+| `◈ Window Mgr`  | `AppDelegate.swift`               | Creates borderless `NSWindow` at `kCGDesktopWindowLevel` per screen |
+| `◈ Root View`   | `JarvisRootView.swift`            | Phase-driven orchestrator: BOOT → LOOP → SHUTDOWN → LOCK → STANDBY |
+| `◈ Phase Ctrl`  | `HUDPhaseController.swift`        | Central state machine governing HUD lifecycle phases                |
+| `◈ Boot`        | `BootSequenceView.swift`          | 10s cinematic reactor ignition with shockwaves & diagnostics        |
+| `◈ Shutdown`    | `ShutdownSequenceView.swift`      | 7s cinematic power-down with ring dimming & particle implosion      |
+| `◈ Lock Screen` | `JARVISLockScreenView.swift`      | Animated lock overlay with subdued reactor & scan lines             |
+| `◈ HUD`         | `JarvisHUDView.swift`             | **1400+ lines** — Full reactor canvas, 15+ view structs             |
+| `◈ Canvas Host` | `AnimatedCanvasHost.swift`        | `TimelineView` wrapper driving 60fps phase propagation              |
+| `◈ Reactor Ctrl`| `ReactorAnimationController.swift`| Telemetry-reactive state machine: nominal/dying/chargingWake/CPU OD |
+| `◈ Battery`     | `BatteryMonitor.swift`            | Native IOKit battery polling at 2 Hz with edge detection            |
+| `◈ Mood Engine` | `SystemMoodEngine.swift`          | Aggregates load → mood spectrum (serene → overdrive)                |
+| `◈ Bridge`      | `TelemetryBridge.swift`           | Async JSON stream reader from Go daemon via `Process` pipe          |
+| `◈ Store`       | `TelemetryStore.swift`            | `@Published` properties — CPU, GPU, memory, thermals, deltas        |
+| `◈ Chatter`     | `ChatterEngine.swift`             | JARVIS diagnostic text stream with 18 chars/sec typewriter          |
+| `◈ Particles`   | `ParticleField.swift`             | Ambient floating particle system                                    |
+| `◈ Metal Bloom` | `CoreReactorMetalView.swift`      | Metal fragment shader Gaussian bloom (σ=18) for core reactor        |
+| `◈ Metal Scan`  | `ScanLineMetalView.swift`         | Metal fragment shader horizontal scan-line sweep                    |
+| `◈ Holographic` | `HolographicFlicker.swift`        | Periodic glitch/flicker effect                                      |
+| `◈ Lifecycle`   | `ProcessLifecycleObserver.swift`   | Sleep/wake/lock/unlock/SIGTERM handlers                             |
+| `◈ Lock Mgr`    | `LockScreenManager.swift`         | Standby PNG wallpaper generation                                    |
+| `◈ Nominal`     | `JARVISNominalState.swift`        | Single source of truth for all animation constants                  |
+| `◈ Video`       | `VideoGenerationPipeline.swift`   | AVAssetWriter + ffmpeg cinematic video generation                   |
+| `◈ Daemon`      | `mactop/`                         | Go-based Apple Silicon telemetry collector (`--headless` mode)      |
 
 
 
@@ -214,10 +229,11 @@ The central reactor is built from **220+ concentric rings** with layered structu
 
 ```bash
 # Required
-→ macOS 14.0+ (Sonoma or later)
-→ Apple Silicon (M1/M2/M3/M4)
-→ Xcode 15+ or Swift 5.9+ toolchain
+→ macOS 15.0+ (Sequoia or later)
+→ Apple Silicon (M1/M2/M3/M4/M5)
+→ Xcode 26+ or Swift 6.3+ toolchain
 → Go 1.21+ (for daemon compilation)
+→ ffmpeg 7.x (for video pipeline: brew install ffmpeg@7)
 ```
 
 ### Build & Run
@@ -234,7 +250,7 @@ cd ..
 
 # ── 3. Build the Swift HUD application ───────────────────
 cd JarvisTelemetry
-swift build -c release
+swift build --disable-sandbox -c release
 
 # ── 4. Run (requires sudo for IOKit sensor access) ───────
 sudo .build/release/JarvisTelemetry
@@ -299,16 +315,33 @@ Every visual element is a `Path` stroke or fill — no `Image`, no `UIBezierPath
 ```
 jarvis/
 ├── JarvisTelemetry/
-│   ├── Package.swift                          # SPM manifest (macOS 14+)
+│   ├── Package.swift                          # SPM manifest (macOS 15+)
 │   └── Sources/JarvisTelemetry/
 │       ├── JarvisTelemetryApp.swift           # @main entry point
-│       ├── AppDelegate.swift                  # Wallpaper window manager
-│       ├── JarvisRootView.swift               # Preloader → HUD orchestrator
-│       ├── JarvisPreloader.swift              # SceneKit 3.2s boot sequence
+│       ├── AppDelegate.swift                  # Wallpaper window manager + DI
+│       ├── JarvisRootView.swift               # Phase-driven view orchestrator
+│       ├── HUDPhaseController.swift           # BOOT/LOOP/SHUTDOWN/LOCK state machine
+│       ├── BootSequenceView.swift             # 10s cinematic reactor ignition
+│       ├── ShutdownSequenceView.swift         # 7s cinematic power-down
+│       ├── JARVISLockScreenView.swift         # Animated lock screen overlay
 │       ├── AnimatedCanvasHost.swift           # 60fps TimelineView wrapper
 │       ├── JarvisHUDView.swift                # ◆ Full reactor + 15 view structs
+│       ├── ReactorAnimationController.swift   # Telemetry-reactive state machine
+│       ├── BatteryMonitor.swift               # IOKit battery polling @ 2 Hz
+│       ├── SystemMoodEngine.swift             # Load → mood spectrum engine
+│       ├── JARVISNominalState.swift           # Animation constants source of truth
 │       ├── TelemetryBridge.swift              # JSON stream from Go daemon
-│       ├── TelemetryStore.swift               # @Published telemetry properties
+│       ├── TelemetryStore.swift               # @Published telemetry + deltas
+│       ├── ChatterEngine.swift                # Diagnostic text stream
+│       ├── ChatterStreamView.swift            # Chatter display overlay
+│       ├── ParticleField.swift                # Ambient particle system
+│       ├── HolographicFlicker.swift           # Periodic glitch effect
+│       ├── AwarenessEngine.swift              # Threshold detection + ripples
+│       ├── CoreReactorMetalView.swift         # Metal Gaussian bloom shader
+│       ├── ScanLineMetalView.swift            # Metal scan-line fragment shader
+│       ├── ProcessLifecycleObserver.swift     # macOS lifecycle event handlers
+│       ├── LockScreenManager.swift            # Standby PNG wallpaper
+│       ├── VideoGenerationPipeline.swift      # AVAssetWriter + ffmpeg pipeline
 │       └── Resources/
 │           └── jarvis-mactop-daemon           # Compiled Go binary (build artifact)
 ├── mactop/                                     # Go telemetry daemon source
@@ -317,11 +350,11 @@ jarvis/
 │   ├── go.sum
 │   ├── Makefile
 │   └── internal/                               # IOKit + SMC sensor readers
+├── public/Jarvis-images/                       # Reference images for video pipeline
+├── docs/superpowers/                           # Design specs & plans
+│   ├── specs/                                  # Design documents
+│   └── plans/                                  # Implementation plans
 ├── jarvis-hud-preview.html                     # HTML Canvas mirror for previews
-├── hud-preview-screenshot.png                  # Latest rendered preview
-├── real-jarvis-01.jpg                          # Reference: Iron Man HUD
-├── real-jarvis-02.jpg                          # Reference: Iron Man HUD
-├── real-jarvis-03.jpg                          # Reference: Iron Man HUD
 └── README.md                                   # ◄ You are here
 ```
 

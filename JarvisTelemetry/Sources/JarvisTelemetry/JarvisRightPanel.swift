@@ -71,7 +71,7 @@ struct JarvisRightPanel: View {
     @EnvironmentObject var store: TelemetryStore
     @Environment(\.animationPhase) var phase: Double
 
-    private let cyan      = Color(red: 0.00, green: 0.83, blue: 1.00)
+    private let cyan      = Color(red: 0.102, green: 0.902, blue: 0.961)
     private let panelBg   = Color(red: 0.004, green: 0.059, blue: 0.118)
 
     var body: some View {

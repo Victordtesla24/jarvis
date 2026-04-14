@@ -11,7 +11,7 @@ struct BootSequenceView: View {
     @EnvironmentObject var store: TelemetryStore
 
     // Iron Man palette — matches JarvisHUDView exactly
-    private let cyan      = Color(red: 0.00, green: 0.83, blue: 1.00)   // #00D4FF
+    private let cyan      = Color(red: 0.102, green: 0.902, blue: 0.961)   // #1AE6F5
     private let cyanBright = Color(red: 0.41, green: 0.95, blue: 0.95)  // #69F1F1
     private let cyanDim   = Color(red: 0.00, green: 0.55, blue: 0.70)   // #008CB3
     private let amber     = Color(red: 1.00, green: 0.78, blue: 0.00)   // #FFC800
@@ -402,31 +402,73 @@ struct BootEnergyCascade: View {
 
 // MARK: - Reactor Rings Materialization
 
-/// 220 rings materializing from inner to outer — matching the main reactor structure
+/// Rings materializing in staggered arc-cluster order — R9 spec.
+/// Clusters map to logical HUD zones: E-Core (inner) → P-Core → GPU → structural.
+/// Each cluster fades in over a bootProgress span of bootClusterFadeSpan.
+/// Only active on the full-boot path (progress driven at 8s pace).
 struct BootReactorRings: View {
     let progress: Double
     let phase: Double
     let cx: CGFloat, cy: CGFloat, R: CGFloat
     let cyan: Color, cyanDim: Color, steel: Color
 
+    /// Returns a local 0→1 progress for a cluster that starts at `threshold`.
+    private func clusterProgress(_ threshold: Double) -> Double {
+        let span = JARVISNominalState.bootClusterFadeSpan
+        return max(0.0, min(1.0, (progress - threshold) / span))
+    }
+
     var body: some View {
         Canvas { ctx, size in
             let c = CGPoint(x: cx, y: cy)
             let pi2 = Double.pi * 2.0
 
-            // Rings materialize from inner to outer as progress 8% -> 55%
-            let ringProgress = min(1.0, (progress - 0.08) / 0.47)
-            let maxRingIndex = Int(ringProgress * 220)
+            // ── Cluster local progress values ────────────────────────────────
+            // E-Core zone  : frac 0.00–0.30 (inner rings, ~0.06–0.35R) — threshold 0.25
+            // P-Core zone  : frac 0.30–0.55 (~0.35–0.56R)              — threshold 0.45
+            // GPU arc zone : frac 0.55–0.75 (~0.56–0.78R)              — threshold 0.60
+            // Rings zone   : frac 0.75–1.00 (~0.78–0.97R outer)        — threshold 0.75
+            let eCoreP   = clusterProgress(JARVISNominalState.bootClusterECore)
+            let pCoreP   = clusterProgress(JARVISNominalState.bootClusterPCore)
+            let gpuArcP  = clusterProgress(JARVISNominalState.bootClusterGPUArc)
+            let ringsP   = clusterProgress(JARVISNominalState.bootClusterRings)
 
-            for i in 0..<min(maxRingIndex, 220) {
-                let frac = Double(i) / 220.0
-                let r = R * (0.06 + frac * 0.91)
+            // Total ring count — same as before so geometry is unchanged
+            let totalRings = 220
 
-                let ringBirth = Double(i) / 220.0
-                let ringAge = ringProgress - ringBirth
+            for i in 0..<totalRings {
+                let frac = Double(i) / Double(totalRings)
+
+                // ── Assign ring to cluster by radial fraction ────────────────
+                let clusterLocalP: Double
+                if frac < 0.30 {
+                    clusterLocalP = eCoreP
+                } else if frac < 0.55 {
+                    clusterLocalP = pCoreP
+                } else if frac < 0.75 {
+                    clusterLocalP = gpuArcP
+                } else {
+                    clusterLocalP = ringsP
+                }
+                guard clusterLocalP > 0 else { continue }
+
+                // Within-cluster stagger: rings in each cluster appear
+                // sequentially from inner to outer over the cluster's 0→1 window.
+                // clusterFracCount = normalised position within cluster band
+                let bandStart: Double = frac < 0.30 ? 0.00
+                              : frac < 0.55 ? 0.30
+                              : frac < 0.75 ? 0.55 : 0.75
+                let bandEnd:   Double = frac < 0.30 ? 0.30
+                              : frac < 0.55 ? 0.55
+                              : frac < 0.75 ? 0.75 : 1.00
+                let bandWidth = bandEnd - bandStart
+                let posInBand = bandWidth > 0 ? (frac - bandStart) / bandWidth : 0
+                let ringBirth = posInBand          // 0→1 within cluster
+                let ringAge   = clusterLocalP - ringBirth
+                guard ringAge > 0 else { continue }
                 let ringOp = min(1.0, ringAge * 8)
 
-                // Rotation begins as rings appear — slow at first, accelerating
+                let r = R * (0.06 + frac * 0.91)
                 let rotSpeed = 0.02 + frac * 0.05
                 let altDir: Double = i % 2 == 0 ? 1.0 : -1.0
                 let rotAngle = phase * rotSpeed * altDir * min(1.0, ringAge * 3)
@@ -442,7 +484,6 @@ struct BootReactorRings: View {
                                  startAngle: .radians(rotAngle),
                                  endAngle: .radians(rotAngle + pi2), clockwise: false)
                     }
-                    // Bloom glow
                     ctx.stroke(path, with: .color(cyan.opacity(min(baseOp * 0.15, 0.08))),
                                style: StrokeStyle(lineWidth: 12))
                     ctx.stroke(path, with: .color(steel.opacity(min(baseOp + 0.18, 0.50))),
@@ -469,18 +510,16 @@ struct BootReactorRings: View {
                                style: StrokeStyle(lineWidth: 0.5))
                 }
 
-                // Particle spark trail on newly appearing rings — ENHANCED
+                // Particle spark trail on newly appearing rings
                 if ringAge > 0 && ringAge < 0.06 {
                     let sparkOp = (1.0 - ringAge / 0.06) * 0.8
                     let sparkAngle = rotAngle + ringAge * 18.0
                     let sx = c.x + r * cos(sparkAngle)
                     let sy = c.y + r * sin(sparkAngle)
                     let sparkSize = 2.5 + (1.0 - ringAge / 0.06) * 4.0
-                    // Glow behind spark
                     let glowRect = CGRect(x: sx - sparkSize * 2, y: sy - sparkSize * 2,
                                           width: sparkSize * 4, height: sparkSize * 4)
                     ctx.fill(Path(ellipseIn: glowRect), with: .color(cyan.opacity(sparkOp * 0.3)))
-                    // Bright spark
                     let sRect = CGRect(x: sx - sparkSize/2, y: sy - sparkSize/2,
                                        width: sparkSize, height: sparkSize)
                     ctx.fill(Path(ellipseIn: sRect), with: .color(cyan.opacity(sparkOp)))
@@ -755,8 +794,8 @@ struct BootDiagnosticStream: View {
     let cyan: Color, cyanBright: Color, amber: Color, crimson: Color
 
     private var lines: [(text: String, color: Color, threshold: Double)] {
-        let chip = store.chipName.isEmpty || store.chipName == "Apple Silicon"
-            ? "APPLE M4 MAX" : store.chipName.uppercased()
+        let chip = store.chipName.isEmpty || store.chipName == JARVISNominalState.chipNameDefault
+            ? "CHIP: READING..." : store.chipName.uppercased()
         let eCt = store.eCoreCount > 0 ? store.eCoreCount : 10
         let pCt = store.pCoreCount > 0 ? store.pCoreCount : 4
         let sCt = store.sCoreCount > 0 ? store.sCoreCount : 1

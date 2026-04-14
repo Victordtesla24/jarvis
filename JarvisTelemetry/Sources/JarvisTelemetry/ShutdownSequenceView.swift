@@ -9,7 +9,7 @@ struct ShutdownSequenceView: View {
     @EnvironmentObject var phaseController: HUDPhaseController
     @EnvironmentObject var store: TelemetryStore
 
-    private let cyan      = Color(red: 0.00, green: 0.83, blue: 1.00)
+    private let cyan      = Color(red: 0.102, green: 0.902, blue: 0.961)
     private let cyanBright = Color(red: 0.41, green: 0.95, blue: 0.95)
     private let cyanDim   = Color(red: 0.00, green: 0.55, blue: 0.70)
     private let amber     = Color(red: 1.00, green: 0.78, blue: 0.00)
@@ -63,8 +63,9 @@ struct ShutdownSequenceView: View {
                         .ignoresSafeArea()
                     }
 
-                    // ── 4. RINGS DECELERATING & FADING (0-72%) — SEQUENTIAL ──
-                    if p < 0.75 {
+                    // ── 4. RINGS DECELERATING & FADING (0-45%) — R10 5-ring stagger ──
+                    // Ring 1 (last) fully fades by progress ≈ 0.40; guard at 0.45 for safety
+                    if p < 0.45 {
                         ShutdownRings(progress: p, phase: phase, cx: cx, cy: cy, R: R,
                                       cyan: cyan, cyanDim: cyanDim, steel: steel)
                     }
@@ -170,91 +171,109 @@ struct ShutdownSequenceView: View {
     }
 }
 
-// MARK: - Decelerating Rings — ENHANCED
+// MARK: - Decelerating Rings — R10 explicit 5-ring stagger (Ring 5 → Ring 1)
 
-/// Rings slow with angular momentum drag — SEQUENTIAL outer-to-inner dimming
+/// Five structural rings decelerate and fade in order 5→4→3→2→1.
+/// Each ring has an explicit start offset (seconds) and fades over
+/// JARVISNominalState.shutdownRingFadeDur (0.4 s).
+/// `progress` is shutdownProgress (0→1 over shutdownDuration seconds).
 struct ShutdownRings: View {
     let progress: Double
     let phase: Double
     let cx: CGFloat, cy: CGFloat, R: CGFloat
     let cyan: Color, cyanDim: Color, steel: Color
 
+    private struct RingConfig {
+        let radiusFrac: Double   // fraction of R
+        let startOffset: Double  // seconds from shutdown start
+        let dir: Double          // rotation direction (+1 / -1)
+    }
+
+    private let dur = JARVISNominalState.shutdownDuration
+
+    // Maps the five structural reactor rings to their spec timing.
+    private let ringConfigs: [RingConfig] = [
+        RingConfig(radiusFrac: 0.35, startOffset: JARVISNominalState.shutdownRing5Start, dir:  1),  // Ring 5
+        RingConfig(radiusFrac: 0.48, startOffset: JARVISNominalState.shutdownRing4Start, dir: -1),  // Ring 4
+        RingConfig(radiusFrac: 0.62, startOffset: JARVISNominalState.shutdownRing3Start, dir:  1),  // Ring 3
+        RingConfig(radiusFrac: 0.78, startOffset: JARVISNominalState.shutdownRing2Start, dir: -1),  // Ring 2
+        RingConfig(radiusFrac: 0.95, startOffset: JARVISNominalState.shutdownRing1Start, dir:  1),  // Ring 1
+    ]
+
     var body: some View {
         Canvas { ctx, size in
             let c = CGPoint(x: cx, y: cy)
             let pi2 = Double.pi * 2.0
+            let fadeDur = JARVISNominalState.shutdownRingFadeDur
+            // Convert progress (0→1) to elapsed seconds
+            let elapsed = progress * dur
 
-            // 16 ring groups (outer to inner) — more granular
-            let rings: [(radiusFrac: Double, fadeStart: Double, decayRate: Double)] = [
-                (0.97, 0.00, 0.90),
-                (0.95, 0.02, 0.91),
-                (0.93, 0.05, 0.92),
-                (0.90, 0.08, 0.925),
-                (0.88, 0.11, 0.93),
-                (0.84, 0.14, 0.935),
-                (0.80, 0.18, 0.94),
-                (0.75, 0.22, 0.945),
-                (0.70, 0.26, 0.95),
-                (0.65, 0.30, 0.955),
-                (0.58, 0.35, 0.96),
-                (0.50, 0.40, 0.965),
-                (0.42, 0.44, 0.97),
-                (0.32, 0.48, 0.975),
-                (0.22, 0.52, 0.98),
-                (0.15, 0.56, 0.985),
-            ]
-
-            for (i, ring) in rings.enumerated() {
+            for (i, ring) in ringConfigs.enumerated() {
+                // Opacity: starts at 1.0 when elapsed >= startOffset, fades to 0 over fadeDur
                 let ringOp: Double
-                if progress > ring.fadeStart + 0.16 { ringOp = 0 }
-                else if progress > ring.fadeStart { ringOp = 1.0 - (progress - ring.fadeStart) / 0.16 }
-                else { ringOp = 1.0 }
-                guard ringOp > 0.01 else { continue }
+                let elapsedSinceFade = elapsed - ring.startOffset
+                if elapsedSinceFade < 0 {
+                    ringOp = 1.0
+                } else if elapsedSinceFade < fadeDur {
+                    ringOp = 1.0 - elapsedSinceFade / fadeDur
+                } else {
+                    ringOp = 0.0
+                }
+                guard ringOp > 0.005 else { continue }
+
+                // Angular deceleration: ring starts at full speed and slows
+                // as opacityProgress approaches 0.  velocity = ringOp^0.5 (smooth rolloff)
+                let velocity = sqrt(max(0, ringOp))
+                let angle = phase * 0.06 * velocity * ring.dir
 
                 let r = R * ring.radiusFrac
-
-                let timeSinceDecel = max(0, progress - ring.fadeStart * 0.5)
-                let framesDecayed = timeSinceDecel * 60.0
-                let velocity = pow(ring.decayRate, framesDecayed)
-                let altDir: Double = i % 2 == 0 ? 1.0 : -1.0
-                let angle = phase * 0.08 * velocity * altDir
-
                 let path = Path { p in
                     p.addArc(center: c, radius: r,
                              startAngle: .radians(angle),
                              endAngle: .radians(angle + pi2), clockwise: false)
                 }
 
-                let isStructural = i % 3 == 0
-                if isStructural {
-                    // Cyan bloom fading
-                    ctx.stroke(path, with: .color(cyan.opacity(0.05 * ringOp)),
-                               style: StrokeStyle(lineWidth: 20))
-                    ctx.stroke(path, with: .color(steel.opacity(0.35 * ringOp)),
-                               style: StrokeStyle(lineWidth: 2.5))
-                    ctx.stroke(path, with: .color(Color.white.opacity(0.12 * ringOp)),
-                               style: StrokeStyle(lineWidth: 0.6))
-                } else {
-                    ctx.stroke(path, with: .color(cyan.opacity(0.03 * ringOp)),
-                               style: StrokeStyle(lineWidth: 14))
-                    ctx.stroke(path, with: .color(cyanDim.opacity(0.22 * ringOp)),
-                               style: StrokeStyle(lineWidth: 1.0))
+                // Structural ring draw style: bloom + steel stroke + white edge
+                ctx.stroke(path, with: .color(cyan.opacity(0.06 * ringOp)),
+                           style: StrokeStyle(lineWidth: 18))
+                ctx.stroke(path, with: .color(steel.opacity(0.40 * ringOp)),
+                           style: StrokeStyle(lineWidth: 2.5))
+                ctx.stroke(path, with: .color(Color.white.opacity(0.12 * ringOp)),
+                           style: StrokeStyle(lineWidth: 0.6))
+
+                // Speed highlight — white edge when still spinning fast
+                if velocity > 0.4 {
+                    ctx.stroke(path, with: .color(Color.white.opacity(0.06 * ringOp * velocity)),
+                               style: StrokeStyle(lineWidth: 0.4))
                 }
 
-                // White edge highlight while spinning fast
-                if velocity > 0.3 {
-                    ctx.stroke(path, with: .color(Color.white.opacity(0.07 * ringOp * velocity)),
-                               style: StrokeStyle(lineWidth: 0.5))
-                }
-
-                // Dimming sparkle — brief flash as each ring dies
-                if ringOp > 0 && ringOp < 0.15 {
-                    let sparkOp = ringOp / 0.15
-                    let sparkAngle = angle + phase * 0.5
+                // Death sparkle — brief cyan flash at the very end of each ring's life
+                if ringOp > 0 && ringOp < 0.18 {
+                    let sparkOp = ringOp / 0.18
+                    let sparkAngle = angle + phase * 0.4
                     let sx = c.x + r * cos(sparkAngle)
                     let sy = c.y + r * sin(sparkAngle)
                     let sparkRect = CGRect(x: sx - 3, y: sy - 3, width: 6, height: 6)
-                    ctx.fill(Path(ellipseIn: sparkRect), with: .color(cyan.opacity(0.5 * sparkOp)))
+                    ctx.fill(Path(ellipseIn: sparkRect),
+                             with: .color(cyan.opacity(0.55 * sparkOp)))
+                }
+
+                // 24-tick inner marks on Ring 5 (i == 0) — mirrors the live HUD
+                if i == 0 {
+                    let tickCount = 24
+                    for t in 0..<tickCount {
+                        let a = angle + Double(t) * (pi2 / Double(tickCount))
+                        let tLen: Double = t % 6 == 0 ? 8 : 4
+                        let tp = Path { p in
+                            p.move(to: CGPoint(x: c.x + cos(a) * (r - tLen/2),
+                                               y: c.y + sin(a) * (r - tLen/2)))
+                            p.addLine(to: CGPoint(x: c.x + cos(a) * (r + tLen/2),
+                                                  y: c.y + sin(a) * (r + tLen/2)))
+                        }
+                        let tickAlpha = t % 6 == 0 ? 0.5 * ringOp : 0.25 * ringOp
+                        ctx.stroke(tp, with: .color(cyan.opacity(tickAlpha)),
+                                   style: StrokeStyle(lineWidth: t % 6 == 0 ? 1.2 : 0.6))
+                    }
                 }
             }
         }
