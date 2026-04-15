@@ -199,9 +199,10 @@ ffmpeg -y -loglevel error \
   -i "$MUSIC/score.mp3" \
   -filter_complex "\
 ${VO_FILTERS};\
-[11:a]volume=0.5[music_raw];\
-[music_raw][vo_mix]sidechaincompress=threshold=0.05:ratio=8:attack=5:release=400[music_duck];\
-[music_duck][vo_mix]amix=inputs=2:duration=first:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[aout]" \
+[vo_mix]apad=whole_dur=120,asplit=2[vo_duck][vo_out];\
+[11:a]atrim=end=120,volume=0.5[music_raw];\
+[music_raw][vo_duck]sidechaincompress=threshold=0.05:ratio=8:attack=5:release=400[music_duck];\
+[music_duck][vo_out]amix=inputs=2:duration=longest:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,atrim=end=120[aout]" \
   -map 0:v -map "[aout]" \
   -c:v copy \
   -c:a aac -b:a 192k \
