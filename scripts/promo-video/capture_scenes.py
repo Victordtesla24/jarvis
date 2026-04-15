@@ -172,26 +172,33 @@ def capture_act3(dev: str) -> None:
 
 
 def capture_act4(dev: str) -> None:
+    """Act 4 — integration + shutdown (21s total).
+
+    Timeline inside act4.mp4:
+      [0-7]   steady state → used for s14 jarvis_links
+      [7-15]  steady state → used for s15 lock_freeze (polish can overlay lock anim)
+      [15-21] shutdown animation (SIGTERM fired at t=15 into the capture)
+    """
     out = RAW / "act4.mp4"
     if out.exists() and out.stat().st_size > 100_000:
         print(f"  ⏭  {out.name} already exists, skipping")
         return
-    print(f"  🎥  act4.mp4 — macOS integration + shutdown (25s)")
+    print(f"  🎥  act4.mp4 — macOS integration + shutdown (21s)")
     p = launch_app()
     time.sleep(11.0)
-    # Start recording BEFORE SIGTERM so the shutdown animation is captured
     rec_proc = subprocess.Popen(
         ["ffmpeg", "-y", "-loglevel", "error",
          "-f", "avfoundation", "-capture_cursor", "0", "-framerate", "30",
          "-i", dev,
-         "-t", "25",
+         "-t", "21",
          "-vf", "scale=2560:1440:force_original_aspect_ratio=decrease,"
                 "pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black",
          "-c:v", "libx264", "-preset", "medium", "-crf", "16",
          "-pix_fmt", "yuv420p", "-r", "30",
          str(out)],
     )
-    time.sleep(18.0)  # 18s of steady state before sending SIGTERM
+    # Fire SIGTERM at t=15 so the ShutdownSequenceView runs inside the [15,21] slice
+    time.sleep(15.0)
     subprocess.run(["sudo", "-n", "kill", "-TERM", str(p.pid)], capture_output=True)
     try:
         rec_proc.wait(timeout=15)
