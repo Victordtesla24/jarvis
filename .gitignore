@@ -56,3 +56,9 @@ mcp.json
 
 # ── Harness API keys — NEVER commit ─────────────────────
 tests/api_keys.env
+
+# ── JARVIS promo video working output ───────────────────
+promo/
+scripts/promo-video/fonts/
+scripts/promo-video/__pycache__/
+scripts/promo-video/lib/__pycache__/
