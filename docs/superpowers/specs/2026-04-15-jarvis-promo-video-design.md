@@ -20,7 +20,7 @@ JARVIS Telemetry is visually striking but has no polished way to show its featur
 
 **In scope:**
 - A new `scripts/promo-video/` directory containing the full production pipeline (orchestration script, scene capture, AI shot generation, TTS, music selection, ffmpeg assembly).
-- A minimal change to `JarvisTelemetry/Sources/JarvisTelemetry/TelemetryBridge.swift` plus one new file `TelemetryReplayPlayer.swift` to support deterministic telemetry replay for Act 3 battery drama.
+- A minimal change to `JarvisTelemetry/Sources/JarvisTelemetry/BatteryMonitor.swift` to support deterministic battery-state replay for the Act 3 battery drama.
 - A single YAML source-of-truth file `shot_list.yaml` defining every shot, VO line, music cue, and transition.
 - Two ffmpeg passes: video (concat + crossfades + title cards + color grade) and audio (music + VO with sidechain ducking + loudness normalisation).
 - Seven validation gates that verify captures, VO, music, timing, encode settings, loudness, and sanity frames.
@@ -44,7 +44,7 @@ JARVIS Telemetry is visually striking but has no polished way to show its featur
 - `tests/lib/visual_lib.py` — existing screen/window capture primitives using Quartz `CGWindowListCreateImage`. Used as the capture fallback when ffmpeg avfoundation is unavailable.
 - `tests/build_and_launch.sh` — existing app launch wrapper. Reused by `capture_scenes.py`.
 - `JarvisTelemetry/Sources/JarvisTelemetry/VideoGenerationPipeline.swift` — existing Swift pipeline for user-provided image → video conversion. NOT used by the promo pipeline. Stays untouched.
-- `JarvisTelemetry/Sources/JarvisTelemetry/TelemetryBridge.swift` — launches the Go daemon subprocess and reads 1Hz JSON via NSPipe. Minimal change adds a `JARVIS_TELEMETRY_REPLAY` env var that swaps the daemon for a pre-recorded JSON sequence.
+- `JarvisTelemetry/Sources/JarvisTelemetry/BatteryMonitor.swift` — polls IOKit power sources at 2 Hz for `batteryPercent` / `isCharging`. Minimal change adds a `JARVIS_BATTERY_REPLAY` env var that swaps IOKit polling for a pre-recorded JSON timeline. `TelemetryBridge.swift` is untouched.
 - `JarvisTelemetry/Sources/JarvisTelemetry/HUDPhaseController.swift` — the theatrical boot/shutdown sequences. These are already cinema-quality and need no changes; capture just records them.
 - `JarvisTelemetry/Sources/JarvisTelemetry/JarvisPersonality.swift` — the battery reactivity controller that produces the Act 3 drama.
 
@@ -80,7 +80,7 @@ JARVIS Telemetry is visually striking but has no polished way to show its featur
 2. **Idempotent phase scripts.** Each phase (`capture_scenes.py`, `generate_vo.py`, etc.) skips work whose output already exists. Rerunning after a tweak only regenerates what changed. Makes iteration cheap.
 3. **Layered provider fallback, not retry loops.** If Runway fails, fall through to Gemini Veo, then to Ken-Burns zoom on a Gemini/OpenAI-generated still. Log which provider was actually used so the provenance of every shot is traceable. Same pattern for TTS (OpenAI `fable` → macOS `say Daniel`) and music (curated track → bundled ambient fallback).
 4. **Two-pass ffmpeg assembly.** Pass 1 builds a silent video (concat + crossfades + title cards + color grade), Pass 2 muxes the mixed audio (music + VO with sidechain ducking + loudness normalisation). Two passes are easier to debug and rerun independently than one mega filter-graph.
-5. **`TelemetryBridge` gains a replay env var.** A new `JARVIS_TELEMETRY_REPLAY=path/to/sequence.json` env var makes the bridge load a scripted JSON telemetry sequence instead of launching the Go daemon. This is the only way to produce the Act 3 battery drama deterministically on a real machine that isn't at 4% battery. ~10 LOC change to `TelemetryBridge.swift`, ~50 LOC new file `TelemetryReplayPlayer.swift`.
+5. **`BatteryMonitor` gains a replay env var.** A new `JARVIS_BATTERY_REPLAY=path/to/battery_timeline.json` env var makes `BatteryMonitor` read a scripted timeline of `(t, batteryPercent, isCharging)` frames instead of polling IOKit. This is the only way to produce the Act 3 battery drama deterministically on a machine that isn't at 4% battery. All downstream reactive logic (ring slowdown, core dim, chatter fade, spark burst) flows through `JarvisPersonality` which already reads `BatteryMonitor`, so only one file is touched. `TelemetryBridge` is untouched — the live Go daemon still drives real CPU / GPU / thermal values, which is exactly what we want. ~30 LOC change to `BatteryMonitor.swift`.
 6. **`VideoGenerationPipeline.swift` stays untouched.** That Swift class is for user-provided images, not for screen-capture-based promos. Duplicating functionality is avoided by keeping the promo pipeline Python-side.
 7. **Rough cut first.** The first run (`run.sh --rough`) uses Ken-Burns fallback for AI shots, macOS `say Daniel` for VO, and a bundled placeholder music track. Produces a watchable ~5-10 min wall-clock cut with zero external API cost. The polish pass only spends credits after the rough cut is approved.
 8. **Validation gates abort early and loudly.** Seven gates check captures, VO, music, timing drift, encode settings, loudness, and sanity frames. Anything wrong halts the pipeline at the earliest possible point with a clear error message.
@@ -232,23 +232,22 @@ shot_list.yaml
 
 **Est. time:** 30 min
 
-### Unit 2 — Telemetry replay mode
+### Unit 2 — Battery replay mode
 
-**Goal:** Extend `TelemetryBridge.swift` with a `JARVIS_TELEMETRY_REPLAY` env var that swaps the Go daemon for a scripted JSON sequence. Create `TelemetryReplayPlayer.swift` (new file) that reads a JSON array of frames and emits them to `TelemetryStore` at 1Hz. Author `replay_sequences/act3_battery_drama.json` with the full Act 3 drama as a 30-frame sequence.
+**Goal:** Extend `BatteryMonitor.swift` with a `JARVIS_BATTERY_REPLAY` env var that swaps IOKit polling for a scripted JSON timeline. Author `replay_sequences/act3_battery_drama.json` with the full Act 3 drama as a ~30-second timeline. Because all downstream reactive behaviour (ring slowdown, core dim, chatter fade, spark burst) flows through `JarvisPersonality` reading `BatteryMonitor`, changing only `BatteryMonitor` is sufficient.
 
 **Files:**
-- Create: `JarvisTelemetry/Sources/JarvisTelemetry/TelemetryReplayPlayer.swift` (~50 LOC)
-- Modify: `JarvisTelemetry/Sources/JarvisTelemetry/TelemetryBridge.swift` (~10 LOC — env var check + delegation)
+- Modify: `JarvisTelemetry/Sources/JarvisTelemetry/BatteryMonitor.swift` (~30 LOC — env var check + replay loop + JSON decoder)
 - Create: `scripts/promo-video/replay_sequences/act3_battery_drama.json`
 
 **Success criteria:**
-- Launching the app with `JARVIS_TELEMETRY_REPLAY=…/act3_battery_drama.json` produces the full Act 3 visual sequence (battery drop, chatter fade, charger on, overdrive, stabilise) on a machine that is currently plugged in and fully charged.
-- Without the env var, the bridge behaves exactly as before (launches the Go daemon, reads NSPipe).
-- The replay sequence includes ±3% random jitter so telemetry values don't look fake.
+- Launching the app with `JARVIS_BATTERY_REPLAY=…/act3_battery_drama.json` produces the full Act 3 visual sequence (battery drop, chatter fade, charger on, overdrive, stabilise) on a machine that is currently plugged in and fully charged.
+- Without the env var, `BatteryMonitor` behaves exactly as before (IOKit polling at 2 Hz).
+- The replay sequence includes ±1% random jitter on battery % so values don't look fake.
 
 **Dependencies:** Unit 1
 
-**Est. time:** 1 hour
+**Est. time:** 45 min
 
 ### Unit 3 — Scene capture
 
@@ -406,7 +405,7 @@ shot_list.yaml
 | Phase | Work | Est. time |
 |---|---|---|
 | P1 | Scaffold `scripts/promo-video/` + `shot_list.yaml` (Unit 1) | 30 min |
-| P2 | `TelemetryBridge` replay mode + `TelemetryReplayPlayer.swift` + Act 3 JSON (Unit 2) | 1 hour |
+| P2 | `BatteryMonitor` replay mode + Act 3 JSON (Unit 2) | 45 min |
 | P3 | `capture_scenes.py` (Unit 3) | 1.5 hours |
 | P4 | `generate_vo.py` (Unit 4) | 30 min |
 | P5 | `generate_ai_shots.py` (Unit 5) | 1 hour |
