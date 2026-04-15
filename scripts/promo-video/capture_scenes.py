@@ -32,44 +32,46 @@ SWIFT_BIN = REPO_ROOT / "JarvisTelemetry" / ".build" / "release" / "JarvisTeleme
 REPLAY_JSON = REPO_ROOT / "scripts" / "promo-video" / "replay_sequences" / "act3_battery_drama.json"
 LAUNCH_LOG = REPO_ROOT / "tests" / "output" / "jarvis_launch.log"
 
-# avfoundation device index for the main display — "1:none" means screen 1, no audio.
-# On some systems this is "2:none" (when a virtual camera at index 1 shifts the list).
-# capture_scenes.py auto-probes and picks whichever index works.
-SCREEN_DEV_CANDIDATES = ["1:none", "2:none", "0:none"]
+def preflight_capture() -> None:
+    """Verify macOS `screencapture` works and ffmpeg is installed.
 
-
-def preflight_ffmpeg() -> str:
-    """Return the avfoundation input index that produces a non-empty probe."""
+    Why screencapture instead of ffmpeg avfoundation? On macOS 14+, ffmpeg's
+    avfoundation screen-grab input has been observed to return pure-black
+    frames while /usr/sbin/screencapture (which uses ScreenCaptureKit under
+    the hood) captures the composited display correctly. We use screencapture
+    for the raw capture and ffmpeg only for format conversion and assembly.
+    """
     if not subprocess.run(["which", "ffmpeg"], capture_output=True).stdout:
         sys.exit("[preflight] ffmpeg not found; `brew install ffmpeg`")
+    if not Path("/usr/sbin/screencapture").exists():
+        sys.exit("[preflight] /usr/sbin/screencapture not found (macOS only)")
 
-    probe = RAW / "_probe.mp4"
-    for dev in SCREEN_DEV_CANDIDATES:
-        probe.unlink(missing_ok=True)
-        try:
-            subprocess.run(
-                ["ffmpeg", "-y", "-loglevel", "error",
-                 "-f", "avfoundation", "-capture_cursor", "0", "-framerate", "30",
-                 "-i", dev,
-                 "-t", "0.5",
-                 "-c:v", "libx264", "-preset", "ultrafast",
-                 str(probe)],
-                check=True, capture_output=True, timeout=20,
-            )
-            if probe.exists() and probe.stat().st_size > 5000:
-                probe.unlink(missing_ok=True)
-                print(f"[preflight] avfoundation device '{dev}' works")
-                return dev
-        except subprocess.CalledProcessError as exc:
-            stderr = exc.stderr.decode()[:300] if exc.stderr else ""
-            print(f"[preflight] device '{dev}' failed: {stderr.splitlines()[-1] if stderr else ''}")
-
-    sys.exit(
-        "[preflight] NO avfoundation screen capture device works.\n"
-        "Grant Screen Recording permission to Terminal (or your shell/ffmpeg) in:\n"
-        "  System Settings → Privacy & Security → Screen Recording\n"
-        "Then re-run ./scripts/promo-video/run.sh --rough"
-    )
+    # Probe: capture 1 second. If Screen Recording permission is missing,
+    # the output file will be zero-length or the exit code non-zero.
+    probe = RAW / "_probe.mov"
+    probe.unlink(missing_ok=True)
+    try:
+        subprocess.run(
+            ["/usr/sbin/screencapture", "-v", "-V", "1", "-x", str(probe)],
+            check=True, capture_output=True, timeout=20,
+        )
+    except subprocess.CalledProcessError as exc:
+        stderr = exc.stderr.decode()[:400] if exc.stderr else ""
+        sys.exit(
+            "[preflight] /usr/sbin/screencapture -v failed.\n"
+            "Grant Screen Recording permission to Terminal in:\n"
+            "  System Settings → Privacy & Security → Screen Recording\n"
+            f"screencapture stderr:\n{stderr}"
+        )
+    if not probe.exists() or probe.stat().st_size < 50_000:
+        sz = probe.stat().st_size if probe.exists() else 0
+        sys.exit(
+            f"[preflight] screencapture probe produced only {sz}B — Screen "
+            f"Recording permission likely missing. Grant it to Terminal in:\n"
+            f"  System Settings → Privacy & Security → Screen Recording"
+        )
+    probe.unlink(missing_ok=True)
+    print("[preflight] screencapture OK")
 
 
 def preflight_swift_build() -> None:
@@ -136,26 +138,41 @@ def stop_app(p: subprocess.Popen, grace: float = 3.0) -> None:
             pass
 
 
-def record(dev: str, out_mp4: Path, duration: float) -> None:
+def record(out_mp4: Path, duration: float) -> None:
+    """Record the main display via macOS `screencapture -v -V` and transcode
+    to 2560x1440 H.264. Two stages:
+      1. screencapture writes a native-resolution .mov via ScreenCaptureKit
+      2. ffmpeg rescales/pads to 2560x1440, re-encodes for pipeline consistency
+    """
     out_mp4.unlink(missing_ok=True)
+    raw_mov = out_mp4.with_suffix(".raw.mov")
+    raw_mov.unlink(missing_ok=True)
+
+    # Ceil duration to an integer because screencapture -V takes integer seconds
+    secs = max(1, int(round(duration)))
+    subprocess.run(
+        ["/usr/sbin/screencapture", "-v", "-V", str(secs), "-x", str(raw_mov)],
+        check=True, capture_output=True,
+    )
+    if not raw_mov.exists() or raw_mov.stat().st_size < 100_000:
+        raise RuntimeError(f"screencapture produced empty/small file: {raw_mov}")
+
+    # Transcode: scale longest edge to 2560, pad to 2560x1440, H.264, yuv420p, 30fps
     subprocess.run(
         ["ffmpeg", "-y", "-loglevel", "error",
-         "-f", "avfoundation",
-         "-capture_cursor", "0",
-         "-framerate", "30",
-         "-i", dev,
-         "-t", f"{duration}",
+         "-i", str(raw_mov),
          "-vf", "scale=2560:1440:force_original_aspect_ratio=decrease,"
-                "pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black",
+                "pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black,fps=30",
+         "-t", f"{duration}",
          "-c:v", "libx264", "-preset", "medium", "-crf", "16",
          "-pix_fmt", "yuv420p",
-         "-r", "30",
          str(out_mp4)],
-        check=True,
+        check=True, capture_output=True,
     )
+    raw_mov.unlink(missing_ok=True)
 
 
-def capture_act1(dev: str) -> None:
+def capture_act1() -> None:
     out = RAW / "act1.mp4"
     if out.exists() and out.stat().st_size > 100_000:
         print(f"  ⏭  {out.name} already exists, skipping")
@@ -163,11 +180,11 @@ def capture_act1(dev: str) -> None:
     print(f"  🎥  act1.mp4 — cold boot + hero reactor (30s)")
     p = launch_app()
     time.sleep(0.8)
-    record(dev, out, 30.0)
+    record(out, 30.0)
     stop_app(p)
 
 
-def capture_act2(dev: str) -> None:
+def capture_act2() -> None:
     out = RAW / "act2.mp4"
     if out.exists() and out.stat().st_size > 100_000:
         print(f"  ⏭  {out.name} already exists, skipping")
@@ -175,11 +192,11 @@ def capture_act2(dev: str) -> None:
     print(f"  🎥  act2.mp4 — floating panels + chatter (35s)")
     p = launch_app()
     time.sleep(11.0)  # wait for boot sequence to complete
-    record(dev, out, 35.0)
+    record(out, 35.0)
     stop_app(p)
 
 
-def capture_act3(dev: str) -> None:
+def capture_act3() -> None:
     out = RAW / "act3.mp4"
     if out.exists() and out.stat().st_size > 100_000:
         print(f"  ⏭  {out.name} already exists, skipping")
@@ -187,11 +204,11 @@ def capture_act3(dev: str) -> None:
     print(f"  🎥  act3.mp4 — battery drama via replay (30s)")
     p = launch_app(extra_env={"JARVIS_BATTERY_REPLAY": str(REPLAY_JSON)})
     time.sleep(11.0)
-    record(dev, out, 30.0)
+    record(out, 30.0)
     stop_app(p)
 
 
-def capture_act4(dev: str) -> None:
+def capture_act4() -> None:
     """Act 4 — integration + shutdown (21s total).
 
     Timeline inside act4.mp4:
@@ -206,42 +223,59 @@ def capture_act4(dev: str) -> None:
     print(f"  🎥  act4.mp4 — macOS integration + shutdown (21s)")
     p = launch_app()
     time.sleep(11.0)
+
+    raw_mov = out.with_suffix(".raw.mov")
+    raw_mov.unlink(missing_ok=True)
+    # Start screencapture in background for 21 seconds
     rec_proc = subprocess.Popen(
-        ["ffmpeg", "-y", "-loglevel", "error",
-         "-f", "avfoundation", "-capture_cursor", "0", "-framerate", "30",
-         "-i", dev,
-         "-t", "21",
-         "-vf", "scale=2560:1440:force_original_aspect_ratio=decrease,"
-                "pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black",
-         "-c:v", "libx264", "-preset", "medium", "-crf", "16",
-         "-pix_fmt", "yuv420p", "-r", "30",
-         str(out)],
+        ["/usr/sbin/screencapture", "-v", "-V", "21", "-x", str(raw_mov)],
     )
-    # Fire SIGTERM at t=15 so the ShutdownSequenceView runs inside the [15,21] slice
+    # Let 15s elapse, then fire SIGTERM at the app so ShutdownSequenceView runs
     time.sleep(15.0)
     _kill(p.pid, "TERM")
+    # Wait for screencapture to finish (it will stop automatically at -V 21)
     try:
         rec_proc.wait(timeout=15)
     except subprocess.TimeoutExpired:
         rec_proc.terminate()
-        rec_proc.wait(timeout=5)
+        try:
+            rec_proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            rec_proc.kill()
     try:
         p.wait(timeout=10)
     except subprocess.TimeoutExpired:
         _kill(p.pid, "KILL")
 
+    # Transcode raw mov → 2560x1440 H.264 mp4 matching the other acts
+    if raw_mov.exists() and raw_mov.stat().st_size > 100_000:
+        subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error",
+             "-i", str(raw_mov),
+             "-vf", "scale=2560:1440:force_original_aspect_ratio=decrease,"
+                    "pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black,fps=30",
+             "-t", "21",
+             "-c:v", "libx264", "-preset", "medium", "-crf", "16",
+             "-pix_fmt", "yuv420p",
+             str(out)],
+            check=True, capture_output=True,
+        )
+        raw_mov.unlink(missing_ok=True)
+    else:
+        raise RuntimeError(f"act4 screencapture produced empty file: {raw_mov}")
+
 
 def main() -> int:
-    dev = preflight_ffmpeg()
+    preflight_capture()
     preflight_swift_build()
     if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0:
         print("[capture] sudo credentials cached — launching with privileged SMC access")
     else:
         print("[capture] sudo not cached — launching unprivileged (some SMC sensors will report 0)")
-    capture_act1(dev)
-    capture_act2(dev)
-    capture_act3(dev)
-    capture_act4(dev)
+    capture_act1()
+    capture_act2()
+    capture_act3()
+    capture_act4()
     print("\n[capture] all 4 acts captured to promo/raw_captures/")
     return 0
 
