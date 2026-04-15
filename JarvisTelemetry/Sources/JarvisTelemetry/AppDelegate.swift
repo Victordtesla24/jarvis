@@ -92,11 +92,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             defer:        false,
             screen:       screen
         )
-        win.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopWindow)))
+        // Promo capture mode raises the window above everything so ffmpeg
+        // screen capture can actually see it. In normal use, the window is
+        // glued to the desktop wallpaper layer.
+        if ProcessInfo.processInfo.environment["JARVIS_PROMO_CAPTURE"] == "1" {
+            win.level = .floating
+            win.ignoresMouseEvents = false
+        } else {
+            win.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopWindow)))
+            win.ignoresMouseEvents = true
+        }
         win.backgroundColor = NSColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1.0)
         win.isOpaque      = true
         win.hasShadow     = false
-        win.ignoresMouseEvents  = true
         win.collectionBehavior  = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 
         let config = WKWebViewConfiguration()
