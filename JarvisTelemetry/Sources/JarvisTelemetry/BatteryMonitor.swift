@@ -45,18 +45,100 @@ final class BatteryMonitor: ObservableObject {
     /// Minimum interval between charging-attach triggers (debounce)
     private let debounceInterval: TimeInterval = 0.5
 
+    // MARK: - Replay mode (promo video only)
+
+    /// Frame in a battery replay timeline
+    private struct ReplayFrame: Decodable {
+        let t: Double       // seconds from replay start
+        let pct: Int        // battery percent 0-100
+        let charging: Bool
+    }
+
+    /// Parsed replay frames (nil in live mode)
+    private var replayFrames: [ReplayFrame]? = nil
+
+    /// Wall-clock start of replay playback
+    private var replayStartTime: Date? = nil
+
+    /// Index of the current frame
+    private var replayCursor: Int = 0
+
+    /// Load replay frames from JSON file if env var is set.
+    /// Returns true if replay mode is active.
+    private func loadReplayIfRequested() -> Bool {
+        guard let path = ProcessInfo.processInfo.environment["JARVIS_BATTERY_REPLAY"],
+              !path.isEmpty else { return false }
+        let url = URL(fileURLWithPath: path)
+        guard let data = try? Data(contentsOf: url),
+              let frames = try? JSONDecoder().decode([ReplayFrame].self, from: data),
+              !frames.isEmpty else {
+            NSLog("[BatteryMonitor] JARVIS_BATTERY_REPLAY set but failed to parse \(path)")
+            return false
+        }
+        replayFrames = frames
+        replayStartTime = Date()
+        replayCursor = 0
+        NSLog("[BatteryMonitor] Replay mode: \(frames.count) frames from \(path)")
+        return true
+    }
+
+    /// Advance replay cursor and emit the current frame.
+    private func pollReplay() {
+        chargingJustAttached = false
+        guard let frames = replayFrames,
+              let start = replayStartTime else { return }
+        let now = Date().timeIntervalSince(start)
+
+        // Advance cursor to the latest frame whose t ≤ now
+        while replayCursor + 1 < frames.count && frames[replayCursor + 1].t <= now {
+            replayCursor += 1
+        }
+        let frame = frames[replayCursor]
+
+        // Apply ±1% jitter so the value doesn't look suspiciously static
+        let jitter = Int.random(in: -1...1)
+        let pct = max(0, min(100, frame.pct + jitter))
+
+        let nowCharging = frame.charging
+
+        // Reuse the live-mode edge detection logic for chargingJustAttached
+        if nowCharging && !previousChargingState {
+            let wallNow = Date()
+            if wallNow.timeIntervalSince(lastChargingAttachTime) > debounceInterval {
+                chargingJustAttached = true
+                lastChargingAttachTime = wallNow
+            }
+        }
+
+        batteryPercent = pct
+        isCharging = nowCharging
+        previousChargingState = nowCharging
+        powerSource = nowCharging ? "AC Power" : "Battery Power"
+        isDying = pct <= JARVISNominalState.batteryDyingThreshold
+            && !nowCharging
+            && powerSource == "Battery Power"
+    }
+
     // MARK: - Lifecycle
 
-    /// Start polling battery state at 2 Hz
+    /// Start polling battery state at 2 Hz (live IOKit) or from a replay
+    /// file if JARVIS_BATTERY_REPLAY is set.
     func start() {
+        let replayActive = loadReplayIfRequested()
+
         // Initial read
-        poll()
+        if replayActive { pollReplay() } else { poll() }
 
         // Poll at 2 Hz (500ms)
         timer = Timer.publish(every: 0.5, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                self?.poll()
+                guard let self else { return }
+                if self.replayFrames != nil {
+                    self.pollReplay()
+                } else {
+                    self.poll()
+                }
             }
     }
 
