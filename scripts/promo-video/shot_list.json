@@ -1,0 +1,199 @@
+{
+  "meta": {
+    "title": "JARVIS — Cinematic promo",
+    "duration_seconds": 120,
+    "width": 2560,
+    "height": 1440,
+    "fps": 30,
+    "loudness_target_lufs": -14,
+    "subtitle": "MADE ON APPLE SILICON"
+  },
+  "scenes": [
+    {
+      "id": "s01_intro",
+      "act": 1,
+      "start": 0.0,
+      "duration": 3.0,
+      "source": "ai",
+      "ai_prompt": "cosmic void, single point of cyan light approaching, volumetric fog, Marvel Studios cinematic lighting, slow forward dolly",
+      "capture_hint": null,
+      "vo_ref": null,
+      "transition_in": "cut"
+    },
+    {
+      "id": "s02_boot_ignition",
+      "act": 1,
+      "start": 3.0,
+      "duration": 5.0,
+      "source": "live",
+      "capture_hint": "act1_boot",
+      "vo_ref": "vo_01",
+      "transition_in": "fade"
+    },
+    {
+      "id": "s03_boot_rings",
+      "act": 1,
+      "start": 8.0,
+      "duration": 6.0,
+      "source": "live",
+      "capture_hint": "act1_boot",
+      "vo_ref": "vo_02",
+      "transition_in": "fade"
+    },
+    {
+      "id": "s04_hero_reactor",
+      "act": 1,
+      "start": 14.0,
+      "duration": 8.0,
+      "source": "live",
+      "capture_hint": "act1_hero",
+      "vo_ref": null,
+      "transition_in": "fade"
+    },
+    {
+      "id": "s05_title_card",
+      "act": 1,
+      "start": 22.0,
+      "duration": 8.0,
+      "source": "title_card",
+      "capture_hint": "act1_hero",
+      "title_text": "JARVIS",
+      "subtitle_text": "Cinema-grade telemetry for Apple Silicon",
+      "vo_ref": "vo_03",
+      "transition_in": "fade"
+    },
+    {
+      "id": "s06_panel_wide",
+      "act": 2,
+      "start": 30.0,
+      "duration": 7.0,
+      "source": "live",
+      "capture_hint": "act2_panels_wide",
+      "vo_ref": "vo_04",
+      "transition_in": "fade"
+    },
+    {
+      "id": "s07_left_panel",
+      "act": 2,
+      "start": 37.0,
+      "duration": 11.0,
+      "source": "live",
+      "capture_hint": "act2_panels_left",
+      "vo_ref": "vo_05",
+      "transition_in": "cut"
+    },
+    {
+      "id": "s08_right_panel",
+      "act": 2,
+      "start": 48.0,
+      "duration": 10.0,
+      "source": "live",
+      "capture_hint": "act2_panels_right",
+      "vo_ref": "vo_06",
+      "transition_in": "cut"
+    },
+    {
+      "id": "s09_panel_wide_return",
+      "act": 2,
+      "start": 58.0,
+      "duration": 7.0,
+      "source": "live",
+      "capture_hint": "act2_panels_wide",
+      "vo_ref": null,
+      "transition_in": "fade"
+    },
+    {
+      "id": "s10_charger_unplug",
+      "act": 3,
+      "start": 65.0,
+      "duration": 8.0,
+      "source": "live",
+      "capture_hint": "act3_drama",
+      "vo_ref": "vo_07",
+      "transition_in": "fade"
+    },
+    {
+      "id": "s11_low_power_hold",
+      "act": 3,
+      "start": 73.0,
+      "duration": 5.0,
+      "source": "live",
+      "capture_hint": "act3_drama",
+      "vo_ref": null,
+      "transition_in": "cut"
+    },
+    {
+      "id": "s12_charger_reconnect",
+      "act": 3,
+      "start": 78.0,
+      "duration": 5.0,
+      "source": "live",
+      "capture_hint": "act3_drama",
+      "vo_ref": null,
+      "transition_in": "cut"
+    },
+    {
+      "id": "s13_overdrive",
+      "act": 3,
+      "start": 83.0,
+      "duration": 12.0,
+      "source": "live",
+      "capture_hint": "act3_drama",
+      "vo_ref": "vo_08",
+      "transition_in": "cut"
+    },
+    {
+      "id": "s14_jarvis_links",
+      "act": 4,
+      "start": 95.0,
+      "duration": 7.0,
+      "source": "live",
+      "capture_hint": "act4_integration",
+      "vo_ref": "vo_09",
+      "transition_in": "fade"
+    },
+    {
+      "id": "s15_lock_freeze",
+      "act": 4,
+      "start": 102.0,
+      "duration": 8.0,
+      "source": "live",
+      "capture_hint": "act4_integration",
+      "vo_ref": null,
+      "transition_in": "cut"
+    },
+    {
+      "id": "s16_shutdown",
+      "act": 4,
+      "start": 110.0,
+      "duration": 6.0,
+      "source": "live",
+      "capture_hint": "act4_shutdown",
+      "vo_ref": "vo_10",
+      "transition_in": "fade"
+    },
+    {
+      "id": "s17_outro",
+      "act": 4,
+      "start": 116.0,
+      "duration": 4.0,
+      "source": "ai",
+      "ai_prompt": "slow cosmic pull-back, cyan logotype JARVIS fades into deep space void, end credits aesthetic, volumetric cyan fog",
+      "capture_hint": null,
+      "vo_ref": null,
+      "transition_in": "fade"
+    }
+  ],
+  "vo_lines": {
+    "vo_01": { "text": "Good evening. I am JARVIS.",                             "place_at": 3.5 },
+    "vo_02": { "text": "Initialising Apple Silicon telemetry array.",            "place_at": 9.0 },
+    "vo_03": { "text": "All cores reporting. Nominal.",                          "place_at": 24.0 },
+    "vo_04": { "text": "Live data streams.",                                     "place_at": 31.0 },
+    "vo_05": { "text": "Memory bandwidth. Neural engine. GPU frequency.",        "place_at": 38.5 },
+    "vo_06": { "text": "Every microsecond, rendered.",                           "place_at": 49.5 },
+    "vo_07": { "text": "Power critical, sir.",                                   "place_at": 67.0 },
+    "vo_08": { "text": "Systems restored. All cores nominal.",                   "place_at": 85.0 },
+    "vo_09": { "text": "Shall I launch your applications, sir?",                 "place_at": 96.5 },
+    "vo_10": { "text": "Until next time, sir.",                                  "place_at": 111.0 }
+  }
+}
