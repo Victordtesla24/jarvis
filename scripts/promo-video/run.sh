@@ -28,10 +28,13 @@ echo "================================================================"
 echo " JARVIS promo video — mode: $MODE"
 echo "================================================================"
 
-# Sudo credentials (capture_scenes.py needs them to launch the app)
-if ! sudo -n true 2>/dev/null; then
-  echo "[run] sudo credentials not cached. Run 'sudo -v' in this terminal first."
-  exit 1
+# Sudo is optional — capture_scenes.py will use it if available, otherwise
+# launch the app unprivileged (IOKit/IOReport drive the visible animations;
+# some SMC temp sensors will report 0, which is acceptable for a promo cut).
+if sudo -n true 2>/dev/null; then
+  echo "[run] sudo cached — full SMC sensor access"
+else
+  echo "[run] sudo not cached — running unprivileged (SMC temps may report 0)"
 fi
 
 # Phase 1: capture scenes (idempotent)

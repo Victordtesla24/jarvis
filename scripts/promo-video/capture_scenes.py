@@ -95,21 +95,41 @@ def launch_app(extra_env: dict[str, str] | None = None) -> subprocess.Popen:
     log = open(LAUNCH_LOG, "a")
     log.write(f"\n=== {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
     log.flush()
-    p = subprocess.Popen(
-        ["sudo", "-n", "-E", str(SWIFT_BIN)],
-        env=env, stdout=log, stderr=log,
-    )
+    # Use sudo -n -E only if credentials are cached, otherwise run unprivileged.
+    # Running unprivileged means some SMC sensors report zero but IOKit / IOReport
+    # still drive the visible ring animations (see tests/build_and_launch.sh).
+    use_sudo = subprocess.run(
+        ["sudo", "-n", "true"], capture_output=True
+    ).returncode == 0
+    if use_sudo:
+        p = subprocess.Popen(
+            ["sudo", "-n", "-E", str(SWIFT_BIN)],
+            env=env, stdout=log, stderr=log,
+        )
+    else:
+        p = subprocess.Popen(
+            [str(SWIFT_BIN)],
+            env=env, stdout=log, stderr=log,
+        )
     return p
+
+
+def _kill(pid: int, sig: str) -> None:
+    """Try sudo kill first (for sudo-launched processes), fall back to plain kill."""
+    if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0:
+        subprocess.run(["sudo", "-n", "kill", f"-{sig}", str(pid)], capture_output=True)
+    else:
+        subprocess.run(["kill", f"-{sig}", str(pid)], capture_output=True)
 
 
 def stop_app(p: subprocess.Popen, grace: float = 3.0) -> None:
     if p.poll() is not None:
         return
-    subprocess.run(["sudo", "-n", "kill", "-TERM", str(p.pid)], capture_output=True)
+    _kill(p.pid, "TERM")
     try:
         p.wait(timeout=grace)
     except subprocess.TimeoutExpired:
-        subprocess.run(["sudo", "-n", "kill", "-KILL", str(p.pid)], capture_output=True)
+        _kill(p.pid, "KILL")
         try:
             p.wait(timeout=1.0)
         except subprocess.TimeoutExpired:
@@ -199,7 +219,7 @@ def capture_act4(dev: str) -> None:
     )
     # Fire SIGTERM at t=15 so the ShutdownSequenceView runs inside the [15,21] slice
     time.sleep(15.0)
-    subprocess.run(["sudo", "-n", "kill", "-TERM", str(p.pid)], capture_output=True)
+    _kill(p.pid, "TERM")
     try:
         rec_proc.wait(timeout=15)
     except subprocess.TimeoutExpired:
@@ -208,15 +228,16 @@ def capture_act4(dev: str) -> None:
     try:
         p.wait(timeout=10)
     except subprocess.TimeoutExpired:
-        subprocess.run(["sudo", "-n", "kill", "-KILL", str(p.pid)], capture_output=True)
+        _kill(p.pid, "KILL")
 
 
 def main() -> int:
     dev = preflight_ffmpeg()
     preflight_swift_build()
-    if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode != 0:
-        print("[capture] no cached sudo credentials. Run `sudo -v` first.")
-        return 2
+    if subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0:
+        print("[capture] sudo credentials cached — launching with privileged SMC access")
+    else:
+        print("[capture] sudo not cached — launching unprivileged (some SMC sensors will report 0)")
     capture_act1(dev)
     capture_act2(dev)
     capture_act3(dev)
