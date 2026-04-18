@@ -1,25 +1,47 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 # scripts/promo-video/pick_music.sh — Download curated royalty-free score.
 # Usage: ./pick_music.sh [candidate_number]   (1, 2, or 3; default 1)
 # Writes promo/music/score.mp3 and promo/music/LICENCE.txt. Falls back to
 # the bundled ambient drone if download fails or the network is blocked.
+#
+# R-47: all float comparisons use awk (macOS POSIX); no bc dependency.
+# R-62: bundled fallback is verified against its committed SHA-256.
 set -eu
 set -o pipefail
 
 CAND="${1:-1}"
-REPO_ROOT="${REPO_ROOT:-/Users/vic/claude/General-Work/jarvis/jarvis-build}"
+REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 OUT_DIR="$REPO_ROOT/promo/music"
 OUT_MP3="$OUT_DIR/score.mp3"
 OUT_LIC="$OUT_DIR/LICENCE.txt"
 FALLBACK="$REPO_ROOT/scripts/promo-video/music-fallback.mp3"
+FALLBACK_HASH_FILE="$REPO_ROOT/scripts/promo-video/music-fallback.mp3.sha256"
 
 mkdir -p "$OUT_DIR"
+
+# Helper: awk float comparison, echoes 1 when $1 >= $2.
+ge() { awk -v a="$1" -v b="$2" 'BEGIN{print (a+0>=b+0)?1:0}'; }
+
+verify_fallback() {
+  [[ -f "$FALLBACK" ]] || { echo "[pick_music] missing fallback $FALLBACK" >&2; return 1; }
+  if [[ ! -f "$FALLBACK_HASH_FILE" ]]; then
+    echo "[pick_music][WARN] no committed sha256 for fallback — skipping verification" >&2
+    return 0
+  fi
+  local expected actual
+  expected=$(awk '{print $1}' "$FALLBACK_HASH_FILE")
+  actual=$(shasum -a 256 "$FALLBACK" | awk '{print $1}')
+  if [[ "$expected" != "$actual" ]]; then
+    echo "[pick_music][FATAL] fallback hash mismatch: expected=$expected actual=$actual" >&2
+    return 1
+  fi
+}
 
 # Idempotent: keep existing file if valid and ≥120s
 if [[ -f "$OUT_MP3" ]]; then
   dur=$(ffprobe -v error -show_entries format=duration \
         -of default=noprint_wrappers=1:nokey=1 "$OUT_MP3" 2>/dev/null || echo 0)
-  if [[ -n "$dur" && $(echo "$dur >= 120" | bc -l) -eq 1 ]]; then
+  if [[ -n "$dur" && "$(ge "$dur" 120)" == "1" ]]; then
     echo "[pick_music] keeping existing $OUT_MP3 (${dur}s)"
     exit 0
   fi
@@ -54,7 +76,7 @@ if curl -fsSL --max-time 60 -o "$OUT_MP3.tmp" "$TRACK_URL" 2>/dev/null; then
   mv "$OUT_MP3.tmp" "$OUT_MP3"
   dur=$(ffprobe -v error -show_entries format=duration \
         -of default=noprint_wrappers=1:nokey=1 "$OUT_MP3" 2>/dev/null || echo 0)
-  if [[ -n "$dur" && $(echo "$dur >= 120" | bc -l) -eq 1 ]]; then
+  if [[ -n "$dur" && "$(ge "$dur" 120)" == "1" ]]; then
     echo "[pick_music] downloaded OK (${dur}s)"
     DOWNLOAD_OK=1
   else
@@ -65,6 +87,7 @@ else
 fi
 
 if [[ "$DOWNLOAD_OK" == "0" ]]; then
+  verify_fallback
   cp "$FALLBACK" "$OUT_MP3"
   ATTRIBUTION="Bundled JARVIS ambient drone (synthesised fallback, public domain)"
 fi

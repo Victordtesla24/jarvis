@@ -190,3 +190,13 @@ log "  [ ] frames 31-40: SHUTDOWN sequence (ShutdownSequenceView)"
 log ""
 log "Frames: $REACTIVE_DIR"
 log "App log: $REACTIVE_DIR/jarvis_stderr.log"
+
+# R-64: fail the demo on too-few frames or non-clean shutdown.
+die() { printf '[run_reactive_demo][FAIL] %s\n' "$1" >&2; exit 1; }
+if [[ "$FRAME_COUNT" -lt 36 ]]; then
+    die "Expected >=36 frames, got $FRAME_COUNT"
+fi
+if [[ "$SHUTDOWN_STATUS" == "SIGKILL required" ]]; then
+    die "SIGTERM non-compliance — SIGKILL was required"
+fi
+log "REACTIVE DEMO: PASS ($FRAME_COUNT frames, shutdown: $SHUTDOWN_STATUS)"

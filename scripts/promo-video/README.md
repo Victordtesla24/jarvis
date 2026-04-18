@@ -38,7 +38,7 @@ extracted to `promo/qa_frames/*.png`.
   clear error message.
 - **Sudo credentials cached** (`sudo -v`) before running — the app needs root for
   IOKit / SMC sensor reads.
-- **API keys** in `tests/api_keys.env` or `~/.jarvis/.env`:
+- **API keys** in `~/.jarvis/.env` (sole canonical location):
   - `OPENAI_API_KEY` — TTS `fable` voice (polish pass)
   - `RUNWAY_API_KEY` — Gen-3 Alpha Turbo image-to-video (polish pass)
   - `GEMINI_API_KEY` — Imagen still generation + Veo fallback

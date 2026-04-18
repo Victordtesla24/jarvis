@@ -212,8 +212,11 @@ struct LockReactorCore: View {
 
             let slowPulse = 0.9 + sin(phase * 1.2) * 0.1  // Subdued pulse
 
-            // Volumetric glow layers
-            for layer in 0..<Int(bloomIntensity * 20) {
+            // R-29: fixed loop bound; visibility gate uses the lo > 0.005
+            // guard inside the loop to skip layers that would draw as
+            // transparent. The dynamic-upper-bound form caused SwiftUI to
+            // re-evaluate Int(bloomIntensity * 20) on every frame.
+            for layer in 0..<20 {
                 let lr = R * 0.01 + Double(layer) * R * 0.015
                 let falloff = 1.0 - Double(layer) / 20.0
                 let lo = (0.20 * falloff * falloff) * Double(bloomIntensity) * slowPulse
@@ -383,6 +386,22 @@ struct ParticleWireframeSphere: View {
     let cyan: Color
     let cyanBright: Color
 
+    // R-30: 140 (angleSeed, distSeed) tuples, precomputed once at type scope.
+    // The Canvas body below only does phase-dependent math — no per-frame PRNG.
+    static let particleSeeds: [(Double, Double)] = {
+        var seed: UInt64 = 42
+        var out: [(Double, Double)] = []
+        out.reserveCapacity(140)
+        for _ in 0..<140 {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            let a = Double(seed >> 11) / Double(1 << 53)
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            let d = Double(seed >> 11) / Double(1 << 53)
+            out.append((a, d))
+        }
+        return out
+    }()
+
     var body: some View {
         Canvas { ctx, size in
             let c = CGPoint(x: cx, y: cy)
@@ -489,14 +508,9 @@ struct ParticleWireframeSphere: View {
                 center: c, startRadius: 0, endRadius: coreR
             ))
 
-            // Fixed-seed particle cloud — 140 particles orbiting at r ≈ 1.3R…1.9R
-            var seed: UInt64 = 42
-            for _ in 0..<140 {
-                seed = seed &* 6364136223846793005 &+ 1442695040888963407
-                let angleSeed = Double(seed >> 11) / Double(1 << 53)
-                seed = seed &* 6364136223846793005 &+ 1442695040888963407
-                let distSeed = Double(seed >> 11) / Double(1 << 53)
-
+            // R-30: 140 particle seeds are precomputed once at type scope —
+            // the Canvas loop only runs phase-dependent math per frame.
+            for (angleSeed, distSeed) in Self.particleSeeds {
                 let particleAngle = angleSeed * pi2 + phase * 0.12
                 let particleDist = sphereRadius * (1.3 + distSeed * 0.6)
                 let px = c.x + cos(particleAngle) * particleDist

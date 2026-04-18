@@ -1,64 +1,90 @@
-# ── Build artifacts ──────────────────────────────────────
+# =============================================================================
+# JARVIS Telemetry — .gitignore
+# =============================================================================
+
+# ── Build artifacts ─────────────────────────────────────────────────────────
 .build/
+build/
+DerivedData/
 *.o
 *.d
 *.swp
-DerivedData/
-
-# ── macOS system files ──────────────────────────────────
-.DS_Store
+*.swo
 *.xcuserdata
-
-# ── IDE ─────────────────────────────────────────────────
-.vscode/
-.idea/
 *.xcworkspace/
 
-# ── Go daemon binary (build from source) ────────────────
+# ── Compiled Go binary (built per-machine from mactop/) ─────────────────────
 jarvis-mactop-daemon
 JarvisTelemetry/Sources/JarvisTelemetry/Resources/jarvis-mactop-daemon
-
-# ── mactop submodule build artifacts ────────────────────
 mactop/mactop
 mactop/.git
 mactop/mactop.gif
 mactop/screenshota.png
-
-.claude/
-.remember/
-logs/
-.superpowers/
-state/
-.vscode/
-tmp/    
-*.logs
-*.png
-*.jpeg
-*.jpg
-*.mp4
-
 mactop_backup/
-jarvis-mactop-daemon
-.build/
+
+# ── macOS junk ──────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── Python (pipeline tooling under scripts/) ────────────────────────────────
+**/.venv/
+**/venv/
+**/__pycache__/
+*.pyc
+*.pyo
 *.pkl
-.serena/
-.cursorrules
-.github/
+.pytest_cache/
+.coverage
+htmlcov/
 
-LICENSE
-CLAUDE.md
-
+# ── Node / npm (none currently, future-proofing) ────────────────────────────
 node_modules/
 package-lock.json
 package.json
 
-mcp.json
+# ── IDEs & editor state ─────────────────────────────────────────────────────
+.vscode/
+.idea/
+.cursor/
+.cursorrules
 
-# ── Harness API keys — NEVER commit ─────────────────────
-tests/api_keys.env
+# ── Claude Code / agent tooling state (per-machine) ─────────────────────────
+.claude/
+.remember/
+.superpowers/
+.serena/
+.context/
+.filescope/
+.sourcerer/
+.juno_task/
+.ralph-infinite.log
+mcp-debug.log
 
-# ── JARVIS promo video working output ───────────────────
+# ── Logs (universal) ────────────────────────────────────────────────────────
+*.log
+logs/
+state/
+tmp/
+
+# ── Generated media assets (regenerable via scripts/promo-video/) ───────────
+*.png
+*.jpeg
+*.jpg
+*.mp4
+*.gif
 promo/
 scripts/promo-video/fonts/
-scripts/promo-video/__pycache__/
-scripts/promo-video/lib/__pycache__/
+
+# ── Secrets — NEVER commit ──────────────────────────────────────────────────
+.env
+.env.*
+tests/api_keys.env
+mcp.json
+
+# ── CI workflows are managed externally for now ─────────────────────────────
+.github/
+
+# ── Per-machine docs that override repo defaults ────────────────────────────
+LICENSE
+CLAUDE.md

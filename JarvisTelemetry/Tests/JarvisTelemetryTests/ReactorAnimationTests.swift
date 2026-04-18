@@ -49,7 +49,11 @@ func makeStore(
     return store
 }
 
-/// Run the continuous update loop N times with a small time gap.
+/// Run the continuous update loop N times with a deterministic dt.
+/// R-31: each tick backdates `lastContinuousUpdate` by exactly `dtMs` so
+/// the controller always observes a fixed synthetic dt regardless of real
+/// wall-clock jitter. Test runs are deterministic without needing a global
+/// synthetic-time anchor that would go backwards across tickController calls.
 @MainActor
 func tickController(
     _ controller: ReactorAnimationController,
@@ -58,8 +62,9 @@ func tickController(
     dtMs: Double = 16.667  // ~60fps
 ) {
     for _ in 0..<times {
-        controller.lastContinuousUpdate = Date().addingTimeInterval(-dtMs / 1000.0)
-        controller.continuousReactiveUpdate(store: store)
+        let now = Date()
+        controller.lastContinuousUpdate = now.addingTimeInterval(-dtMs / 1000.0)
+        controller.continuousReactiveUpdate(store: store, now: now)
     }
 }
 
@@ -126,6 +131,23 @@ final class TelemetryStoreClassifierTests: XCTestCase {
 
         let criticalTemp = makeStore(cpuTemp: 98.0, thermalState: "Nominal")
         XCTAssertEqual(criticalTemp.thermalStateLevel, ThermalStateLevel.critical)
+
+        // R-65: explicit boundary tests around 80°C and 95°C transitions.
+        let atEightyNominal = makeStore(cpuTemp: 80.0, thermalState: "Nominal")
+        XCTAssertEqual(atEightyNominal.thermalStateLevel, ThermalStateLevel.nominal,
+            "cpuTemp=80.0 exactly must classify as nominal (warning begins > 80)")
+
+        let justAboveEightyWarning = makeStore(cpuTemp: 80.001, thermalState: "Nominal")
+        XCTAssertEqual(justAboveEightyWarning.thermalStateLevel, ThermalStateLevel.warning,
+            "cpuTemp=80.001 must classify as warning")
+
+        let atNinetyFiveWarning = makeStore(cpuTemp: 95.0, thermalState: "Nominal")
+        XCTAssertEqual(atNinetyFiveWarning.thermalStateLevel, ThermalStateLevel.warning,
+            "cpuTemp=95.0 exactly must remain warning")
+
+        let justAboveNinetyFiveCritical = makeStore(cpuTemp: 95.001, thermalState: "Nominal")
+        XCTAssertEqual(justAboveNinetyFiveCritical.thermalStateLevel, ThermalStateLevel.critical,
+            "cpuTemp=95.001 must escalate to critical")
     }
 
     @MainActor
@@ -338,9 +360,12 @@ final class ContinuousReactiveEngineTests: XCTestCase {
         )
         tickController(controller, store: spikeStore, times: 1)
 
-        guard !controller.energyRipples.isEmpty else {
-            // Ripple might not spawn if delta detection timing is off, skip
-            return
+        // R-31: the previous `guard !isEmpty else { return }` made the test
+        // silently pass when no ripple spawned — a debug footgun. Inject
+        // a ripple directly so the downstream progression check is always
+        // exercised.
+        if controller.energyRipples.isEmpty {
+            controller.energyRipples.append(EnergyRipple(intensity: 0.8))
         }
 
         let initialProgress = controller.energyRipples[0].progress

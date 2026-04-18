@@ -47,30 +47,43 @@ final class BatteryMonitor: ObservableObject {
 
     // MARK: - Replay mode (promo video only)
 
-    /// Frame in a battery replay timeline
-    private struct ReplayFrame: Decodable {
+    /// Frame in a battery replay timeline. Internal so tests can construct.
+    struct ReplayFrame: Decodable, Equatable {
         let t: Double       // seconds from replay start
         let pct: Int        // battery percent 0-100
         let charging: Bool
     }
 
-    /// Parsed replay frames (nil in live mode)
-    private var replayFrames: [ReplayFrame]? = nil
+    /// Parsed replay frames (nil in live mode). Internal for tests.
+    var replayFrames: [ReplayFrame]? = nil
 
-    /// Wall-clock start of replay playback
-    private var replayStartTime: Date? = nil
+    /// Wall-clock start of replay playback. Internal for tests.
+    var replayStartTime: Date? = nil
 
-    /// Index of the current frame
-    private var replayCursor: Int = 0
+    /// Index of the current frame. Internal for tests.
+    var replayCursor: Int = 0
+
+    /// Test hook — inject replay frames directly, bypassing env var + JSON.
+    func injectReplayForTesting(frames: [ReplayFrame], startTime: Date = Date()) {
+        replayFrames = frames
+        replayStartTime = startTime
+        replayCursor = 0
+        previousChargingState = false
+        lastChargingAttachTime = .distantPast
+    }
 
     /// Load replay frames from JSON file if env var is set.
-    /// Returns true if replay mode is active.
-    private func loadReplayIfRequested() -> Bool {
+    /// Returns true if replay mode is active. Internal so tests can exercise
+    /// the branches directly.
+    func loadReplayIfRequested() -> Bool {
         guard let path = ProcessInfo.processInfo.environment["JARVIS_BATTERY_REPLAY"],
               !path.isEmpty else { return false }
         let url = URL(fileURLWithPath: path)
-        guard let data = try? Data(contentsOf: url),
-              let frames = try? JSONDecoder().decode([ReplayFrame].self, from: data),
+        guard let data = try? Data(contentsOf: url) else {
+            NSLog("[BatteryMonitor] JARVIS_BATTERY_REPLAY set but cannot read \(path)")
+            return false
+        }
+        guard let frames = try? JSONDecoder().decode([ReplayFrame].self, from: data),
               !frames.isEmpty else {
             NSLog("[BatteryMonitor] JARVIS_BATTERY_REPLAY set but failed to parse \(path)")
             return false
@@ -82,8 +95,8 @@ final class BatteryMonitor: ObservableObject {
         return true
     }
 
-    /// Advance replay cursor and emit the current frame.
-    private func pollReplay() {
+    /// Advance replay cursor and emit the current frame. Internal for tests.
+    func pollReplay() {
         chargingJustAttached = false
         guard let frames = replayFrames,
               let start = replayStartTime else { return }
@@ -95,9 +108,9 @@ final class BatteryMonitor: ObservableObject {
         }
         let frame = frames[replayCursor]
 
-        // Apply ±1% jitter so the value doesn't look suspiciously static
+        // Apply ±1% jitter so the value doesn't look suspiciously static.
         let jitter = Int.random(in: -1...1)
-        let pct = max(0, min(100, frame.pct + jitter))
+        let displayPct = max(0, min(100, frame.pct + jitter))
 
         let nowCharging = frame.charging
 
@@ -110,11 +123,13 @@ final class BatteryMonitor: ObservableObject {
             }
         }
 
-        batteryPercent = pct
+        batteryPercent = displayPct
         isCharging = nowCharging
         previousChargingState = nowCharging
         powerSource = nowCharging ? "AC Power" : "Battery Power"
-        isDying = pct <= JARVISNominalState.batteryDyingThreshold
+        // R-56: evaluate isDying against the RAW frame.pct (no display
+        // jitter) so the dying flag doesn't flicker at the threshold boundary.
+        isDying = frame.pct <= JARVISNominalState.batteryDyingThreshold
             && !nowCharging
             && powerSource == "Battery Power"
     }

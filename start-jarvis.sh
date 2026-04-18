@@ -21,9 +21,18 @@ fi
 if [[ -d "$APP_BUNDLE" ]]; then
     echo "==> Launching $APP_BUNDLE"
     open "$APP_BUNDLE"
-    # give macOS a moment to fork, then record the PID
-    sleep 1
-    PID=$(pgrep -x JarvisWallpaper || pgrep -x JarvisTelemetry || true)
+    # Poll for up to 5s — `open` returns immediately but the process fork
+    # can take longer under load. Empty-PID case MUST NOT reach the pidfile write.
+    PID=""
+    for _ in $(seq 1 10); do
+        PID=$(pgrep -n -x JarvisWallpaper 2>/dev/null || pgrep -n -x JarvisTelemetry 2>/dev/null || true)
+        [[ -n "$PID" ]] && break
+        sleep 0.5
+    done
+    if [[ -z "$PID" ]]; then
+        echo "ERROR: JarvisWallpaper did not start within 5s"
+        exit 1
+    fi
 elif [[ -x "$SPM_BIN" ]]; then
     echo "==> Launching $SPM_BIN"
     nohup "$SPM_BIN" > /tmp/jarvis-wallpaper.log 2>&1 &

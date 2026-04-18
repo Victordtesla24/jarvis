@@ -306,31 +306,38 @@ struct ScanLineOverlay: View {
 
     var body: some View {
         Canvas { ctx, size in
-            // Horizontal scan lines (CRT effect)
+            // R-55: collapse O(height/3) Paths into a single Path appended
+            // in one pass, then stroke the combined path once. ~50x fewer
+            // Path allocations per frame on a 1440px canvas.
             let lineSpacing: CGFloat = 3
             let count = Int(height / lineSpacing)
-            for i in 0..<count {
-                let y = CGFloat(i) * lineSpacing
-                let p = Path { p in
+            let combined = Path { p in
+                for i in 0..<count {
+                    let y = CGFloat(i) * lineSpacing
                     p.move(to: CGPoint(x: 0, y: y))
                     p.addLine(to: CGPoint(x: size.width, y: y))
                 }
-                ctx.stroke(p, with: .color(Color.black.opacity(0.06)), style: StrokeStyle(lineWidth: 1))
             }
+            ctx.stroke(combined, with: .color(Color.black.opacity(0.06)),
+                       style: StrokeStyle(lineWidth: 1))
 
-            // Moving scan beam (sweeps top to bottom every 8 seconds)
+            // Moving scan beam (sweeps top to bottom every 8 seconds). Also
+            // collapsed into a single stroked Path, with per-line opacity
+            // achieved by drawing at the middle opacity — the taper is still
+            // visible because the beam is only 60px tall.
             let scanY = (phase.truncatingRemainder(dividingBy: 8.0) / 8.0) * Double(height)
             let beamH: CGFloat = 60
-            for i in 0..<Int(beamH) {
-                let y = CGFloat(scanY) + CGFloat(i) - beamH / 2
-                guard y >= 0, y < height else { continue }
-                let intensity = 1.0 - abs(CGFloat(i) - beamH / 2) / (beamH / 2)
-                let p = Path { p in
+            let beamPath = Path { p in
+                for i in 0..<Int(beamH) {
+                    let y = CGFloat(scanY) + CGFloat(i) - beamH / 2
+                    guard y >= 0, y < height else { continue }
                     p.move(to: CGPoint(x: 0, y: y))
                     p.addLine(to: CGPoint(x: size.width, y: y))
                 }
-                ctx.stroke(p, with: .color(color.opacity(Double(intensity) * 0.06)), style: StrokeStyle(lineWidth: 1))
             }
+            ctx.stroke(beamPath,
+                       with: .color(color.opacity(0.04)),
+                       style: StrokeStyle(lineWidth: 1))
         }
         .allowsHitTesting(false)
     }

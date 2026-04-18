@@ -1,0 +1,3005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JARVIS — Kartik's System</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Audiowide&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cy:        #1AE6F5;
+    --cy-hot:    #8CFAFE;
+    --cy-dim:    #0E90A8;
+    --cy-wash:   rgba(26, 230, 245, 0.10);
+    --bg:        #050A14;
+    --bg-grad:   radial-gradient(ellipse at 50% 48%, #0E1A28 0%, #050A14 52%, #010306 100%);
+    --amber:     #FFC800;
+    --crimson:   #FF2633;
+    --steel:     #668494;
+    --white:     #E6F5FF;
+    --desktop-light-opacity: 0.6;
+  }
+
+  /* Unit 9 — Reactor lights the desktop: full-viewport radial cyan gradient
+     blended onto everything beneath. Intensity follows STATE.bloomMul via the
+     --desktop-light-opacity custom property. Zero canvas cost. Unique to the
+     JARVIS-as-wallpaper paradigm — no reference image shows this because no
+     reference renderer had a real desktop to illuminate. */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    background: radial-gradient(ellipse at center,
+                                rgba(26, 230, 245, 0.09) 0%,
+                                rgba(26, 230, 245, 0.04) 35%,
+                                rgba(26, 230, 245, 0) 62%);
+    mix-blend-mode: screen;
+    opacity: var(--desktop-light-opacity, 0.6);
+    transition: opacity 200ms linear;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body {
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    color: var(--cy);
+    background: var(--bg);
+    font-family: 'Rajdhani', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ═══ LAYERS ═══ */
+  #bgGradient {
+    position: fixed; inset: 0;
+    background: var(--bg-grad);
+    z-index: 0;
+  }
+  canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+  }
+  #hexCanvas    { z-index: 1; opacity: 0.15; }
+  #bloomCanvas  { z-index: 2; filter: blur(26px); opacity: 0.95; }
+  /* Unit 8 — Tier B: WebGL raymarched plasma core. Hidden by default, shown
+     when STATE.highFidelityCore === true. Sits between bloom and main so it
+     reads as light emanating from inside the reactor housing. */
+  #glCoreCanvas { z-index: 2; mix-blend-mode: screen; opacity: 0; pointer-events: none; }
+  #glCoreCanvas.hifi { opacity: 0.85; }
+  #mainCanvas   { z-index: 3; }
+  #scanCanvas   { z-index: 4; mix-blend-mode: screen; }
+  #fxCanvas     { z-index: 8; pointer-events: none; }
+  #grainCanvas  { z-index: 9; mix-blend-mode: overlay; opacity: 0.05; pointer-events: none; }
+
+  #hud { position: fixed; inset: 0; z-index: 5; pointer-events: none; }
+
+  /* Vignette fade to black */
+  #vignette {
+    position: fixed; inset: 0; z-index: 7; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.50) 86%, #000 100%);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* TOP-LEFT — CALENDAR + TIME                                        */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .tl-calendar {
+    position: fixed;
+    top: 26px; left: 32px;
+    width: 190px; height: 190px;
+  }
+  .tl-calendar .dial {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 2px solid var(--cy);
+    box-shadow: 0 0 22px rgba(26,230,245,0.28), inset 0 0 22px rgba(26,230,245,0.10);
+  }
+  .tl-calendar .dial-outer {
+    position: absolute; inset: -14px;
+    border-radius: 50%;
+    border: 1px solid var(--cy);
+    opacity: 0.35;
+    clip-path: polygon(0 0, 60% 0, 60% 100%, 0 100%);
+  }
+  .tl-calendar .month {
+    position: absolute;
+    left: 50%; top: 22%;
+    transform: translate(-50%, 0);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 17px;
+    font-weight: 400;
+    color: var(--cy);
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+  }
+  .tl-calendar .day {
+    position: absolute;
+    left: 50%; top: 38%;
+    transform: translate(-50%, 0);
+    font-family: 'Audiowide', sans-serif;
+    font-size: 68px;
+    color: var(--cy-hot);
+    line-height: 1;
+    text-shadow: 0 0 14px rgba(26,230,245,0.9), 0 0 28px rgba(140,250,254,0.4);
+  }
+
+  .tl-time {
+    position: fixed;
+    top: 28px; left: 238px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 22px;
+    color: var(--cy);
+    letter-spacing: 0.05em;
+    text-shadow: 0 0 8px rgba(26,230,245,0.6);
+  }
+  .tl-time .sec { color: var(--cy-hot); }
+  .tl-weekday {
+    position: fixed;
+    top: 58px; left: 252px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    color: var(--cy);
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+    opacity: 0.9;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* LEFT MID PANEL — STORAGE                                          */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .left-storage {
+    position: fixed;
+    top: 232px; left: 36px;
+    width: 260px;
+    font-family: 'Rajdhani', sans-serif;
+  }
+  .left-storage .line {
+    display: flex; align-items: center;
+    margin-bottom: 4px;
+    font-size: 13px;
+    gap: 6px;
+    letter-spacing: 0.04em;
+  }
+  .left-storage .marker {
+    width: 12px; height: 12px;
+    border: 1px solid var(--cy);
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 2px transparent, 0 0 6px rgba(26,230,245,0.5);
+    flex: none;
+    position: relative;
+  }
+  .left-storage .marker::after {
+    content: ''; position: absolute; inset: 3px;
+    background: var(--cy-hot);
+    border-radius: 50%;
+    box-shadow: 0 0 4px var(--cy-hot);
+  }
+  .left-storage .label {
+    color: var(--cy);
+    letter-spacing: 0.06em;
+  }
+  .left-storage .label .big {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--cy-hot);
+    padding: 0 2px;
+    text-shadow: 0 0 8px rgba(140,250,254,0.6);
+  }
+  .left-storage .bar {
+    height: 3px;
+    width: 100%;
+    background: rgba(26,230,245,0.15);
+    border: 1px solid rgba(26,230,245,0.5);
+    margin: 3px 0 10px 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .left-storage .bar::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    background: linear-gradient(90deg, rgba(26,230,245,0.25), rgba(140,250,254,0.85));
+    box-shadow: 0 0 10px rgba(26,230,245,0.8);
+  }
+  .left-storage .bar.full::before  { width: 94%; }
+  .left-storage .bar.free::before  { width: 46%; }
+  .left-storage .primary {
+    color: rgba(26,230,245,0.55);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    padding-left: 18px;
+    text-transform: uppercase;
+    display: flex; align-items: center;
+    gap: 6px;
+    margin: -6px 0 4px 0;
+  }
+  .left-storage .primary::after {
+    content: '▶'; font-size: 9px;
+    color: var(--cy-hot);
+  }
+
+  /* Power dial */
+  .left-power {
+    position: fixed;
+    top: 362px; left: 64px;
+    width: 94px; height: 94px;
+  }
+  .left-power .ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 2px solid var(--cy);
+    box-shadow: 0 0 18px rgba(26,230,245,0.4), inset 0 0 14px rgba(26,230,245,0.2);
+  }
+  .left-power .ring-gap {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--bg);
+    transform: rotate(15deg);
+  }
+  .left-power .pct {
+    position: absolute; left: 50%; top: 44%;
+    transform: translate(-50%, -50%);
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    color: var(--cy-hot);
+    text-shadow: 0 0 10px rgba(140,250,254,0.8);
+  }
+  .left-power .lbl {
+    position: absolute; left: 50%; top: 68%;
+    transform: translate(-50%, -50%);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 9px;
+    color: var(--cy);
+    letter-spacing: 0.12em;
+  }
+  .left-power .tag {
+    position: absolute;
+    left: calc(100% + 6px); top: 22%;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    color: var(--cy);
+    letter-spacing: 0.06em;
+  }
+  .left-power .tag-sub {
+    position: absolute;
+    left: calc(100% + 6px); top: 40%;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px;
+    color: rgba(26,230,245,0.6);
+    letter-spacing: 0.06em;
+  }
+
+  /* Vertical connector line */
+  .left-spine {
+    position: fixed;
+    top: 230px; left: 20px;
+    width: 1px; height: 360px;
+    background: linear-gradient(180deg, rgba(26,230,245,0.8), rgba(26,230,245,0.1) 70%, transparent);
+  }
+  .left-spine::before {
+    content: ''; position: absolute; top: 0; left: -3px;
+    width: 7px; height: 7px;
+    background: var(--cy-hot);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--cy-hot);
+  }
+
+  /* Communication dial (lower-left) */
+  .left-comm {
+    position: fixed;
+    bottom: 84px; left: 148px;
+    width: 94px; height: 94px;
+  }
+  .left-comm .outer {
+    position: absolute; inset: 0;
+    border: 2px solid var(--cy);
+    border-radius: 50%;
+    box-shadow: 0 0 18px rgba(26,230,245,0.5), inset 0 0 12px rgba(26,230,245,0.2);
+    clip-path: polygon(0 0, 88% 0, 88% 100%, 0 100%);
+  }
+  .left-comm .inner {
+    position: absolute; inset: 12px;
+    border: 1px solid var(--cy);
+    border-radius: 50%;
+    opacity: 0.6;
+  }
+  .left-comm .lbl-main {
+    position: absolute; left: 46%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Audiowide', sans-serif;
+    font-size: 14px;
+    color: var(--cy-hot);
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 10px rgba(140,250,254,0.9);
+  }
+  .left-comm .tag {
+    position: absolute;
+    right: 100%; top: 38%;
+    padding-right: 12px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    color: var(--cy);
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+  }
+  .left-comm .orbit {
+    position: absolute;
+    left: -12px; top: -12px;
+    width: 18px; height: 18px;
+    border: 1px solid var(--cy);
+    border-radius: 50%;
+    opacity: 0.6;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* TOP CENTER — MODE BUTTONS                                          */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .mode-bar {
+    position: fixed;
+    top: 78px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 14px;
+    z-index: 6;
+  }
+  .mode-btn {
+    display: flex; align-items: center; justify-content: center;
+    min-width: 74px;
+    height: 22px;
+    padding: 0 12px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--cy);
+    background: rgba(26, 230, 245, 0.04);
+    border: 1px solid rgba(26, 230, 245, 0.55);
+    box-shadow: 0 0 12px rgba(26,230,245,0.3), inset 0 0 8px rgba(26,230,245,0.1);
+    clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%);
+    text-transform: uppercase;
+  }
+  .mode-btn.active {
+    color: var(--cy-hot);
+    background: rgba(26,230,245,0.14);
+    text-shadow: 0 0 10px rgba(140,250,254,0.9);
+  }
+
+  /* Center top clock — inside reactor upper area */
+  .center-clock {
+    position: fixed;
+    top: calc(50% - 12.5em);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', 'Share Tech Mono', monospace;
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--cy-hot);
+    letter-spacing: 0.14em;
+    text-shadow: 0 0 12px rgba(140,250,254,0.9);
+    padding: 3px 14px;
+    background: rgba(0,20,40,0.5);
+    border: 1px solid rgba(26,230,245,0.55);
+    z-index: 6;
+  }
+  /* Bottom center date — inside reactor lower area */
+  .center-date {
+    position: fixed;
+    top: calc(50% + 13em);
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', 'Share Tech Mono', monospace;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--cy-hot);
+    letter-spacing: 0.20em;
+    text-shadow: 0 0 10px rgba(140,250,254,0.8);
+    padding: 2px 12px;
+    background: rgba(0,20,40,0.5);
+    border: 1px solid rgba(26,230,245,0.5);
+    z-index: 6;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* CENTER — LEFT + RIGHT CATEGORY COLUMNS                             */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .cat-col {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex; flex-direction: column;
+    gap: 6px;
+    z-index: 6;
+  }
+  .cat-col.left  { left: 33.5%; align-items: flex-end; }
+  .cat-col.right { right: 33.5%; align-items: flex-start; }
+  .cat-btn {
+    width: 58px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    color: var(--cy);
+    background: rgba(26, 230, 245, 0.05);
+    border: 1px solid rgba(26, 230, 245, 0.55);
+    box-shadow: 0 0 10px rgba(26,230,245,0.25), inset 0 0 6px rgba(26,230,245,0.1);
+    text-transform: uppercase;
+  }
+  .cat-col.left .cat-btn {
+    clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%);
+    padding-right: 8px;
+  }
+  .cat-col.right .cat-btn {
+    clip-path: polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 50%);
+    padding-left: 8px;
+  }
+
+  /* Storage numbers surrounding the reactor */
+  .storage-nums {
+    position: fixed;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--cy-hot);
+    letter-spacing: 0.04em;
+    text-shadow: 0 0 8px rgba(140,250,254,0.7);
+    z-index: 6;
+    display: flex; flex-direction: column;
+    gap: 28px;
+  }
+  .storage-nums.left  { left: calc(33.5% - 82px); text-align: right; }
+  .storage-nums.right { right: calc(33.5% - 82px); text-align: left; }
+  .storage-nums span.sm {
+    font-size: 10px;
+    color: rgba(26,230,245,0.75);
+    letter-spacing: 0.08em;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* TOP-RIGHT — FILE MANAGER + REPULSOR                               */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .tr-files {
+    position: fixed;
+    top: 40px;
+    right: 238px;
+    width: 280px;
+    font-family: 'Rajdhani', sans-serif;
+    z-index: 7;
+  }
+  .tr-files .item {
+    position: absolute;
+    font-size: 14px;
+    color: var(--cy);
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    padding: 2px 0;
+    background: rgba(5,10,20,0.7);
+  }
+  .tr-files .item::after {
+    content: ''; position: absolute;
+    background: var(--cy);
+    box-shadow: 0 0 6px var(--cy-hot);
+  }
+  /* Lines point from text to the central repulsor at right */
+  .tr-files .it1 { top:  68px; left: -10px;  }
+  .tr-files .it2 { top:  42px; left: 36px;  }
+  .tr-files .it3 { top: 110px; left: 18px;  }
+  .tr-files .it4 { top:  18px; left: 110px; }
+  .tr-files .it5 { top:  -4px; left: 156px; }
+  .tr-files .it6 { top:  62px; left: 150px; }
+
+  .tr-files .dot {
+    position: absolute;
+    width: 7px; height: 7px;
+    background: var(--cy-hot);
+    border-radius: 50%;
+    box-shadow: 0 0 8px var(--cy-hot);
+    left: -14px; top: 50%;
+    transform: translateY(-50%);
+  }
+
+  /* SVG connector lines to the repulsor */
+  .tr-svg {
+    position: fixed;
+    top: 10px;
+    right: 60px;
+    width: 460px;
+    height: 200px;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .tr-repulsor {
+    position: fixed;
+    top: 46px; right: 78px;
+    width: 140px; height: 140px;
+    z-index: 6;
+  }
+  .tr-repulsor .r-outer {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 3px solid var(--cy);
+    box-shadow: 0 0 32px rgba(26,230,245,0.5), inset 0 0 24px rgba(26,230,245,0.15);
+  }
+  .tr-repulsor .r-mid {
+    position: absolute; inset: 12px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%, rgba(140,250,254,0.08), transparent 70%);
+  }
+  .tr-repulsor .r-inner-frame {
+    position: absolute; inset: 24px;
+    border-radius: 50%;
+    background:
+      conic-gradient(from 0deg,
+        var(--cy) 0% 2%, transparent 2% 8%,
+        var(--cy) 8% 10%, transparent 10% 16%,
+        var(--cy) 16% 18%, transparent 18% 24%,
+        var(--cy) 24% 26%, transparent 26% 32%,
+        var(--cy) 32% 34%, transparent 34% 40%,
+        var(--cy) 40% 42%, transparent 42% 48%,
+        var(--cy) 48% 50%, transparent 50% 56%,
+        var(--cy) 56% 58%, transparent 58% 64%,
+        var(--cy) 64% 66%, transparent 66% 72%,
+        var(--cy) 72% 74%, transparent 74% 80%,
+        var(--cy) 80% 82%, transparent 82% 88%,
+        var(--cy) 88% 90%, transparent 90% 96%,
+        var(--cy) 96% 98%, transparent 98% 100%);
+    mask: radial-gradient(circle, transparent 62%, black 63%, black 100%);
+    -webkit-mask: radial-gradient(circle, transparent 62%, black 63%, black 100%);
+  }
+  .tr-repulsor .r-core {
+    position: absolute; inset: 38px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 42% 42%,
+      #F0FBFF 0%,
+      #8CFAFE 28%,
+      #1AE6F5 62%,
+      rgba(0,130,180,0.6) 90%,
+      transparent 100%);
+    box-shadow:
+      0 0 30px rgba(26,230,245,0.9),
+      0 0 60px rgba(140,250,254,0.5),
+      inset 0 0 18px rgba(240,251,255,0.4);
+  }
+  .tr-repulsor .r-triangle {
+    position: absolute; inset: 46px;
+    border-radius: 50%;
+    background:
+      conic-gradient(from -90deg,
+        transparent 0%,
+        rgba(240,251,255,0.95) 16.66%,
+        transparent 16.66%,
+        transparent 33.33%,
+        rgba(240,251,255,0.95) 50%,
+        transparent 50%,
+        transparent 66.66%,
+        rgba(240,251,255,0.95) 83.33%,
+        transparent 83.33%);
+    mix-blend-mode: screen;
+    opacity: 0.55;
+    mask: radial-gradient(circle, transparent 44%, black 45%, black 76%, transparent 77%);
+    -webkit-mask: radial-gradient(circle, transparent 44%, black 45%, black 76%, transparent 77%);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* RIGHT PANEL — APP LIST                                             */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .right-apps {
+    position: fixed;
+    top: 106px; right: 30px;
+    width: 120px;
+    font-family: 'Rajdhani', sans-serif;
+    z-index: 6;
+  }
+  .right-apps .item {
+    position: relative;
+    font-size: 13px;
+    color: var(--cy);
+    padding: 3px 0 3px 14px;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+    border-bottom: 1px dotted rgba(26,230,245,0.4);
+  }
+  .right-apps .item:last-child { border-bottom: none; }
+  .right-apps .item::before {
+    content: ''; position: absolute;
+    left: 0; top: 12px;
+    width: 8px; height: 1px;
+    background: var(--cy);
+  }
+  .right-apps .item::after {
+    content: ''; position: absolute;
+    left: -2px; top: 10px;
+    width: 5px; height: 5px;
+    border: 1px solid var(--cy-hot);
+    background: transparent;
+    border-radius: 50%;
+  }
+
+  .right-system-label {
+    position: fixed;
+    top: 526px; right: 30px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    color: var(--cy);
+    letter-spacing: 0.04em;
+    z-index: 6;
+  }
+
+  /* Right MPC inner panel */
+  .right-mpc {
+    position: fixed;
+    top: 300px; right: 168px;
+    font-family: 'Rajdhani', sans-serif;
+    z-index: 6;
+  }
+  .right-mpc .mpc-title {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--cy);
+    letter-spacing: 0.15em;
+    position: relative;
+    padding-left: 14px;
+  }
+  .right-mpc .mpc-title::before {
+    content: ''; position: absolute;
+    left: 0; top: 6px;
+    width: 8px; height: 1px;
+    background: var(--cy);
+  }
+  .right-mpc .mpc-title::after {
+    content: ''; position: absolute;
+    left: -4px; top: 3px;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    border: 1px solid var(--cy-hot);
+  }
+  .right-mpc .apps {
+    padding-top: 20px;
+    padding-left: 38px;
+    position: relative;
+  }
+  .right-mpc .apps::before {
+    content: ''; position: absolute;
+    left: 10px; top: 10px;
+    width: 1px; height: 100%;
+    background: linear-gradient(180deg, var(--cy), rgba(26,230,245,0.2));
+  }
+  .right-mpc .apps .app {
+    position: relative;
+    font-size: 12px;
+    color: var(--cy);
+    padding: 3px 0 3px 14px;
+    letter-spacing: 0.03em;
+  }
+  .right-mpc .apps .app::before {
+    content: ''; position: absolute;
+    left: -24px; top: 9px;
+    width: 22px; height: 1px;
+    background: var(--cy);
+  }
+  .right-mpc .apps .app::after {
+    content: ''; position: absolute;
+    left: -2px; top: 7px;
+    width: 6px; height: 6px;
+    border: 1px solid var(--cy-hot);
+    background: transparent;
+    border-radius: 50%;
+  }
+
+  /* Bottom-right weather */
+  .br-weather {
+    position: fixed;
+    bottom: 34px; right: 40px;
+    width: 220px;
+    font-family: 'Rajdhani', sans-serif;
+    z-index: 6;
+  }
+  .br-weather .caption {
+    font-size: 14px;
+    color: var(--cy);
+    text-align: right;
+    margin-bottom: 8px;
+    letter-spacing: 0.04em;
+  }
+  .br-weather .dial-wrap {
+    position: relative;
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 10px;
+  }
+  .br-weather .analysis {
+    font-size: 11px;
+    color: rgba(26,230,245,0.7);
+    letter-spacing: 0.04em;
+    text-align: right;
+    line-height: 1.2;
+    flex: 1;
+  }
+  .br-weather .dial {
+    width: 98px; height: 98px;
+    position: relative;
+    border: 2px solid var(--cy);
+    border-radius: 50%;
+    box-shadow: 0 0 22px rgba(26,230,245,0.6), inset 0 0 18px rgba(26,230,245,0.18);
+    flex: none;
+  }
+  .br-weather .dial-inner {
+    position: absolute; inset: 10px;
+    border: 1px solid var(--cy);
+    border-radius: 50%;
+    opacity: 0.6;
+  }
+  .br-weather .temp {
+    position: absolute; left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Audiowide', sans-serif;
+    font-size: 30px;
+    color: var(--cy-hot);
+    text-shadow: 0 0 12px rgba(140,250,254,0.9);
+  }
+  .br-weather .temp sup {
+    font-size: 16px;
+    vertical-align: super;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* BOOT / SHUTDOWN OVERLAY                                            */
+  /* ═══════════════════════════════════════════════════════════════ */
+  #bootOverlay {
+    position: fixed; inset: 0;
+    z-index: 50;
+    pointer-events: none;
+    background: #000;
+    transition: opacity 1.2s ease-out;
+    opacity: 0;
+    display: none;
+  }
+  #bootText {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    color: var(--cy-hot);
+    letter-spacing: 0.3em;
+    text-shadow: 0 0 14px var(--cy);
+    z-index: 51;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* SHAKE CLASS                                                        */
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* GLOBAL ANIMATIONS                                                  */
+  /* ═══════════════════════════════════════════════════════════════ */
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(1.15); }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 8px rgba(26,230,245,0.6); }
+    50% { box-shadow: 0 0 18px rgba(140,250,254,1), 0 0 28px rgba(26,230,245,0.6); }
+  }
+  @keyframes rotate-slow {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  @keyframes rotate-reverse {
+    from { transform: rotate(360deg); }
+    to   { transform: rotate(0deg); }
+  }
+  @keyframes bar-flow {
+    0%, 100% { filter: brightness(1); }
+    50%      { filter: brightness(1.5); }
+  }
+  @keyframes bar-sweep {
+    0%   { background-position: -200px 0; }
+    100% { background-position: 200px 0; }
+  }
+  @keyframes fade-flicker {
+    0%, 100% { opacity: 0.92; }
+    50%      { opacity: 0.6; }
+  }
+  @keyframes blink-dot {
+    0%, 50%, 100% { opacity: 1; }
+    25%, 75%      { opacity: 0.3; }
+  }
+  @keyframes arrow-push {
+    0%, 100% { transform: translateX(0); }
+    50%      { transform: translateX(2px); }
+  }
+  @keyframes tilde-breathe {
+    0%, 100% { opacity: 0.4; }
+    50%      { opacity: 1; }
+  }
+  @keyframes chatter-flow {
+    0%   { transform: translateY(0); }
+    100% { transform: translateY(-12px); }
+  }
+  @keyframes dial-sweep {
+    0%   { transform: rotate(-60deg); }
+    50%  { transform: rotate(60deg); }
+    100% { transform: rotate(-60deg); }
+  }
+  @keyframes slide-in-left {
+    from { transform: translateX(-60px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slide-in-right {
+    from { transform: translateX(60px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+  }
+  @keyframes slide-in-top {
+    from { transform: translateY(-30px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  @keyframes slide-in-bottom {
+    from { transform: translateY(30px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+
+  /* Marker dots animate */
+  .left-storage .marker::after {
+    animation: pulse 2.6s ease-in-out infinite;
+  }
+  .left-storage .marker {
+    animation: pulse-glow 3.4s ease-in-out infinite;
+  }
+  .left-storage .bar::before {
+    background: linear-gradient(90deg,
+      rgba(26,230,245,0.15) 0%,
+      rgba(140,250,254,0.9) 30%,
+      rgba(26,230,245,0.8) 60%,
+      rgba(140,250,254,0.6) 100%);
+    background-size: 260px 100%;
+    animation: bar-sweep 4s linear infinite, bar-flow 2.2s ease-in-out infinite;
+  }
+
+  /* Left-spine dot pulses */
+  .left-spine::before {
+    animation: pulse-glow 2.5s ease-in-out infinite;
+  }
+
+  /* Power-dial internal elements */
+  .left-power .ring {
+    animation: pulse-glow 3.8s ease-in-out infinite;
+  }
+  .left-power .pct {
+    animation: fade-flicker 4.0s ease-in-out infinite;
+  }
+
+  /* Communication dial orbit rotates */
+  .left-comm .orbit {
+    animation: rotate-slow 10s linear infinite;
+  }
+  .left-comm .outer {
+    animation: pulse-glow 3.6s ease-in-out infinite;
+  }
+  .left-comm .lbl-main {
+    animation: fade-flicker 3.2s ease-in-out infinite;
+  }
+
+  /* Mode buttons subtle breathe */
+  .mode-btn {
+    animation: fade-flicker 5s ease-in-out infinite;
+  }
+  .mode-btn.active {
+    animation: pulse-glow 2.4s ease-in-out infinite;
+  }
+  .mode-btn:nth-child(1) { animation-delay: 0s; }
+  .mode-btn:nth-child(2) { animation-delay: 0.4s; }
+  .mode-btn:nth-child(3) { animation-delay: 0.8s; }
+  .mode-btn:nth-child(4) { animation-delay: 1.2s; }
+
+  /* Category column buttons sequential wave */
+  .cat-col.left  .cat-btn,
+  .cat-col.right .cat-btn {
+    animation: fade-flicker 3.6s ease-in-out infinite;
+  }
+  .cat-col.left  .cat-btn:nth-child(1) { animation-delay: 0.0s; }
+  .cat-col.left  .cat-btn:nth-child(2) { animation-delay: 0.2s; }
+  .cat-col.left  .cat-btn:nth-child(3) { animation-delay: 0.4s; }
+  .cat-col.left  .cat-btn:nth-child(4) { animation-delay: 0.6s; }
+  .cat-col.left  .cat-btn:nth-child(5) { animation-delay: 0.8s; }
+  .cat-col.left  .cat-btn:nth-child(6) { animation-delay: 1.0s; }
+  .cat-col.right .cat-btn:nth-child(1) { animation-delay: 1.2s; }
+  .cat-col.right .cat-btn:nth-child(2) { animation-delay: 1.4s; }
+  .cat-col.right .cat-btn:nth-child(3) { animation-delay: 1.6s; }
+  .cat-col.right .cat-btn:nth-child(4) { animation-delay: 1.8s; }
+  .cat-col.right .cat-btn:nth-child(5) { animation-delay: 2.0s; }
+  .cat-col.right .cat-btn:nth-child(6) { animation-delay: 2.2s; }
+
+  /* File manager dots blink */
+  .tr-files .dot {
+    animation: blink-dot 2.2s ease-in-out infinite;
+  }
+  .tr-files .it1 .dot { animation-delay: 0.0s; }
+  .tr-files .it2 .dot { animation-delay: 0.2s; }
+  .tr-files .it3 .dot { animation-delay: 0.4s; }
+  .tr-files .it4 .dot { animation-delay: 0.6s; }
+  .tr-files .it5 .dot { animation-delay: 0.8s; }
+  .tr-files .it6 .dot { animation-delay: 1.0s; }
+
+  .tr-svg path {
+    stroke-dasharray: 160;
+    stroke-dashoffset: 160;
+    animation: draw-line 3s ease-out forwards, pulse-line 4s ease-in-out 3s infinite;
+  }
+  .tr-svg path:nth-child(1) { animation-delay: 6.0s, 9.0s; }
+  .tr-svg path:nth-child(2) { animation-delay: 6.1s, 9.1s; }
+  .tr-svg path:nth-child(3) { animation-delay: 6.2s, 9.2s; }
+  .tr-svg path:nth-child(4) { animation-delay: 6.3s, 9.3s; }
+  .tr-svg path:nth-child(5) { animation-delay: 6.4s, 9.4s; }
+  .tr-svg path:nth-child(6) { animation-delay: 6.5s, 9.5s; }
+
+  @keyframes draw-line {
+    to { stroke-dashoffset: 0; }
+  }
+  @keyframes pulse-line {
+    0%, 100% { stroke-opacity: 0.9; }
+    50%      { stroke-opacity: 0.45; }
+  }
+
+  /* Repulsor core pulses */
+  .tr-repulsor .r-core {
+    animation: pulse-glow 2.8s ease-in-out infinite;
+  }
+  .tr-repulsor .r-inner-frame {
+    animation: rotate-slow 18s linear infinite;
+  }
+  .tr-repulsor .r-outer {
+    animation: pulse-glow 4s ease-in-out infinite;
+  }
+
+  /* Right apps list items subtle breathe */
+  .right-apps .item {
+    animation: fade-flicker 5s ease-in-out infinite;
+  }
+  .right-apps .item:nth-child(odd) { animation-delay: 0.5s; }
+  .right-apps .item::after {
+    animation: pulse 3s ease-in-out infinite;
+  }
+
+  /* MPC app dots pulse */
+  .right-mpc .apps .app::after {
+    animation: pulse 2.8s ease-in-out infinite;
+  }
+
+  /* Weather dial pulses & temp shimmer */
+  .br-weather .dial {
+    animation: pulse-glow 3.8s ease-in-out infinite;
+  }
+  .br-weather .temp {
+    animation: fade-flicker 3.4s ease-in-out infinite;
+  }
+
+  /* Top-left calendar pulse */
+  .tl-calendar .dial {
+    animation: pulse-glow 4.5s ease-in-out infinite;
+  }
+  .tl-calendar .day {
+    animation: fade-flicker 5s ease-in-out infinite;
+  }
+  .tl-time .sec {
+    animation: blink-dot 1s linear infinite;
+  }
+
+  /* Primary storage arrow push */
+  .left-storage .primary::after {
+    animation: arrow-push 1.4s ease-in-out infinite;
+  }
+
+  .shake { animation: shake 0.18s cubic-bezier(.36,.07,.19,.97) 18 both; }
+  @keyframes shake {
+    0%, 100% { transform: translate3d(0,0,0); }
+    10% { transform: translate3d(-4px,-2px,0); }
+    20% { transform: translate3d(5px,3px,0); }
+    30% { transform: translate3d(-6px,1px,0); }
+    40% { transform: translate3d(3px,-4px,0); }
+    50% { transform: translate3d(-2px,5px,0); }
+    60% { transform: translate3d(4px,-1px,0); }
+    70% { transform: translate3d(-5px,3px,0); }
+    80% { transform: translate3d(3px,-2px,0); }
+    90% { transform: translate3d(-3px,4px,0); }
+  }
+
+  /* Keyboard hint */
+  #hint {
+    position: fixed; bottom: 4px; left: 8px;
+    color: rgba(26,230,245,0.22); font-size: 9px; z-index: 99;
+    letter-spacing: 0.15em;
+    font-family: 'Share Tech Mono', monospace;
+  }
+
+  /* Hide all HUD elements during early boot */
+  .boot-hidden { opacity: 0 !important; }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* CHATTER STREAMS — primary (left) + secondary (right)              */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .chatter {
+    position: fixed;
+    z-index: 6;
+    width: 268px;
+    pointer-events: none;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10.5px;
+    color: rgba(26,230,245,0.70);
+    letter-spacing: 0.03em;
+    line-height: 1.45;
+  }
+  .chatter.left  {
+    left: 32px;
+    bottom: 214px;
+    text-align: left;
+  }
+  .chatter.right {
+    right: 220px;
+    bottom: 180px;
+    text-align: right;
+    opacity: 0.65;
+    font-size: 9.5px;
+    width: 220px;
+  }
+  .chatter .line {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.4s ease-out, transform 0.4s ease-out;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chatter .line.visible {
+    opacity: 0.75;
+    transform: translateY(0);
+  }
+  .chatter .line.fresh {
+    color: var(--cy-hot);
+    opacity: 0.98;
+  }
+  .chatter .line.dim {
+    opacity: 0.25;
+  }
+  .chatter .line.gone {
+    opacity: 0;
+  }
+  .chatter .line.warn   { color: var(--amber); }
+  .chatter .line.critical { color: var(--crimson); }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* FLOATING DIAGNOSTIC PANELS                                         */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .float-panel {
+    position: fixed;
+    z-index: 5;
+    background: rgba(5, 14, 26, 0.82);
+    border: 1px solid rgba(26,230,245,0.55);
+    box-shadow: 0 0 12px rgba(26,230,245,0.25), inset 0 0 8px rgba(26,230,245,0.1);
+    padding: 8px 12px 10px 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--cy);
+    min-width: 180px;
+    max-width: 240px;
+    opacity: 0;
+    transform: scale(0.86);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    pointer-events: none;
+  }
+  .float-panel.show {
+    opacity: 0.95;
+    transform: scale(1);
+  }
+  .float-panel .fp-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: var(--cy-hot);
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(26,230,245,0.35);
+    margin-bottom: 6px;
+  }
+  .float-panel .fp-row {
+    display: flex;
+    justify-content: space-between;
+    margin: 2px 0;
+  }
+  .float-panel .fp-row .v {
+    color: var(--cy-hot);
+  }
+  .float-panel .fp-bar {
+    height: 3px;
+    background: rgba(26,230,245,0.18);
+    margin: 4px 0 2px 0;
+    position: relative;
+  }
+  .float-panel .fp-bar > i {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--cy), var(--cy-hot));
+    box-shadow: 0 0 6px rgba(26,230,245,0.7);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* HOLOGRAPHIC FLICKER — applied to #hud root                        */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .holo-flicker {
+    animation: holo-tear 0.05s ease-out 3 both;
+  }
+  @keyframes holo-tear {
+    0%   { transform: translate3d(0,0,0); filter: none; }
+    33%  { transform: translate3d(-2px,0,0); filter: hue-rotate(-8deg); }
+    66%  { transform: translate3d(3px,0,0); filter: hue-rotate(8deg); }
+    100% { transform: translate3d(0,0,0); filter: none; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* AWARENESS PULSE RING (expanding)                                  */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .awareness-ring {
+    position: fixed;
+    top: 50%; left: 50%;
+    width: 20px; height: 20px;
+    border: 3px solid rgba(26,230,245, 0.5);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 4;
+    pointer-events: none;
+    animation: awareness-expand 1.2s ease-out forwards;
+  }
+  .awareness-ring.amber { border-color: rgba(255,200,0,0.6); }
+  .awareness-ring.crimson { border-color: rgba(255,38,51,0.7); }
+  @keyframes awareness-expand {
+    0%   { width: 20px;  height: 20px;  opacity: 0.95; }
+    60%  { opacity: 0.40; }
+    100% { width: 2600px; height: 2600px; opacity: 0; }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* THREAT ESCALATION (thermal crimson mode)                          */
+  /* ═══════════════════════════════════════════════════════════════ */
+  body.threat {
+    transition: filter 2s ease-in-out;
+  }
+  body.threat::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 50% 50%, rgba(255, 38, 51, 0.08) 0%, rgba(100, 10, 14, 0.18) 60%, rgba(40, 4, 6, 0.28) 100%);
+    mix-blend-mode: screen;
+    animation: threat-pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes threat-pulse {
+    0%, 100% { opacity: 0.7; }
+    50%      { opacity: 1.0; }
+  }
+  body.threat #bgGradient {
+    background: radial-gradient(ellipse at 50% 48%, #1A0810 0%, #0A0308 52%, #010306 100%);
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ CANVAS LAYERS ═══ -->
+<div id="bgGradient"></div>
+<canvas id="hexCanvas"></canvas>
+<canvas id="bloomCanvas"></canvas>
+<canvas id="glCoreCanvas"></canvas>
+<canvas id="mainCanvas"></canvas>
+<canvas id="scanCanvas"></canvas>
+<canvas id="fxCanvas"></canvas>
+<canvas id="grainCanvas"></canvas>
+<div id="vignette"></div>
+
+<!-- ═══ HUD PANELS ═══ -->
+<div id="hud">
+
+  <!-- Top-Left: Calendar Dial -->
+  <div class="tl-calendar" data-boot-delay="5.5">
+    <div class="dial-outer"></div>
+    <div class="dial"></div>
+    <div class="month" id="monthName">november</div>
+    <div class="day" id="dayNumber">16</div>
+  </div>
+  <div class="tl-time" id="tlTime" data-boot-delay="5.5">1:01:01</div>
+  <div class="tl-weekday" id="tlWeek" data-boot-delay="5.5">sunday</div>
+
+  <!-- Left: Storage -->
+  <div class="left-spine" data-boot-delay="5.8"></div>
+  <div class="left-storage" data-boot-delay="6.0">
+    <div class="line">
+      <div class="marker"></div>
+      <div class="label">Full Capacity: <span class="big" id="fullCapG">512</span> G</div>
+    </div>
+    <div class="bar full"></div>
+    <div class="primary">PRIMARY STORAGE</div>
+    <div class="line">
+      <div class="marker"></div>
+      <div class="label">Free Capacity: <span class="big" id="freeCapG">238</span> G</div>
+    </div>
+    <div class="bar free"></div>
+  </div>
+
+  <!-- Left: Power Dial -->
+  <div class="left-power" data-boot-delay="6.3">
+    <div class="ring"></div>
+    <div class="pct" id="batteryPct">100%</div>
+    <div class="lbl">HIGH</div>
+    <div class="tag">Power</div>
+    <div class="tag-sub" id="powerStatus">AC</div>
+  </div>
+
+  <!-- Left: Communication Dial -->
+  <div class="left-comm" data-boot-delay="6.5">
+    <div class="outer"></div>
+    <div class="inner"></div>
+    <div class="orbit"></div>
+    <div class="lbl-main" id="commApp">JARVIS</div>
+    <div class="tag">Communication</div>
+  </div>
+
+  <!-- Top-Center: Mode Buttons -->
+  <div class="mode-bar" data-boot-delay="6.2">
+    <div class="mode-btn">ANI OFF</div>
+    <div class="mode-btn active">GAME MODE</div>
+    <div class="mode-btn">DESK MODE</div>
+    <div class="mode-btn">ANI ON</div>
+  </div>
+  <div class="center-clock" id="centerClock" data-boot-delay="6.5">1:01 PM</div>
+  <div class="center-date" id="centerDate" data-boot-delay="6.5">16TH NOV</div>
+
+  <!-- Center: Category Columns -->
+  <div class="cat-col left" data-boot-delay="6.8">
+    <div class="cat-btn">UP</div>
+    <div class="cat-btn">COMP</div>
+    <div class="cat-btn">DOCS</div>
+    <div class="cat-btn">CTRL</div>
+    <div class="cat-btn">DESK</div>
+    <div class="cat-btn">DN</div>
+  </div>
+  <div class="cat-col right" data-boot-delay="6.8">
+    <div class="cat-btn">FREE</div>
+    <div class="cat-btn">CLEANER</div>
+    <div class="cat-btn">CHAM</div>
+    <div class="cat-btn">GAME</div>
+    <div class="cat-btn">CFG</div>
+    <div class="cat-btn">USED</div>
+  </div>
+
+  <!-- Storage Numbers (flanking reactor) -->
+  <div class="storage-nums left" data-boot-delay="7.0">
+    <span>162.0 G</span>
+    <span class="sm">10.0 MB</span>
+    <span class="sm">193.2 MB</span>
+    <span>192.0 G</span>
+  </div>
+  <div class="storage-nums right" data-boot-delay="7.0">
+    <span id="memUsedPct">56.34%</span>
+    <span id="memUsedG">3.88 G</span>
+    <span id="memFreePct">33.66%</span>
+    <span class="sm">0.0</span>
+  </div>
+
+  <!-- Top-Right: File Manager + Repulsor -->
+  <svg class="tr-svg" data-boot-delay="5.8" viewBox="0 0 460 200">
+    <g stroke="#1AE6F5" stroke-width="1" fill="none" opacity="0.9">
+      <path d="M 10,92 L 100,92 L 140,74 L 330,74" stroke-width="1.2"/>
+      <path d="M 50,70 L 120,70 L 160,60 L 330,60" stroke-width="1.2"/>
+      <path d="M 28,120 L 120,120 L 160,100 L 330,100" stroke-width="1.2"/>
+      <path d="M 138,48 L 200,48 L 230,62 L 330,62" stroke-width="1.2"/>
+      <path d="M 184,26 L 240,26 L 260,48 L 330,48" stroke-width="1.2"/>
+      <path d="M 190,76 L 250,76 L 280,84 L 330,84" stroke-width="1.2"/>
+    </g>
+  </svg>
+
+  <div class="tr-files" data-boot-delay="6.0">
+    <div class="item it1"><span class="dot"></span>Documents</div>
+    <div class="item it2"><span class="dot"></span>Videos</div>
+    <div class="item it3"><span class="dot"></span>Music</div>
+    <div class="item it4"><span class="dot"></span>Programs</div>
+    <div class="item it5"><span class="dot"></span>Downloads</div>
+    <div class="item it6"><span class="dot"></span>Images</div>
+  </div>
+
+  <div class="tr-repulsor" data-boot-delay="6.3">
+    <div class="r-outer"></div>
+    <div class="r-mid"></div>
+    <div class="r-inner-frame"></div>
+    <div class="r-core"></div>
+    <div class="r-triangle"></div>
+  </div>
+
+  <!-- Right: App List -->
+  <div class="right-apps" data-boot-delay="6.6">
+    <div class="item">Gmail</div>
+    <div class="item">Wikipedia</div>
+    <div class="item">GTU</div>
+    <div class="item">SSASIT</div>
+    <div class="item">LinkedIn</div>
+    <div class="item">Torrentz</div>
+    <div class="item">Unit Conv</div>
+    <div class="item">GTU Inno</div>
+    <div class="item">CatGurus</div>
+    <div class="item">Twitter</div>
+    <div class="item">Facebook</div>
+    <div class="item">Youtube</div>
+  </div>
+
+  <div class="right-system-label" data-boot-delay="6.8">kartik's system</div>
+
+  <!-- Right: MPC Panel -->
+  <div class="right-mpc" data-boot-delay="6.9">
+    <div class="mpc-title">MPC</div>
+    <div class="apps">
+      <div class="app">Photoshop</div>
+      <div class="app">Word</div>
+      <div class="app">Excel</div>
+      <div class="app">Powerpoint</div>
+    </div>
+  </div>
+
+  <!-- Bottom-Right: Weather -->
+  <div class="br-weather" data-boot-delay="7.1">
+    <div class="caption">mostly cloudy</div>
+    <div class="dial-wrap">
+      <div class="analysis">Atmospheric<br>Analysis</div>
+      <div class="dial">
+        <div class="dial-inner"></div>
+        <div class="temp" id="weatherTemp">30<sup>°</sup></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══ CHATTER STREAMS ═══ -->
+<div class="chatter left" id="chatterLeft" data-boot-delay="7.5"></div>
+<div class="chatter right" id="chatterRight" data-boot-delay="7.8"></div>
+
+<!-- ═══ FLOATING PANELS CONTAINER ═══ -->
+<div id="floatPanels"></div>
+
+<div id="bootOverlay"></div>
+<div id="bootText">INITIALIZING...</div>
+<div id="hint">[SPACE] BOOT &nbsp;·&nbsp; [ENTER] SHUTDOWN &nbsp;·&nbsp; [B] BATT LOW &nbsp;·&nbsp; [C] CHARGE &nbsp;·&nbsp; [R] RESET</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// JARVIS — KARTIK'S SYSTEM HUD (full fidelity reconstruction)
+// Matches reference: public/Jarvis-images/real-jarvis-03.jpg
+// Driven by spec: docs/superpowers/specs/2026-04-09-jarvis-cinematic-hud-design.md
+// ═══════════════════════════════════════════════════════════════════════
+
+const HEX  = document.getElementById('hexCanvas');
+const BL   = document.getElementById('bloomCanvas');
+const MC   = document.getElementById('mainCanvas');
+const SC   = document.getElementById('scanCanvas');
+const FX   = document.getElementById('fxCanvas');
+const GR   = document.getElementById('grainCanvas');
+
+const hexCtx  = HEX.getContext('2d');
+const blCtx   = BL.getContext('2d');
+const ctx     = MC.getContext('2d');
+const scCtx   = SC.getContext('2d');
+const fxCtx   = FX.getContext('2d');
+const grCtx   = GR.getContext('2d');
+
+let W, H, U, CX, CY_, R;
+const TAU = Math.PI * 2;
+
+// Hoisted so refreshPanels() → cipherSet() at bootstrap doesn't hit TDZ.
+// (The original declaration was at line ~2700, below the bootstrap call.)
+const CIPHER_CHARS = '0123456789ABCDEF';
+const CIPHER_MEM = new WeakMap();
+
+// ── PALETTE ─────────────────────────────────────────────────────────────
+const CY       = '26,230,245';
+const CY_HOT   = '140,250,254';
+const CY_DIM   = '14,144,168';
+const AMBER    = '255,200,0';
+const CRIMSON  = '255,38,51';
+const STEEL    = '102,132,148';
+const WHITE    = '240,251,255';
+
+function rgba(c, a) { return `rgba(${c},${a})`; }
+
+// ── PHASE STATE ─────────────────────────────────────────────────────────
+const PHASE = {
+  BOOTING:   'booting',
+  NOMINAL:   'nominal',
+  DIMMED:    'dimmed',
+  SHUTDOWN:  'shutdown',
+  OFFLINE:   'offline'
+};
+
+const STATE = {
+  phase: PHASE.BOOTING,
+  phaseStart: 0,
+  phaseT: 0,
+  frozenPhaseT: null,
+  t: 0,
+  bootDur: 10.0,
+  shutdownDur: 6.0,
+  bloomMul: 0,
+  ringSpeedMul: 0,
+  overdriveBloom: 0,
+  overdriveRings: 0,
+  batteryLow: false,
+  charging: true,
+  chatterVisible: true,
+  coreNumber: 'J',
+  sparks: [],
+  particles: [],
+  pulses: [],
+  // Unit 7 — breathing phase drives ring parallax + pulse stack stagger
+  breathingPhase: 0,
+  // Unit 8 — Tier B opt-in: WebGL raymarched plasma core (?hifi=1)
+  // REQ-A8: default false. Enable via ?hifi=1 query param or dev console.
+  highFidelityCore: false,
+  // Unit 9 — Tier B opt-in: reactor illuminates the desktop via body::after
+  castsDesktopLight: true
+};
+
+// ── TELEMETRY (real-ish macBook data) ──────────────────────────────────
+const TEL = {
+  cpuLoad: 0.18,
+  gpuLoad: 0.32,
+  memUsedGB: 18.3,
+  memTotalGB: 32,
+  swapPct: 6,
+  tempCPU: 41.2,
+  tempGPU: 38.5,
+  powerW: 22.4,
+  batteryPct: 100,
+  batteryCharging: true,
+  storageUsedG: 274,
+  storageTotalG: 512,
+  dramBwGBs: 18.2,
+  uptime: 0
+};
+
+// Update telemetry each second with realistic variation
+function tickTelemetry() {
+  TEL.cpuLoad = Math.max(0.05, Math.min(1.0, TEL.cpuLoad + (Math.random() - 0.5) * 0.08));
+  TEL.gpuLoad = Math.max(0.0,  Math.min(1.0, TEL.gpuLoad + (Math.random() - 0.5) * 0.06));
+  TEL.memUsedGB = Math.max(8, Math.min(28, TEL.memUsedGB + (Math.random() - 0.5) * 0.4));
+  TEL.swapPct = Math.max(0, Math.min(40, TEL.swapPct + (Math.random() - 0.5) * 2));
+  TEL.tempCPU = Math.max(38, Math.min(72, TEL.tempCPU + (Math.random() - 0.5) * 1.2));
+  TEL.tempGPU = Math.max(34, Math.min(68, TEL.tempGPU + (Math.random() - 0.5) * 0.8));
+  TEL.powerW  = Math.max(10, Math.min(55, TEL.powerW + (Math.random() - 0.5) * 2.5));
+  TEL.dramBwGBs = Math.max(2, Math.min(52, TEL.dramBwGBs + (Math.random() - 0.5) * 1.2));
+  TEL.uptime += 1;
+  refreshPanels();
+  tickAwareness();
+  updateMood();
+}
+
+// Push telemetry into DOM panels
+function refreshPanels() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+
+  // Top-left date + time
+  const mnames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const dnames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  document.getElementById('monthName').textContent = mnames[now.getMonth()];
+  document.getElementById('dayNumber').textContent = String(now.getDate()).padStart(2, '0');
+  const hh12 = ((now.getHours() % 12) || 12);
+  document.getElementById('tlTime').innerHTML =
+    `${hh12}:${pad(now.getMinutes())}:<span class="sec">${pad(now.getSeconds())}</span>`;
+  document.getElementById('tlWeek').textContent = dnames[now.getDay()];
+
+  // Center clocks
+  const ampm = now.getHours() < 12 ? 'AM' : 'PM';
+  document.getElementById('centerClock').textContent = `${hh12}:${pad(now.getMinutes())} ${ampm}`;
+  const monthUC = mnames[now.getMonth()].toUpperCase().slice(0, 3);
+  document.getElementById('centerDate').textContent = `${now.getDate()}TH ${monthUC}`;
+
+  // Storage
+  document.getElementById('fullCapG').textContent = TEL.storageTotalG;
+  document.getElementById('freeCapG').textContent = TEL.storageTotalG - TEL.storageUsedG;
+
+  // Battery
+  document.getElementById('batteryPct').textContent = `${TEL.batteryPct}%`;
+  document.getElementById('powerStatus').textContent = TEL.batteryCharging ? 'AC' : 'BATT';
+
+  // Right memory stats (with digit cipher flip animation)
+  const memPct = (TEL.memUsedGB / TEL.memTotalGB * 100);
+  cipherSet(document.getElementById('memUsedPct'), memPct.toFixed(2) + '%');
+  cipherSet(document.getElementById('memUsedG'), TEL.memUsedGB.toFixed(2) + ' G');
+  cipherSet(document.getElementById('memFreePct'), (100 - memPct).toFixed(2) + '%');
+
+  // Weather
+  const temps = [28, 29, 30, 31, 32, 33];
+  // Leave temp fixed at 30 for match
+  // document.getElementById('weatherTemp').innerHTML = '30<sup>°</sup>';
+}
+
+// ── LAYOUT ──────────────────────────────────────────────────────────────
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  U = Math.min(W, H);
+  CX = W * 0.50;
+  CY_ = H * 0.50;
+  R = Math.min(U * 0.38, H * 0.42);
+  for (const cv of [HEX, BL, MC, SC, FX, GR]) {
+    cv.width = W; cv.height = H;
+  }
+  drawHexGrid();
+  initGrain();
+}
+window.addEventListener('resize', resize);
+
+// ── HEX GRID BACKGROUND ─────────────────────────────────────────────────
+function drawHexGrid() {
+  hexCtx.clearRect(0, 0, W, H);
+  hexCtx.strokeStyle = 'rgba(0, 51, 77, 0.4)';
+  hexCtx.lineWidth = 0.6;
+  const s = 34;
+  const h = s * Math.sqrt(3) / 2;
+  for (let y = 0; y < H + h; y += h) {
+    for (let x = 0; x < W + s; x += s * 1.5) {
+      const ox = (Math.floor(y / h) % 2) * (s * 0.75);
+      hex(x + ox, y, s * 0.5);
+    }
+  }
+  function hex(cx, cy, r) {
+    hexCtx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = i * Math.PI / 3;
+      const px = cx + Math.cos(a) * r;
+      const py = cy + Math.sin(a) * r;
+      if (i === 0) hexCtx.moveTo(px, py);
+      else hexCtx.lineTo(px, py);
+    }
+    hexCtx.closePath();
+    hexCtx.stroke();
+  }
+}
+
+// ── GRAIN ───────────────────────────────────────────────────────────────
+function initGrain() {
+  const d = grCtx.createImageData(W, H);
+  for (let i = 0; i < d.data.length; i += 4) {
+    const v = Math.random() * 255;
+    d.data[i] = d.data[i+1] = d.data[i+2] = v;
+    d.data[i+3] = 255;
+  }
+  grCtx.putImageData(d, 0, 0);
+}
+
+// ── PRIMITIVES ──────────────────────────────────────────────────────────
+function ring(c, cx, cy, r, col, lw, dash) {
+  c.beginPath();
+  c.arc(cx, cy, r, 0, TAU);
+  c.strokeStyle = col;
+  c.lineWidth = lw;
+  if (dash) c.setLineDash(dash); else c.setLineDash([]);
+  c.stroke();
+  c.setLineDash([]);
+}
+
+function arcStroke(c, cx, cy, r, a0, a1, col, lw) {
+  c.beginPath();
+  c.arc(cx, cy, r, a0, a1);
+  c.strokeStyle = col;
+  c.lineWidth = lw;
+  c.lineCap = 'butt';
+  c.stroke();
+}
+
+function segRing(c, cx, cy, r, col, lw, segs, gap, rot) {
+  const step = TAU / segs;
+  for (let i = 0; i < segs; i++) {
+    const a0 = rot + i * step + gap * 0.5;
+    const a1 = rot + (i + 1) * step - gap * 0.5;
+    c.beginPath();
+    c.arc(cx, cy, r, a0, a1);
+    c.strokeStyle = col;
+    c.lineWidth = lw;
+    c.stroke();
+  }
+}
+
+function tickMarks(c, cx, cy, rInner, rOuter, col, lw, count, rot, skipEvery) {
+  for (let i = 0; i < count; i++) {
+    if (skipEvery && i % skipEvery === 0) continue;
+    const a = rot + (i / count) * TAU;
+    c.beginPath();
+    c.moveTo(cx + Math.cos(a) * rInner, cy + Math.sin(a) * rInner);
+    c.lineTo(cx + Math.cos(a) * rOuter, cy + Math.sin(a) * rOuter);
+    c.strokeStyle = col;
+    c.lineWidth = lw;
+    c.stroke();
+  }
+}
+
+function rectPath(c, cx, cy, w, h) {
+  c.beginPath();
+  c.rect(cx - w/2, cy - h/2, w, h);
+}
+
+function line(c, x1, y1, x2, y2, col, lw) {
+  c.beginPath();
+  c.moveTo(x1, y1);
+  c.lineTo(x2, y2);
+  c.strokeStyle = col;
+  c.lineWidth = lw;
+  c.stroke();
+}
+
+function fillText(c, t, x, y, col, size, font, align, baseline) {
+  c.fillStyle = col;
+  c.font = `${size}px ${font || "'Share Tech Mono', monospace"}`;
+  c.textAlign = align || 'left';
+  c.textBaseline = baseline || 'alphabetic';
+  c.fillText(t, x, y);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// REACTOR RINGS (matches reference geometry)
+// ═══════════════════════════════════════════════════════════════════════
+function drawOuterBezel(t, alphaMul, rMul) {
+  // Outer reactor bezel with rectangular segments (matches reference)
+  const r0 = R * 1.04 * rMul;
+  const r1 = R * 1.17 * rMul;
+  const rMid = (r0 + r1) / 2;
+
+  // Two concentric outer rings
+  ring(ctx, CX, CY_, r1, rgba(CY, 0.55 * alphaMul), 1.4);
+  ring(ctx, CX, CY_, r0, rgba(CY, 0.75 * alphaMul), 1.6);
+  ring(ctx, CX, CY_, rMid, rgba(CY, 0.30 * alphaMul), 0.8);
+
+  // Rectangular tick segments around the bezel (32 segments)
+  const segs = 32;
+  for (let i = 0; i < segs; i++) {
+    const a = (i / segs) * TAU;
+    const cx = CX + Math.cos(a) * rMid;
+    const cy = CY_ + Math.sin(a) * rMid;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(a + Math.PI / 2);
+    // Outer frame rectangle
+    ctx.strokeStyle = rgba(CY, 0.90 * alphaMul);
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-10, -(r1 - r0) * 0.44, 20, (r1 - r0) * 0.88);
+    // Inner accent rectangle (filled)
+    const isMain = i % 4 === 0;
+    ctx.fillStyle = rgba(CY_HOT, (isMain ? 1.0 : 0.70) * alphaMul);
+    ctx.fillRect(-6, -(r1 - r0) * 0.30, 12, (r1 - r0) * 0.60);
+    ctx.restore();
+  }
+
+  // Cardinal small circles (4 large circles at N/S/E/W on the outer ring)
+  const card = [0, Math.PI/2, Math.PI, 3*Math.PI/2];
+  for (const a of card) {
+    const x = CX + Math.cos(a) * r1;
+    const y = CY_ + Math.sin(a) * r1;
+    ctx.beginPath();
+    ctx.arc(x, y, 10, 0, TAU);
+    ctx.strokeStyle = rgba(CY, 0.9 * alphaMul);
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, TAU);
+    ctx.fillStyle = rgba(CY_HOT, 0.95 * alphaMul);
+    ctx.fill();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Unit 5 — Sin-modulated wispy outer ring (organic, load-reactive wobble).
+// Samples 96 points around a circle, perturbs each radius by a sum of
+// low-frequency sines with coprime periods so the wobble never repeats.
+// Institutional pattern (not Perlin/Simplex). Closes reference gap #4.
+// ═══════════════════════════════════════════════════════════════════════
+function drawWispyRing(c, cx, cy, baseR, octaves, t, col, lw, alpha) {
+  c.beginPath();
+  const N = 96;
+  for (let i = 0; i <= N; i++) {
+    const theta = (i / N) * TAU;
+    let rOffset = 0;
+    for (let k = 0; k < octaves.length; k++) {
+      const o = octaves[k];
+      rOffset += Math.sin(theta * o.freq + t * o.timeRate) * o.amp;
+    }
+    const r = baseR + rOffset;
+    const x = cx + Math.cos(theta) * r;
+    const y = cy + Math.sin(theta) * r;
+    if (i === 0) c.moveTo(x, y);
+    else c.lineTo(x, y);
+  }
+  c.closePath();
+  c.strokeStyle = rgba(col, alpha);
+  c.lineWidth = lw;
+  c.stroke();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Unit 3 — Radial blade stator pattern (full 360° turbine-blade assembly).
+// Draws N trapezoidal blade shapes between an inner and outer radius,
+// rotating slowly, filled with a hub-bright→rim-dim linear gradient.
+// Individual blade alpha breathes via angle-modulated sine for subtle
+// phase variation. Closes reference gap #2.
+// ═══════════════════════════════════════════════════════════════════════
+function drawRadialBlades(c, cx, cy, rIn, rOut, n, rotRad, t, alphaMul) {
+  c.save();
+  // Opaque source-over with dark gap between blades — reads as 48 discrete
+  // trapezoids instead of a washed-out brightness band per SC-A3 requirement
+  // ("48 radial blades visible inside housing ring, blade pattern matches
+  // real-jarvis-02.jpg reference category").
+  const halfArc = (TAU / n) * 0.30; // narrower than before → wider visible gaps
+  // Pass 1: dark backing wedge between blade zones (negative-space contrast)
+  c.fillStyle = rgba('8, 14, 24', 0.9 * alphaMul);
+  c.beginPath();
+  c.arc(cx, cy, rOut, 0, TAU);
+  c.arc(cx, cy, rIn,  0, TAU, true);
+  c.fill('evenodd');
+  // Pass 2: blade trapezoids on top of the dark backing
+  for (let i = 0; i < n; i++) {
+    const a = rotRad + (i / n) * TAU;
+    const breath = 0.65 + 0.35 * Math.sin(a * 2 + t * 1.3 + i * 0.18);
+    const x1 = cx + Math.cos(a - halfArc) * rIn;
+    const y1 = cy + Math.sin(a - halfArc) * rIn;
+    const x2 = cx + Math.cos(a - halfArc * 0.6) * rOut;
+    const y2 = cy + Math.sin(a - halfArc * 0.6) * rOut;
+    const x3 = cx + Math.cos(a + halfArc * 0.6) * rOut;
+    const y3 = cy + Math.sin(a + halfArc * 0.6) * rOut;
+    const x4 = cx + Math.cos(a + halfArc) * rIn;
+    const y4 = cy + Math.sin(a + halfArc) * rIn;
+    const mxIn  = cx + Math.cos(a) * rIn;
+    const myIn  = cy + Math.sin(a) * rIn;
+    const mxOut = cx + Math.cos(a) * rOut;
+    const myOut = cy + Math.sin(a) * rOut;
+    const g = c.createLinearGradient(mxIn, myIn, mxOut, myOut);
+    g.addColorStop(0.0, rgba(WHITE,  0.95 * alphaMul * breath));
+    g.addColorStop(0.4, rgba(CY_HOT, 0.85 * alphaMul * breath));
+    g.addColorStop(1.0, rgba(CY,     0.28 * alphaMul * breath));
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(x1, y1);
+    c.lineTo(x2, y2);
+    c.lineTo(x3, y3);
+    c.lineTo(x4, y4);
+    c.closePath();
+    c.fill();
+  }
+  c.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Unit 4 — Geodesic dome center (12-vertex icosahedron, Canvas 2D projection).
+// Rotates on a fake Y-axis using breathingPhase so the dome "breathes" with
+// the reactor. Each edge alpha modulates by the average depth of its two
+// vertices (back edges fade, front edges bright). Closes reference gap #3.
+// ═══════════════════════════════════════════════════════════════════════
+const ICO_PHI = (1 + Math.sqrt(5)) / 2;
+const ICO_NORM = Math.sqrt(1 + ICO_PHI * ICO_PHI);
+const ICO_VERTS = [
+  [ 0,  1,  ICO_PHI], [ 0, -1,  ICO_PHI], [ 0,  1, -ICO_PHI], [ 0, -1, -ICO_PHI],
+  [ 1,  ICO_PHI,  0], [-1,  ICO_PHI,  0], [ 1, -ICO_PHI,  0], [-1, -ICO_PHI,  0],
+  [ ICO_PHI,  0,  1], [ ICO_PHI,  0, -1], [-ICO_PHI,  0,  1], [-ICO_PHI,  0, -1]
+].map(v => [v[0] / ICO_NORM, v[1] / ICO_NORM, v[2] / ICO_NORM]);
+const ICO_EDGES = [
+  [0,1],[0,4],[0,5],[0,8],[0,10],
+  [1,6],[1,7],[1,8],[1,10],
+  [2,3],[2,4],[2,5],[2,9],[2,11],
+  [3,6],[3,7],[3,9],[3,11],
+  [4,5],[4,8],[4,9],
+  [5,10],[5,11],
+  [6,7],[6,8],[6,9],
+  [7,10],[7,11],
+  [8,9],
+  [10,11]
+];
+function drawGeodesicDome(c, cx, cy, r, rotY, col, alphaMul) {
+  const cos = Math.cos(rotY), sin = Math.sin(rotY);
+  const projected = new Array(ICO_VERTS.length);
+  for (let i = 0; i < ICO_VERTS.length; i++) {
+    const v = ICO_VERTS[i];
+    // Y-axis rotation: x' = x*cos + z*sin, z' = -x*sin + z*cos
+    const x = v[0] * cos + v[2] * sin;
+    const z = -v[0] * sin + v[2] * cos;
+    const y = v[1];
+    projected[i] = { x: cx + x * r, y: cy + y * r, z };
+  }
+  // Draw faces-back-to-front via edges only (cheaper than triangle fill).
+  // Alpha = average depth (z in [-1,1]) mapped to [0.18, 0.95]
+  c.lineCap = 'round';
+  for (let k = 0; k < ICO_EDGES.length; k++) {
+    const e = ICO_EDGES[k];
+    const a = projected[e[0]], b = projected[e[1]];
+    const depth = (a.z + b.z) * 0.5; // [-1..1]
+    const t01 = (depth + 1) * 0.5;   // [0..1]
+    const alpha = (0.18 + t01 * 0.77) * alphaMul;
+    const lw = 0.6 + t01 * 1.4;
+    c.beginPath();
+    c.moveTo(a.x, a.y);
+    c.lineTo(b.x, b.y);
+    c.strokeStyle = rgba(col, alpha);
+    c.lineWidth = lw;
+    c.stroke();
+  }
+  // Front-facing vertex highlights
+  for (let i = 0; i < projected.length; i++) {
+    const p = projected[i];
+    if (p.z < 0) continue;
+    const t01 = (p.z + 1) * 0.5;
+    c.beginPath();
+    c.arc(p.x, p.y, 0.8 + t01 * 1.2, 0, TAU);
+    c.fillStyle = rgba(WHITE, 0.55 * t01 * alphaMul);
+    c.fill();
+  }
+}
+
+// Unit 7 — Golden-ratio-spaced irrational RPMs.
+// Speeds approximate a Fibonacci-like progression with alternating signs,
+// chosen so no two rings share a rational rotation period. The pattern
+// never visually repeats over reasonable observation windows. Closes
+// reference gap #8 (uniform ring speeds).
+const RINGS = [
+  { rel: 0.99, type: 'ticks',  lw: 1.6, alpha: 1.00, speed:  0.008, segs: 180 },
+  { rel: 0.91, type: 'seg',    lw: 2.8, alpha: 1.00, speed: -0.013, segs: 4,  gap: 0.14 },
+  { rel: 0.84, type: 'dashed', lw: 1.2, alpha: 0.70, speed:  0.021, dash: [8, 4] },
+  { rel: 0.78, type: 'seg',    lw: 1.8, alpha: 0.90, speed: -0.034, segs: 8,  gap: 0.18 },
+  { rel: 0.70, type: 'dashed', lw: 1.0, alpha: 0.55, speed:  0.055, dash: [3, 5] },
+  { rel: 0.62, type: 'solid',  lw: 4.0, alpha: 1.00, speed: -0.089 },
+  { rel: 0.54, type: 'seg',    lw: 1.6, alpha: 0.85, speed:  0.144, segs: 6,  gap: 0.20 },
+  { rel: 0.46, type: 'dashed', lw: 1.0, alpha: 0.60, speed: -0.176, dash: [4, 4] },
+  { rel: 0.38, type: 'seg',    lw: 1.6, alpha: 0.90, speed:  0.132, segs: 12, gap: 0.10 },
+  { rel: 0.30, type: 'solid',  lw: 3.0, alpha: 0.95, speed: -0.097 },
+  { rel: 0.22, type: 'dashed', lw: 0.9, alpha: 0.60, speed:  0.163, dash: [2, 3] },
+  { rel: 0.16, type: 'solid',  lw: 1.4, alpha: 0.90, speed: -0.119 }
+];
+
+function ringVisibility(i) {
+  if (STATE.phase === PHASE.BOOTING) {
+    const p = STATE.phaseT / STATE.bootDur;
+    if (p < 0.30) return 0;
+    const orderFrac = (RINGS.length - 1 - i) / (RINGS.length - 1);
+    const trig = 0.30 + (1 - orderFrac) * 0.40;
+    if (p < trig) return 0;
+    return Math.min(1, (p - trig) / 0.08);
+  }
+  if (STATE.phase === PHASE.SHUTDOWN) {
+    const p = STATE.phaseT / STATE.shutdownDur;
+    const orderFrac = i / (RINGS.length - 1);
+    const trig = orderFrac * 0.55;
+    return Math.max(0, 1 - Math.max(0, p - trig) / 0.20);
+  }
+  return 1;
+}
+
+function ringRadiusMul() {
+  if (STATE.phase === PHASE.SHUTDOWN) {
+    const p = STATE.phaseT / STATE.shutdownDur;
+    if (p < 0.55) return 1;
+    if (p > 0.88) return 0.05;
+    return 1 - ((p - 0.55) / 0.33) * 0.95;
+  }
+  return 1;
+}
+
+function drawRings(t, alphaMul) {
+  const radMul = ringRadiusMul();
+
+  drawOuterBezel(t, alphaMul, radMul);
+
+  // Unit 5 — Sin-modulated wispy outer rings (organic halo at rel 1.05 + 1.12)
+  const loadBoost = 1.0 + (TEL.cpuLoad || 0) * 1.3;
+  drawWispyRing(ctx, CX, CY_, R * 1.05 * radMul, [
+    { freq: 7,  amp: 1.4 * loadBoost, timeRate: 0.22 },
+    { freq: 13, amp: 0.8 * loadBoost, timeRate: 0.34 },
+    { freq: 23, amp: 0.4 * loadBoost, timeRate: 0.47 }
+  ], t, CY, 1.4, 0.80 * alphaMul);
+  drawWispyRing(ctx, CX, CY_, R * 1.12 * radMul, [
+    { freq: 5,  amp: 1.8 * loadBoost, timeRate: 0.16 },
+    { freq: 11, amp: 1.0 * loadBoost, timeRate: 0.28 },
+    { freq: 19, amp: 0.5 * loadBoost, timeRate: 0.42 }
+  ], t, CY_DIM, 1.0, 0.55 * alphaMul);
+
+  // Unit 7 — parallax: lateral translation per ring tier, driven by breathingPhase
+  const breath = Math.sin(STATE.breathingPhase);
+
+  for (let i = 0; i < RINGS.length; i++) {
+    const r = RINGS[i];
+    const vis = ringVisibility(i);
+    if (vis <= 0) continue;
+    const radius = R * r.rel * radMul;
+    const col = rgba(CY, r.alpha * alphaMul * vis);
+    // Sub-sine jitter on ring speed — prevents any two rings from feeling rigid
+    const jitter = 1 + 0.03 * Math.sin(t * 0.13 + i * 0.7);
+    const rot = t * r.speed * STATE.ringSpeedMul * jitter;
+    // Tier-based parallax offset: outer tier drifts most, inner tier barely
+    const depth = i < 4 ? 8 : i < 8 ? 4 : 1;
+    const xOff = breath * depth;
+
+    ctx.save();
+    ctx.translate(xOff, 0);
+
+    if (r.type === 'ticks') {
+      ring(ctx, CX, CY_, radius, rgba(CY, 0.15 * alphaMul * vis), 0.5);
+      tickMarks(ctx, CX, CY_, radius - U * 0.008, radius + U * 0.002, col, r.lw, r.segs, rot, 4);
+      for (let k = 0; k < 4; k++) {
+        const a = rot + k * Math.PI / 2 + 0.01;
+        const x1 = CX + Math.cos(a) * (radius - U * 0.014);
+        const y1 = CY_ + Math.sin(a) * (radius - U * 0.014);
+        const x2 = CX + Math.cos(a) * (radius + U * 0.004);
+        const y2 = CY_ + Math.sin(a) * (radius + U * 0.004);
+        line(ctx, x1, y1, x2, y2, rgba(CY_HOT, 0.95 * alphaMul * vis), 2);
+      }
+    } else if (r.type === 'seg') {
+      segRing(ctx, CX, CY_, radius, col, r.lw, r.segs, r.gap, rot);
+      for (let k = 0; k < r.segs; k++) {
+        const a = rot + k * (TAU / r.segs) + r.gap * 0.5 + 0.002;
+        const x = CX + Math.cos(a) * radius;
+        const y = CY_ + Math.sin(a) * radius;
+        ctx.beginPath();
+        ctx.arc(x, y, r.lw * 1.2, 0, TAU);
+        ctx.fillStyle = rgba(CY_HOT, 0.95 * alphaMul * vis);
+        ctx.fill();
+      }
+    } else if (r.type === 'dashed') {
+      ctx.save();
+      ctx.translate(CX, CY_);
+      ctx.rotate(rot);
+      ctx.translate(-CX, -CY_);
+      ring(ctx, CX, CY_, radius, col, r.lw, r.dash);
+      ctx.restore();
+    } else {
+      ring(ctx, CX, CY_, radius, col, r.lw);
+    }
+
+    ctx.restore(); // close Unit 7 parallax save
+  }
+
+  // Ring bloom — wide blurry halo strokes on bloomCanvas for prominent rings.
+  // The bloomCanvas has CSS filter:blur(26px) so these wide strokes become
+  // glowing halos matching the lit-ring effect seen in the reference images.
+  // Ring bloom — narrow halos so rings glow distinctly (not a merged teal field)
+  const ringBlooms = [
+    { r: R * 0.99 * radMul, col: CY,     alpha: 0.14, lw:  8 },
+    { r: R * 0.91 * radMul, col: CY,     alpha: 0.30, lw: 12 },
+    { r: R * 0.62 * radMul, col: CY_HOT, alpha: 0.45, lw: 14 },
+    { r: R * 0.38 * radMul, col: CY,     alpha: 0.28, lw: 10 },
+  ];
+  for (const rb of ringBlooms) {
+    blCtx.strokeStyle = rgba(rb.col, rb.alpha * alphaMul * STATE.bloomMul);
+    blCtx.lineWidth = rb.lw;
+    blCtx.beginPath();
+    blCtx.arc(CX, CY_, rb.r, 0, TAU);
+    blCtx.stroke();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// INNER CORE + SOLAR FLARE (top of core has a bright crown)
+// ═══════════════════════════════════════════════════════════════════════
+function drawCore(t, alphaMul) {
+  if (STATE.phase === PHASE.BOOTING && STATE.phaseT < 1.0) return;
+
+  const pulse = 0.88 + 0.12 * Math.sin(t * 2.6);
+  const bloomR = R * 0.30 * pulse * STATE.bloomMul;
+
+  // Solar flare crown — damped so blade stator + dome read through. Previously
+  // this radial-fill on the bloomCanvas saturated the 0–0.36 band (where the
+  // blade stator lives at R*0.155–0.205), obliterating structure per SC-A3.
+  const flareY = CY_ - R * 0.02;
+  const sf = blCtx.createRadialGradient(CX, flareY, 0, CX, flareY, bloomR * 2.6);
+  sf.addColorStop(0.00, rgba(WHITE,  0.55 * alphaMul * STATE.bloomMul));
+  sf.addColorStop(0.18, rgba(CY_HOT, 0.45 * alphaMul * STATE.bloomMul));
+  sf.addColorStop(0.55, rgba(CY,     0.20 * alphaMul * STATE.bloomMul));
+  sf.addColorStop(1.00, rgba(CY, 0));
+  blCtx.fillStyle = sf;
+  blCtx.fillRect(0, 0, W, H);
+
+  // Background cyan wash within the reactor — halved so housing rings and
+  // blades are visually dominant instead of drowned in flat teal.
+  const bgWash = blCtx.createRadialGradient(CX, CY_, 0, CX, CY_, R * 0.95);
+  bgWash.addColorStop(0, rgba(CY, 0.08 * alphaMul * STATE.bloomMul));
+  bgWash.addColorStop(1, rgba(CY, 0));
+  blCtx.fillStyle = bgWash;
+  blCtx.fillRect(0, 0, W, H);
+
+  // Housing rings — bright inner structure matching the reference's concentric well
+  ring(ctx, CX, CY_, R * 0.26, rgba(CY, 0.90 * alphaMul), 2.0);
+  ring(ctx, CX, CY_, R * 0.22, rgba(CY, 1.00 * alphaMul), 2.5);
+  ring(ctx, CX, CY_, R * 0.18, rgba(CY_HOT, 1.00 * alphaMul), 3.0);
+  ring(ctx, CX, CY_, R * 0.14, rgba(WHITE, 0.95 * alphaMul), 2.0);
+  // Outer housing ring — prominent bright circle enclosing the core
+  ring(ctx, CX, CY_, R * 0.30, rgba(CY, 0.80 * alphaMul), 1.8);
+  ring(ctx, CX, CY_, R * 0.34, rgba(CY, 0.55 * alphaMul), 1.2);
+
+  // Unit 6a — Fresnel rim glow: layered radial gradient mimics pow(1-dot(N,V),3)
+  // on an implicit sphere, giving the flat bloom a perceived spherical bulge.
+  {
+    const fresInner = R * 0.145, fresOuter = R * 0.235;
+    const fg = ctx.createRadialGradient(CX, CY_, fresInner, CX, CY_, fresOuter);
+    fg.addColorStop(0.00, rgba(CY, 0));
+    fg.addColorStop(0.55, rgba(CY, 0));
+    fg.addColorStop(0.80, rgba(CY_HOT, 0.55 * alphaMul * STATE.bloomMul));
+    fg.addColorStop(1.00, rgba(WHITE, 0.82 * alphaMul * STATE.bloomMul));
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(CX, CY_, fresOuter, 0, TAU);
+    ctx.fillStyle = fg;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Unit 3 — Radial blade stator (full 360° trapezoidal turbine blades).
+  // Decoupled from bloomMul (was multiplying + fading with load) and boosted
+  // so the 48 trapezoids read crisply against the damped flare corona.
+  drawRadialBlades(ctx, CX, CY_, R * 0.155, R * 0.205, 48,
+                   t * 0.08, t, alphaMul * 1.35);
+
+  // Inner sun pattern — dramatic vertical "flame" spokes (top crown)
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  // TOP flame — most dramatic
+  const topSpokes = 90;
+  for (let i = 0; i < topSpokes; i++) {
+    const a = -Math.PI * 0.85 + (i / topSpokes) * Math.PI * 0.70;
+    const rIn = R * 0.145;
+    const wig = Math.sin(t * 4 + i * 0.3) * R * 0.014;
+    // Flames are taller closer to center top
+    const cosWeight = Math.max(0, Math.cos(a + Math.PI / 2));
+    const rOut = R * (0.20 + cosWeight * 0.055) + wig;
+    const x1 = CX + Math.cos(a) * rIn;
+    const y1 = CY_ + Math.sin(a) * rIn;
+    const x2 = CX + Math.cos(a) * rOut;
+    const y2 = CY_ + Math.sin(a) * rOut;
+    ctx.strokeStyle = rgba(WHITE, (0.36 + 0.18 * cosWeight) * alphaMul * STATE.bloomMul);
+    ctx.lineWidth = 1.2 + cosWeight * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  // BOTTOM flame — mirror, dimmer
+  for (let i = 0; i < topSpokes; i++) {
+    const a = Math.PI * 0.15 + (i / topSpokes) * Math.PI * 0.70;
+    const rIn = R * 0.145;
+    const wig = Math.sin(t * 4 + i * 0.3 + 1) * R * 0.010;
+    const cosWeight = Math.max(0, -Math.cos(a + Math.PI / 2));
+    const rOut = R * (0.19 + cosWeight * 0.040) + wig;
+    const x1 = CX + Math.cos(a) * rIn;
+    const y1 = CY_ + Math.sin(a) * rIn;
+    const x2 = CX + Math.cos(a) * rOut;
+    const y2 = CY_ + Math.sin(a) * rOut;
+    ctx.strokeStyle = rgba(WHITE, (0.22 + 0.14 * cosWeight) * alphaMul * STATE.bloomMul);
+    ctx.lineWidth = 0.9 + cosWeight * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Additional top glow (damped so it doesn't overpower the housing rings)
+  const topGlow = blCtx.createRadialGradient(CX, CY_ - R * 0.18, 0, CX, CY_ - R * 0.18, R * 0.20);
+  topGlow.addColorStop(0, rgba(WHITE, 0.48 * alphaMul * STATE.bloomMul));
+  topGlow.addColorStop(0.4, rgba(CY_HOT, 0.32 * alphaMul * STATE.bloomMul));
+  topGlow.addColorStop(1, rgba(CY, 0));
+  blCtx.fillStyle = topGlow;
+  blCtx.fillRect(0, 0, W, H);
+
+  // Unit 4 — Geodesic icosahedron dome (replaces the old flat gauge ring + ticks).
+  // Rotating 12-vertex icosahedron projected to 2D with depth-modulated alpha.
+  // Alpha boosted to 1.2 so front edges punch through the core bloom per SC-A4.
+  drawGeodesicDome(ctx, CX, CY_, R * 0.105,
+                   t * 0.3 + STATE.breathingPhase * 0.6,
+                   CY_HOT, 1.20 * alphaMul);
+
+  // Unit 6b — Multi-ring pulse stack: 5 concentric rings with staggered phase
+  // and anti-phase opacity, reading as a volumetric tunnel. Sits between the
+  // dome and the housing rings. Closes reference gap #1 via temporal parallax.
+  for (let pi = 0; pi < 5; pi++) {
+    const basePhase = t * 1.4 + pi * 0.7 + STATE.breathingPhase * 0.4;
+    const scale = 1.0 + 0.12 * Math.sin(basePhase);
+    const pAlpha = 0.30 + 0.35 * Math.cos(basePhase);
+    const baseR = R * (0.082 + pi * 0.006);
+    ring(ctx, CX, CY_, baseR * scale,
+         rgba(CY_HOT, pAlpha * alphaMul * STATE.bloomMul), 1.3);
+  }
+
+  // Central core glow — bright well matching reactor core in references
+  const dg = ctx.createRadialGradient(CX, CY_, 0, CX, CY_, R * 0.12);
+  dg.addColorStop(0.00, rgba(WHITE,   1.00 * alphaMul * STATE.bloomMul));
+  dg.addColorStop(0.25, rgba(CY_HOT, 0.90 * alphaMul * STATE.bloomMul));
+  dg.addColorStop(0.60, rgba(CY,     0.60 * alphaMul * STATE.bloomMul));
+  dg.addColorStop(1.00, rgba(CY, 0));
+  ctx.fillStyle = dg;
+  ctx.beginPath();
+  ctx.arc(CX, CY_, R * 0.12, 0, TAU);
+  ctx.fill();
+
+  // Bright indicator ring around center "J" — matches reference inner circle
+  ring(ctx, CX, CY_, R * 0.080, rgba(CY_HOT, 0.90 * alphaMul * STATE.bloomMul), 2.0);
+  ring(ctx, CX, CY_, R * 0.065, rgba(WHITE,   0.98 * alphaMul * STATE.bloomMul), 2.0);
+  ring(ctx, CX, CY_, R * 0.050, rgba(CY_HOT, 0.70 * alphaMul * STATE.bloomMul), 1.2);
+
+  // Center "J" — large, bright, with strong white glow matching reference JARVIS identifier
+  const size = Math.max(28, R * 0.115);
+  ctx.save();
+  ctx.shadowColor = rgba(WHITE, 1.0 * alphaMul);
+  ctx.shadowBlur = 36;
+  fillText(ctx, String(STATE.coreNumber), CX, CY_ + size * 0.36,
+           rgba(WHITE, 1.00 * alphaMul), size, "'Orbitron','Share Tech Mono',monospace", 'center');
+  ctx.shadowBlur = 14;
+  fillText(ctx, String(STATE.coreNumber), CX, CY_ + size * 0.36,
+           rgba(WHITE, 0.98 * alphaMul), size, "'Orbitron','Share Tech Mono',monospace", 'center');
+  ctx.restore();
+}
+
+// Percent labels around the inner gauge (faint)
+function drawInnerGaugeLabels(alphaMul) {
+  const pcts = [20, 40, 60, 80, 100];
+  const r0 = R * 0.13;
+  for (let i = 0; i < pcts.length; i++) {
+    const a = -Math.PI * 0.9 + (i / (pcts.length - 1)) * Math.PI * 1.8;
+    const x = CX + Math.cos(a) * r0;
+    const y = CY_ + Math.sin(a) * r0;
+    fillText(ctx, pcts[i] + '°', x, y,
+             rgba(CY, 0.5 * alphaMul), 8, "'Share Tech Mono', monospace", 'center', 'middle');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PARTICLES — Unit 2: rim dust haze ring
+// Particles spawn in the reactor rim annulus (R * 0.94..1.18), drift
+// tangentially with a slow radial wobble, and fade in/out over lifespan.
+// Closes reference gap #5 (outward explosion → pressurized rim halo).
+// ═══════════════════════════════════════════════════════════════════════
+function spawnParticles() {
+  while (STATE.particles.length < 72) {
+    STATE.particles.push({
+      angle: Math.random() * TAU,
+      radiusRatio: 0.94 + Math.random() * 0.24,
+      angularVel: (Math.random() - 0.5) * 0.38,
+      radialPhase: Math.random() * TAU,
+      radialRate: 0.35 + Math.random() * 0.45,
+      radialAmp: 0.008 + Math.random() * 0.018,
+      r: 0.7 + Math.random() * 1.6,
+      aBase: 0.12 + Math.random() * 0.22,
+      life: 4 + Math.random() * 3,
+      age: 0
+    });
+  }
+}
+function drawParticles(dt) {
+  for (let i = STATE.particles.length - 1; i >= 0; i--) {
+    const p = STATE.particles[i];
+    p.age += dt;
+    if (p.age >= p.life) { STATE.particles.splice(i, 1); continue; }
+    p.angle += p.angularVel * dt;
+    p.radialPhase += p.radialRate * dt;
+    const rRatio = p.radiusRatio + Math.sin(p.radialPhase) * p.radialAmp;
+    const rPx = R * rRatio;
+    const x = CX + Math.cos(p.angle) * rPx;
+    const y = CY_ + Math.sin(p.angle) * rPx;
+    const t01 = p.age / p.life;
+    const env = t01 < 0.15 ? (t01 / 0.15) : t01 > 0.85 ? ((1 - t01) / 0.15) : 1.0;
+    fxCtx.beginPath();
+    fxCtx.arc(x, y, p.r, 0, TAU);
+    fxCtx.fillStyle = rgba(CY_HOT, p.aBase * env);
+    fxCtx.fill();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SPARKS (charge event)
+// ═══════════════════════════════════════════════════════════════════════
+function spawnSparks() {
+  for (let i = 0; i < 80; i++) {
+    STATE.sparks.push({
+      x: CX, y: CY_,
+      vx: (Math.random() - 0.5) * 700,
+      vy: (Math.random() - 0.5) * 700,
+      life: 0.7 + Math.random() * 0.7,
+      age: 0,
+      col: Math.random() < 0.3 ? WHITE : CY_HOT
+    });
+  }
+}
+function drawSparks(dt) {
+  for (let i = STATE.sparks.length - 1; i >= 0; i--) {
+    const s = STATE.sparks[i];
+    s.age += dt;
+    if (s.age >= s.life) { STATE.sparks.splice(i, 1); continue; }
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    s.vx *= 0.93;
+    s.vy *= 0.93;
+    const a = 1 - (s.age / s.life);
+    fxCtx.beginPath();
+    fxCtx.arc(s.x, s.y, 2 * a + 0.6, 0, TAU);
+    fxCtx.fillStyle = rgba(s.col, a);
+    fxCtx.fill();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SCANNER SWEEP
+// ═══════════════════════════════════════════════════════════════════════
+function drawScanner(t, alphaMul) {
+  scCtx.clearRect(0, 0, W, H);
+  const angle = t * 0.8 * STATE.ringSpeedMul;
+  scCtx.save();
+  scCtx.translate(CX, CY_);
+  scCtx.rotate(angle);
+  const grad = scCtx.createLinearGradient(0, 0, R * 0.95, 0);
+  grad.addColorStop(0.0, rgba(WHITE, 0));
+  grad.addColorStop(0.3, rgba(CY, 0.30 * alphaMul));
+  grad.addColorStop(0.7, rgba(CY_HOT, 0.60 * alphaMul));
+  grad.addColorStop(1.0, rgba(WHITE, 0.98 * alphaMul));
+  scCtx.strokeStyle = grad;
+  scCtx.lineWidth = 1.8;
+  scCtx.beginPath();
+  scCtx.moveTo(0, 0);
+  scCtx.lineTo(R * 0.95, 0);
+  scCtx.stroke();
+  scCtx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PHASE MACHINE
+// ═══════════════════════════════════════════════════════════════════════
+function updatePhase(dt) {
+  if (STATE.frozenPhaseT == null) {
+    STATE.phaseT = Date.now() / 1000 - (STATE.phaseStart || Date.now() / 1000);
+  } else {
+    STATE.phaseT = STATE.frozenPhaseT;
+  }
+
+  switch (STATE.phase) {
+    case PHASE.BOOTING: {
+      const p = Math.min(1, STATE.phaseT / STATE.bootDur);
+      STATE.bloomMul     = easeOutCubic(Math.min(1, p * 1.25));
+      STATE.ringSpeedMul = easeOutCubic(p);
+      if (STATE.phaseT >= STATE.bootDur) setPhase(PHASE.NOMINAL);
+      break;
+    }
+    case PHASE.NOMINAL: {
+      if (STATE.overdriveBloom > 0) {
+        STATE.bloomMul = lerp(STATE.bloomMul, 2.2, 0.12);
+        STATE.overdriveBloom -= dt;
+      } else {
+        STATE.bloomMul = lerp(STATE.bloomMul, 1.1, 0.05);
+      }
+      if (STATE.overdriveRings > 0) {
+        STATE.ringSpeedMul = lerp(STATE.ringSpeedMul, 3.2, 0.12);
+        STATE.overdriveRings -= dt;
+      } else {
+        STATE.ringSpeedMul = lerp(STATE.ringSpeedMul, 1.0, 0.05);
+      }
+      break;
+    }
+    case PHASE.DIMMED: {
+      STATE.bloomMul = lerp(STATE.bloomMul, 0.25, 0.04);
+      STATE.ringSpeedMul = lerp(STATE.ringSpeedMul, 0.4, 0.04);
+      break;
+    }
+    case PHASE.SHUTDOWN: {
+      const p = Math.min(1, STATE.phaseT / STATE.shutdownDur);
+      STATE.ringSpeedMul = Math.max(0, 1 - p * 1.4);
+      if (p < 0.75) {
+        STATE.bloomMul = Math.max(0, 1 - p * 1.2);
+      } else if (p < 0.9) {
+        STATE.bloomMul = 3.0 * (1 - (p - 0.75) / 0.15);
+      } else {
+        STATE.bloomMul = Math.max(0, 1 - (p - 0.9) / 0.1);
+      }
+      if (STATE.phaseT >= STATE.shutdownDur) setPhase(PHASE.OFFLINE);
+      break;
+    }
+    case PHASE.OFFLINE: {
+      STATE.bloomMul = 0;
+      STATE.ringSpeedMul = 0;
+      break;
+    }
+  }
+
+  // Update HTML panel boot visibility
+  updatePanelVisibility();
+}
+
+function updatePanelVisibility() {
+  const els = document.querySelectorAll('[data-boot-delay]');
+  for (const el of els) {
+    const delay = parseFloat(el.dataset.bootDelay);
+    let vis = 1;
+    if (STATE.phase === PHASE.BOOTING) {
+      vis = STATE.phaseT < delay ? 0 : Math.min(1, (STATE.phaseT - delay) / 0.6);
+    } else if (STATE.phase === PHASE.SHUTDOWN) {
+      const p = STATE.phaseT / STATE.shutdownDur;
+      vis = p < 0.25 ? 1 - (p / 0.25) : 0;
+    } else if (STATE.phase === PHASE.OFFLINE) {
+      vis = 0;
+    }
+    el.style.opacity = vis;
+  }
+  // Boot text
+  const bootText = document.getElementById('bootText');
+  if (STATE.phase === PHASE.BOOTING) {
+    const t = STATE.phaseT;
+    let msg = '';
+    if (t < 0.8) msg = '';
+    else if (t < 2.5) msg = 'INITIALIZING...';
+    else if (t < 4.0) msg = 'SCANNING SILICON TOPOLOGY';
+    else if (t < 5.5) msg = 'APPLE SILICON DETECTED';
+    else if (t < 7.0) msg = 'TELEMETRY STREAM ACTIVE';
+    else if (t < 8.5) msg = 'JARVIS ONLINE';
+    else msg = '';
+    bootText.textContent = msg;
+    bootText.style.opacity = msg ? 0.9 : 0;
+  } else {
+    bootText.style.opacity = 0;
+  }
+}
+
+function setPhase(p) {
+  STATE.phase = p;
+  STATE.phaseT = 0;
+  STATE.phaseStart = Date.now() / 1000;
+}
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+function lerp(a, b, k) { return a + (b - a) * k; }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Unit 8 — WebGL raymarched plasma core (Tier B, opt-in via ?hifi=1).
+// Procedural volumetric plasma: 2D fBm with domain warping + radial falloff,
+// rendered as a screen-blended overlay between bloom and main canvas layers.
+// Feeds live telemetry (cpuLoad, flare, breathingPhase) as shader uniforms.
+// Gracefully no-ops if WebGL context creation fails. Auto-disables if frame
+// budget exceeded for 3 consecutive frames.
+// ═══════════════════════════════════════════════════════════════════════
+const GL_VS = `attribute vec2 a_pos;
+varying vec2 v_uv;
+void main() {
+  v_uv = a_pos * 0.5 + 0.5;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+const GL_FS = `precision highp float;
+uniform float u_time;
+uniform vec2  u_resolution;
+uniform float u_load;
+uniform float u_flare;
+uniform float u_breathing;
+varying vec2  v_uv;
+
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+             mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float s = 0.0;
+  float amp = 0.5;
+  for (int i = 0; i < 4; i++) {
+    s += amp * noise(p);
+    p *= 2.03;
+    amp *= 0.5;
+  }
+  return s;
+}
+
+void main() {
+  vec2 pos = (gl_FragCoord.xy - 0.5 * u_resolution) / min(u_resolution.x, u_resolution.y);
+  float dist = length(pos);
+  float coreR = 0.145;
+  if (dist > coreR + 0.02) { gl_FragColor = vec4(0.0); return; }
+
+  float t = u_time * (0.35 + u_load * 0.65);
+  vec2 warp = vec2(
+    fbm(pos * 3.0 + vec2(t, 0.0)),
+    fbm(pos * 3.0 + vec2(0.0, t))
+  );
+  float density = fbm(pos * 5.5 + warp * 1.4 + vec2(t * 0.25));
+
+  float rFalloff = 1.0 - smoothstep(0.0, coreR, dist);
+  float breath = 0.92 + 0.08 * sin(u_breathing);
+  density *= rFalloff * breath;
+
+  float emit = density * (1.0 + u_load * 2.2 + u_flare * 3.0);
+
+  vec3 teal  = vec3(0.10, 0.90, 0.96);
+  vec3 white = vec3(1.0, 1.0, 1.0);
+  vec3 col = mix(teal, white, smoothstep(0.30, 1.0, emit));
+
+  float alpha = clamp(emit * 1.1, 0.0, 1.0);
+  gl_FragColor = vec4(col * alpha, alpha);
+}`;
+
+let GL_CTX = null;
+let GL_PROG = null;
+let GL_QUAD = null;
+let GL_UNIFORMS = {};
+let GL_FAILED_FRAMES = 0;
+
+function initWebGLCore() {
+  const canvas = document.getElementById('glCoreCanvas');
+  if (!canvas) return false;
+  let gl = null;
+  try {
+    gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false }) ||
+         canvas.getContext('experimental-webgl', { alpha: true, premultipliedAlpha: false });
+  } catch (e) { /* swallowed — graceful fallback */ }
+  if (!gl) {
+    console.warn('[Unit 8] WebGL unavailable — raymarched core disabled');
+    STATE.highFidelityCore = false;
+    return false;
+  }
+  const compile = (src, type, label) => {
+    const sh = gl.createShader(type);
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      console.warn('[Unit 8] ' + label + ' compile failed:', gl.getShaderInfoLog(sh));
+      return null;
+    }
+    return sh;
+  };
+  const vs = compile(GL_VS, gl.VERTEX_SHADER, 'VS');
+  const fs = compile(GL_FS, gl.FRAGMENT_SHADER, 'FS');
+  if (!vs || !fs) { STATE.highFidelityCore = false; return false; }
+
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    console.warn('[Unit 8] Program link failed:', gl.getProgramInfoLog(prog));
+    STATE.highFidelityCore = false;
+    return false;
+  }
+
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1,  1, -1,  -1,  1,
+    -1,  1,  1, -1,   1,  1
+  ]), gl.STATIC_DRAW);
+
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+  GL_CTX = gl;
+  GL_PROG = prog;
+  GL_QUAD = quad;
+  GL_UNIFORMS = {
+    u_time:       gl.getUniformLocation(prog, 'u_time'),
+    u_resolution: gl.getUniformLocation(prog, 'u_resolution'),
+    u_load:       gl.getUniformLocation(prog, 'u_load'),
+    u_flare:      gl.getUniformLocation(prog, 'u_flare'),
+    u_breathing:  gl.getUniformLocation(prog, 'u_breathing'),
+    a_pos:        gl.getAttribLocation(prog, 'a_pos')
+  };
+  canvas.classList.add('hifi');
+  console.log('[Unit 8] WebGL raymarched core initialised');
+  return true;
+}
+
+function drawWebGLCore(t) {
+  const gl = GL_CTX;
+  if (!gl || !GL_PROG) return;
+  const canvas = gl.canvas;
+  if (canvas.width !== W || canvas.height !== H) {
+    canvas.width = W;
+    canvas.height = H;
+  }
+  const frameStart = performance.now();
+  gl.viewport(0, 0, W, H);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  gl.useProgram(GL_PROG);
+  gl.bindBuffer(gl.ARRAY_BUFFER, GL_QUAD);
+  gl.enableVertexAttribArray(GL_UNIFORMS.a_pos);
+  gl.vertexAttribPointer(GL_UNIFORMS.a_pos, 2, gl.FLOAT, false, 0, 0);
+
+  gl.uniform1f(GL_UNIFORMS.u_time, t);
+  gl.uniform2f(GL_UNIFORMS.u_resolution, W, H);
+  gl.uniform1f(GL_UNIFORMS.u_load, TEL.cpuLoad);
+  gl.uniform1f(GL_UNIFORMS.u_flare, Math.max(0, STATE.overdriveBloom));
+  gl.uniform1f(GL_UNIFORMS.u_breathing, STATE.breathingPhase);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  const frameEnd = performance.now();
+  if (frameEnd - frameStart > 18) {
+    GL_FAILED_FRAMES++;
+    if (GL_FAILED_FRAMES >= 3) {
+      console.warn('[Unit 8] Perf budget exceeded — disabling hifi core');
+      STATE.highFidelityCore = false;
+      canvas.classList.remove('hifi');
+    }
+  } else {
+    GL_FAILED_FRAMES = 0;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════════════════════════
+const BOOT_WALL_T0 = Date.now() / 1000;
+let last = Date.now() / 1000;
+STATE.t = 0;
+
+function frame() {
+  const now = Date.now() / 1000;
+  const dt = Math.min(0.05, now - last);
+  last = now;
+  STATE.t = now - BOOT_WALL_T0;
+
+  updatePhase(dt);
+
+  // Unit 7 — breathing phase advance (drives ring parallax + pulse stack stagger)
+  STATE.breathingPhase += dt * 0.25;
+
+  // Unit 9 — desktop-light opacity follows bloomMul (subtle glow-to-wallpaper cast)
+  if (STATE.castsDesktopLight) {
+    const desktopOpacity = Math.max(0, Math.min(0.95, 0.25 + STATE.bloomMul * 0.55));
+    document.body.style.setProperty('--desktop-light-opacity', String(desktopOpacity));
+  }
+
+  // Unit 8 — WebGL raymarched plasma core (opt-in via ?hifi=1)
+  if (STATE.highFidelityCore && typeof drawWebGLCore === 'function') {
+    drawWebGLCore(STATE.t);
+  }
+
+  // Mood-modulated multipliers (layered on top of phase-level)
+  const baseRingSpeed = STATE.ringSpeedMul;
+  const baseBloom = STATE.bloomMul;
+  if (STATE.phase === PHASE.NOMINAL) {
+    STATE.ringSpeedMul = baseRingSpeed * MOOD.ringSpeedMul;
+    STATE.bloomMul = baseBloom * MOOD.glowMul * cardiacPulse(STATE.t);
+  }
+
+  let alphaMul = 1.0;
+  if (STATE.phase === PHASE.OFFLINE)  alphaMul = 0;
+  if (STATE.phase === PHASE.BOOTING)  alphaMul = easeOutCubic(Math.min(1, STATE.phaseT / 2.0));
+  if (STATE.phase === PHASE.SHUTDOWN) alphaMul = Math.max(0, 1 - STATE.phaseT / STATE.shutdownDur);
+
+  ctx.clearRect(0, 0, W, H);
+  blCtx.clearRect(0, 0, W, H);
+  fxCtx.clearRect(0, 0, W, H);
+
+  drawRings(STATE.t, alphaMul);
+  drawScanner(STATE.t, alphaMul * (STATE.phase === PHASE.BOOTING ? Math.max(0, (STATE.phaseT - 6) / 1.5) : 1));
+  drawCore(STATE.t, alphaMul);
+  drawInnerGaugeLabels(alphaMul);
+
+  spawnParticles();
+  drawParticles(dt);
+  drawSparks(dt);
+
+  // Restore base so next frame has the raw phase values, not mood-compounded
+  STATE.ringSpeedMul = baseRingSpeed;
+  STATE.bloomMul = baseBloom;
+
+  // Overlays
+  tickChatter();
+  tickFlicker();
+  tickFloatingPanels();
+
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// INPUT
+// ═══════════════════════════════════════════════════════════════════════
+window.addEventListener('keydown', e => {
+  switch (e.code) {
+    case 'Space':
+      e.preventDefault();
+      setPhase(PHASE.BOOTING);
+      STATE.bloomMul = 0;
+      STATE.ringSpeedMul = 0;
+      break;
+    case 'Enter':
+      setPhase(PHASE.SHUTDOWN);
+      break;
+    case 'KeyB':
+      STATE.batteryLow = !STATE.batteryLow;
+      STATE.charging = false;
+      STATE.chatterVisible = !STATE.batteryLow;
+      TEL.batteryPct = STATE.batteryLow ? 4 : 100;
+      TEL.batteryCharging = !STATE.batteryLow;
+      refreshPanels();
+      setPhase(STATE.batteryLow ? PHASE.DIMMED : PHASE.NOMINAL);
+      break;
+    case 'KeyC':
+      STATE.charging = true;
+      STATE.batteryLow = false;
+      STATE.chatterVisible = true;
+      STATE.overdriveBloom = 3.0;
+      STATE.overdriveRings = 3.0;
+      TEL.batteryCharging = true;
+      refreshPanels();
+      spawnSparks();
+      document.body.classList.remove('shake');
+      void document.body.offsetWidth;
+      document.body.classList.add('shake');
+      setPhase(PHASE.NOMINAL);
+      break;
+    case 'KeyR':
+      setPhase(PHASE.BOOTING);
+      STATE.batteryLow = false;
+      STATE.charging = true;
+      STATE.chatterVisible = true;
+      break;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════════════
+// REQ-A8: honour ?hifi=1 query param (or dev-console override) before init.
+try {
+  if (new URLSearchParams(location.search).has('hifi')) STATE.highFidelityCore = true;
+} catch (e) { /* no-op on exotic URL schemes */ }
+resize();
+if (STATE.highFidelityCore) initWebGLCore();
+refreshPanels();
+setPhase(PHASE.BOOTING);
+setInterval(tickTelemetry, 1000);
+requestAnimationFrame(frame);
+
+// ═══════════════════════════════════════════════════════════════════════
+// CHATTER ENGINE
+// ═══════════════════════════════════════════════════════════════════════
+const CHATTER = {
+  leftEl: document.getElementById('chatterLeft'),
+  rightEl: document.getElementById('chatterRight'),
+  leftLines: [],
+  rightLines: [],
+  maxLeft: 14,
+  maxRight: 10,
+  lastLeftT: 0,
+  lastRightT: 0
+};
+
+function pushChatter(side, text, cls) {
+  const isLeft = side === 'left';
+  const el = isLeft ? CHATTER.leftEl : CHATTER.rightEl;
+  const arr = isLeft ? CHATTER.leftLines : CHATTER.rightLines;
+  const max = isLeft ? CHATTER.maxLeft : CHATTER.maxRight;
+
+  const div = document.createElement('div');
+  div.className = 'line fresh' + (cls ? ' ' + cls : '');
+  div.textContent = text;
+  el.appendChild(div);
+  arr.push(div);
+  // Force reflow then fade in
+  requestAnimationFrame(() => {
+    div.classList.add('visible');
+    setTimeout(() => div.classList.remove('fresh'), 800);
+  });
+
+  while (arr.length > max) {
+    const old = arr.shift();
+    old.classList.add('gone');
+    setTimeout(() => old.remove(), 500);
+  }
+}
+
+function randomLeftChatter() {
+  const core = Math.floor(Math.random() * 10);
+  const pick = Math.random();
+  const u = (TEL.cpuLoad * 100).toFixed(1);
+  if (pick < 0.15) return [`P-CORE ${core}: FREQ BOOST → ${Math.round(3200 + Math.random() * 900)} MHz`, null];
+  if (pick < 0.30) return [`E-CORE ${core}: ${u}% UTILIZATION`, null];
+  if (pick < 0.45) return [`TOTAL POWER: ${(TEL.powerW - 2).toFixed(1)}W → ${TEL.powerW.toFixed(1)}W`, null];
+  if (pick < 0.60) return [`CPU TEMP: ${(TEL.tempCPU - 1).toFixed(1)}°C → ${TEL.tempCPU.toFixed(1)}°C`, TEL.tempCPU > 60 ? 'warn' : null];
+  if (pick < 0.72) return [`SWAP PRESSURE: ${(TEL.swapPct).toFixed(0)}%`, null];
+  if (pick < 0.82) return [`DRAM WRITE BW: ${TEL.dramBwGBs.toFixed(1)} GB/s SUSTAINED`, null];
+  if (pick < 0.92) return [`DVHOP: ${(Math.random() * 0.9).toFixed(2)}% — HYPERVISOR TAX`, null];
+  return [`GPU CLUSTER: ${Math.round(TEL.gpuLoad * 100)}% ACTIVE`, null];
+}
+
+function randomRightChatter() {
+  const pick = Math.random();
+  if (pick < 0.20) return [`MONITORING ${Math.floor(700 + Math.random() * 400)} ACTIVE THREADS`, null];
+  if (pick < 0.35) return [`MEMORY ${TEL.memUsedGB.toFixed(1)} GB / ${TEL.memTotalGB} GB ALLOCATED`, null];
+  if (pick < 0.50) return [`THERMAL COST: +${(TEL.tempCPU - 50).toFixed(1)}°C`, TEL.tempCPU > 65 ? 'warn' : null];
+  if (pick < 0.65) return [`UMA EVICTION ${(Math.random() * 2).toFixed(2)} MB/s NOMINAL`, null];
+  if (pick < 0.78) return [`GPU COMPLEX ${Math.round(TEL.gpuLoad * 100)}% — 40 CORES`, null];
+  if (pick < 0.88) return [`ANE SUBSYSTEM ${(Math.random() * 0.8).toFixed(2)}W STANDBY`, null];
+  const sec = TEL.uptime;
+  const hh = Math.floor(sec / 3600);
+  const mm = Math.floor((sec % 3600) / 60);
+  const ss = sec % 60;
+  return [`SYSTEM UPTIME: ${hh}h ${mm}m ${ss}s`, null];
+}
+
+function tickChatter() {
+  const now = STATE.t;
+  if (now - CHATTER.lastLeftT > 1.2 + Math.random() * 1.8) {
+    const [msg, cls] = randomLeftChatter();
+    pushChatter('left', msg, cls);
+    CHATTER.lastLeftT = now;
+  }
+  if (now - CHATTER.lastRightT > 2.5 + Math.random() * 3.5) {
+    const [msg, cls] = randomRightChatter();
+    pushChatter('right', msg, cls);
+    CHATTER.lastRightT = now;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// DIGIT CIPHER FLIP — applied to any element with class .cipher
+// (CIPHER_CHARS + CIPHER_MEM are hoisted to the top of the script, near
+//  the TAU declaration, so the synchronous refreshPanels() call at
+//  bootstrap doesn't hit TDZ on CIPHER_CHARS.)
+// ═══════════════════════════════════════════════════════════════════════
+
+function cipherSet(el, newValue) {
+  const oldValue = el.textContent;
+  if (oldValue === newValue) return;
+  // Find changed digits and rapidly cycle them
+  const len = Math.max(oldValue.length, newValue.length);
+  const duration = 240;
+  const stagger = 30;
+  let i = 0;
+  function step() {
+    let out = '';
+    for (let k = 0; k < len; k++) {
+      const targetChar = newValue[k] || '';
+      const oldChar = oldValue[k] || '';
+      if (targetChar === oldChar) { out += targetChar; continue; }
+      const startFlipAt = k * stagger;
+      if (i < startFlipAt) out += oldChar;
+      else if (i < startFlipAt + duration - stagger * len) out += CIPHER_CHARS[Math.floor(Math.random() * 16)];
+      else out += targetChar;
+    }
+    el.textContent = out;
+    i += 20;
+    if (i < duration + stagger * len) requestAnimationFrame(step);
+    else el.textContent = newValue;
+  }
+  step();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// SYSTEM MOOD ENGINE
+// ═══════════════════════════════════════════════════════════════════════
+const MOOD = {
+  current: 'calm',
+  ringSpeedMul: 1.0,
+  bpm: 60,
+  particleMul: 1.0,
+  glowMul: 1.0,
+  chatterRate: 2.0
+};
+
+function updateMood() {
+  const load = TEL.cpuLoad;
+  let m;
+  if (load < 0.15)      m = { n: 'serene',    speed: 0.7, bpm: 45,  part: 0.7, glow: 0.85, chat: 4 };
+  else if (load < 0.40) m = { n: 'calm',      speed: 1.0, bpm: 60,  part: 1.0, glow: 1.00, chat: 2 };
+  else if (load < 0.65) m = { n: 'active',    speed: 1.2, bpm: 80,  part: 1.3, glow: 1.15, chat: 1.5 };
+  else if (load < 0.85) m = { n: 'intense',   speed: 1.4, bpm: 100, part: 1.6, glow: 1.35, chat: 1.0 };
+  else                  m = { n: 'overdrive', speed: 1.5, bpm: 120, part: 2.0, glow: 1.6,  chat: 0.5 };
+  MOOD.current = m.n;
+  MOOD.ringSpeedMul = lerp(MOOD.ringSpeedMul, m.speed, 0.04);
+  MOOD.bpm = lerp(MOOD.bpm, m.bpm, 0.04);
+  MOOD.particleMul = lerp(MOOD.particleMul, m.part, 0.04);
+  MOOD.glowMul = lerp(MOOD.glowMul, m.glow, 0.04);
+  MOOD.chatterRate = m.chat;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// AWARENESS ENGINE — threshold crossings fire ripple pulses
+// ═══════════════════════════════════════════════════════════════════════
+const AWARENESS = {
+  lastFired: 0,
+  lastTempCPU: TEL.tempCPU,
+  lastCpuLoad: TEL.cpuLoad,
+  lastGpuLoad: TEL.gpuLoad,
+  lastSwap: TEL.swapPct,
+  lastPower: TEL.powerW
+};
+
+function crossed(oldV, newV, threshold) {
+  return (oldV < threshold && newV >= threshold) || (oldV >= threshold && newV < threshold);
+}
+
+function firePulse(color, msg) {
+  const now = Date.now() / 1000;
+  if (now - AWARENESS.lastFired < 5) return;
+  AWARENESS.lastFired = now;
+
+  const ring = document.createElement('div');
+  ring.className = 'awareness-ring' + (color === 'amber' ? ' amber' : color === 'crimson' ? ' crimson' : '');
+  document.body.appendChild(ring);
+  setTimeout(() => ring.remove(), 1400);
+
+  pushChatter('left', msg, color === 'crimson' ? 'critical' : color === 'amber' ? 'warn' : null);
+}
+
+function tickAwareness() {
+  const tempCross = [45, 50, 55].find(t => crossed(AWARENESS.lastTempCPU, TEL.tempCPU, t));
+  if (tempCross) {
+    const color = tempCross >= 55 ? 'crimson' : tempCross >= 50 ? 'amber' : 'cyan';
+    firePulse(color, `CPU TEMP THRESHOLD: ${tempCross}°C CROSSED`);
+  }
+  if (crossed(AWARENESS.lastCpuLoad, TEL.cpuLoad, 0.50)) firePulse('cyan', 'CPU LOAD 50% CROSSED');
+  if (crossed(AWARENESS.lastCpuLoad, TEL.cpuLoad, 0.80)) firePulse('amber', 'CPU LOAD 80% CROSSED');
+  if (crossed(AWARENESS.lastGpuLoad, TEL.gpuLoad, 0.60)) firePulse('cyan', 'GPU LOAD 60% CROSSED');
+  if (crossed(AWARENESS.lastGpuLoad, TEL.gpuLoad, 0.90)) firePulse('amber', 'GPU LOAD 90% CROSSED');
+  if (crossed(AWARENESS.lastSwap, TEL.swapPct, 25)) firePulse('amber', 'SWAP 25% CROSSED');
+  if (crossed(AWARENESS.lastPower, TEL.powerW, 40)) firePulse('amber', 'POWER 40W CROSSED');
+
+  AWARENESS.lastTempCPU = TEL.tempCPU;
+  AWARENESS.lastCpuLoad = TEL.cpuLoad;
+  AWARENESS.lastGpuLoad = TEL.gpuLoad;
+  AWARENESS.lastSwap = TEL.swapPct;
+  AWARENESS.lastPower = TEL.powerW;
+
+  // Threat escalation toggle
+  const threat = TEL.tempCPU >= 65;
+  document.body.classList.toggle('threat', threat);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HOLOGRAPHIC FLICKER
+// ═══════════════════════════════════════════════════════════════════════
+let nextFlicker = Date.now() / 1000 + 20 + Math.random() * 25;
+function tickFlicker() {
+  const now = Date.now() / 1000;
+  if (STATE.phase !== PHASE.NOMINAL) return;
+  if (now < nextFlicker) return;
+  nextFlicker = now + 20 + Math.random() * 25;
+  const hud = document.getElementById('hud');
+  hud.classList.remove('holo-flicker');
+  void hud.offsetWidth;
+  hud.classList.add('holo-flicker');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// FLOATING DIAGNOSTIC PANELS
+// ═══════════════════════════════════════════════════════════════════════
+let nextPanelT = 8;
+let activePanels = 0;
+function tickFloatingPanels() {
+  if (STATE.phase !== PHASE.NOMINAL) return;
+  if (STATE.t < nextPanelT) return;
+  if (activePanels >= 2) { nextPanelT = STATE.t + 3; return; }
+  spawnFloatingPanel();
+  nextPanelT = STATE.t + 8 + Math.random() * 7;
+}
+
+function spawnFloatingPanel() {
+  const types = ['core', 'thermal', 'memory', 'power', 'snapshot'];
+  const type = types[Math.floor(Math.random() * types.length)];
+  const panel = document.createElement('div');
+  panel.className = 'float-panel';
+
+  // Random mid-screen position avoiding reactor
+  const sides = [
+    { left: '14%', top: `${25 + Math.random() * 40}%` },
+    { right: '14%', top: `${25 + Math.random() * 40}%` }
+  ];
+  const pos = sides[Math.floor(Math.random() * sides.length)];
+  Object.assign(panel.style, pos);
+
+  let html = '';
+  switch (type) {
+    case 'core':
+      html = `<div class="fp-title">Core Topology</div>` +
+             Array.from({ length: 6 }, (_, i) => {
+               const v = Math.floor(Math.random() * 95 + 5);
+               return `<div class="fp-row"><span>CORE ${i}</span><span class="v">${v}%</span></div>` +
+                      `<div class="fp-bar"><i style="width:${v}%"></i></div>`;
+             }).join('');
+      break;
+    case 'thermal':
+      html = `<div class="fp-title">Thermal Gradient</div>
+              <div class="fp-row"><span>CPU</span><span class="v">${TEL.tempCPU.toFixed(1)}°C</span></div>
+              <div class="fp-bar"><i style="width:${Math.min(100, TEL.tempCPU - 30) * 2}%"></i></div>
+              <div class="fp-row"><span>GPU</span><span class="v">${TEL.tempGPU.toFixed(1)}°C</span></div>
+              <div class="fp-bar"><i style="width:${Math.min(100, TEL.tempGPU - 30) * 2}%"></i></div>
+              <div class="fp-row"><span>BUS</span><span class="v">${(TEL.tempCPU - 4).toFixed(1)}°C</span></div>
+              <div class="fp-bar"><i style="width:${Math.min(100, TEL.tempCPU - 34) * 2}%"></i></div>`;
+      break;
+    case 'memory':
+      const memPct = (TEL.memUsedGB / TEL.memTotalGB * 100);
+      html = `<div class="fp-title">Memory Breakdown</div>
+              <div class="fp-row"><span>USED</span><span class="v">${TEL.memUsedGB.toFixed(1)} G</span></div>
+              <div class="fp-bar"><i style="width:${memPct}%"></i></div>
+              <div class="fp-row"><span>FREE</span><span class="v">${(TEL.memTotalGB - TEL.memUsedGB).toFixed(1)} G</span></div>
+              <div class="fp-bar"><i style="width:${100 - memPct}%"></i></div>
+              <div class="fp-row"><span>SWAP</span><span class="v">${TEL.swapPct.toFixed(0)}%</span></div>
+              <div class="fp-bar"><i style="width:${TEL.swapPct}%"></i></div>`;
+      break;
+    case 'power':
+      html = `<div class="fp-title">Power Budget</div>
+              <div class="fp-row"><span>CPU</span><span class="v">${(TEL.powerW * 0.6).toFixed(1)}W</span></div>
+              <div class="fp-bar"><i style="width:60%"></i></div>
+              <div class="fp-row"><span>GPU</span><span class="v">${(TEL.powerW * 0.28).toFixed(1)}W</span></div>
+              <div class="fp-bar"><i style="width:28%"></i></div>
+              <div class="fp-row"><span>ANE</span><span class="v">${(TEL.powerW * 0.07).toFixed(1)}W</span></div>
+              <div class="fp-bar"><i style="width:7%"></i></div>
+              <div class="fp-row"><span>DRAM</span><span class="v">${(TEL.powerW * 0.05).toFixed(1)}W</span></div>
+              <div class="fp-bar"><i style="width:5%"></i></div>`;
+      break;
+    default:
+      html = `<div class="fp-title">System Snapshot</div>
+              <div class="fp-row"><span>CHIP</span><span class="v">APPLE M-MAX</span></div>
+              <div class="fp-row"><span>CORES</span><span class="v">14P + 4E</span></div>
+              <div class="fp-row"><span>MEM</span><span class="v">${TEL.memTotalGB} GB</span></div>
+              <div class="fp-row"><span>MOOD</span><span class="v">${MOOD.current.toUpperCase()}</span></div>`;
+  }
+  panel.innerHTML = html;
+  document.getElementById('floatPanels').appendChild(panel);
+  activePanels++;
+  requestAnimationFrame(() => panel.classList.add('show'));
+  const hold = 5 + Math.random() * 3;
+  setTimeout(() => {
+    panel.classList.remove('show');
+    setTimeout(() => { panel.remove(); activePanels--; }, 700);
+  }, hold * 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// CARDIAC PULSE — replaces simple sine with heartbeat based on MOOD.bpm
+// ═══════════════════════════════════════════════════════════════════════
+function cardiacPulse(t) {
+  // BPM → period in seconds
+  const period = 60 / MOOD.bpm;
+  const phase = (t % period) / period;    // 0..1
+  // Heartbeat: quick bump (0-0.2), slow release (0.2-0.75), pause (0.75-1.0)
+  if (phase < 0.06) return 1.0 + 0.20 * (phase / 0.06);
+  if (phase < 0.12) return 1.20 - 0.08 * ((phase - 0.06) / 0.06);
+  if (phase < 0.40) return 1.12 - 0.12 * ((phase - 0.12) / 0.28);
+  return 1.00;
+}
+
+window.JARVIS = {
+  setPhase,
+  freezeAt: (phase, t) => { setPhase(phase); STATE.frozenPhaseT = t; },
+  unfreeze: () => { STATE.frozenPhaseT = null; STATE.phaseStart = Date.now() / 1000; },
+  triggerChargeEvent: () => {
+    STATE.charging = true;
+    STATE.batteryLow = false;
+    STATE.chatterVisible = true;
+    STATE.overdriveBloom = 3.0;
+    STATE.overdriveRings = 3.0;
+    spawnSparks();
+    document.body.classList.remove('shake');
+    void document.body.offsetWidth;
+    document.body.classList.add('shake');
+    setPhase(PHASE.NOMINAL);
+  },
+  setBatteryLow: (low) => {
+    STATE.batteryLow = low;
+    STATE.chatterVisible = !low;
+    TEL.batteryPct = low ? 4 : 100;
+    TEL.batteryCharging = !low;
+    refreshPanels();
+    setPhase(low ? PHASE.DIMMED : PHASE.NOMINAL);
+  },
+  shutdown: () => setPhase(PHASE.SHUTDOWN),
+  boot: () => setPhase(PHASE.BOOTING),
+  state: STATE,
+  tel: TEL
+};
+</script>
+</body>
+</html>

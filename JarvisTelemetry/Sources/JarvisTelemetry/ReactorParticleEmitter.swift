@@ -37,6 +37,12 @@ final class ParticleEmitterNSView: NSView {
     private var flareCell: CAEmitterCell?
     private var didSetup = false
 
+    // R-26: cache CGColorSpace + CGColor once so 60 Hz updates don't allocate.
+    private static let sharedColorSpace = CGColorSpaceCreateDeviceRGB()
+    private var cachedMainColor: CGColor?
+    private var lastEmittedG: CGFloat = -1.0
+    private var lastEmittedAlpha: CGFloat = -1.0
+
     override func makeBackingLayer() -> CALayer { CALayer() }
     override var isFlipped: Bool { true }
 
@@ -72,10 +78,21 @@ final class ParticleEmitterNSView: NSView {
         // Alpha: brighter under load
         mainCell.alphaSpeed = Float(-0.25 - load * 0.15)
 
-        // Color shifts slightly warmer (more white) under high power
+        // R-26: CGColorSpace is expensive to instantiate — cache once at
+        // class scope, and only rebuild the CGColor when the computed green
+        // channel has drifted by > 0.01 since the last emit.
         let g: CGFloat = 0.902 - CGFloat(powerFlow) * 0.05
-        mainCell.color = CGColor(colorSpace: CGColorSpaceCreateDeviceRGB(),
-                                 components: [0.102, g, 0.961, CGFloat(0.80 + load * 0.15)])
+        let alpha = CGFloat(0.80 + load * 0.15)
+        if abs(g - lastEmittedG) > 0.01 || abs(alpha - lastEmittedAlpha) > 0.01 || cachedMainColor == nil {
+            cachedMainColor = CGColor(
+                colorSpace: Self.sharedColorSpace,
+                components: [0.102, g, 0.961, alpha])
+            lastEmittedG = g
+            lastEmittedAlpha = alpha
+        }
+        if let colour = cachedMainColor {
+            mainCell.color = colour
+        }
 
         // Flare cell: burst particles on spikes
         if flare > 0.05 {

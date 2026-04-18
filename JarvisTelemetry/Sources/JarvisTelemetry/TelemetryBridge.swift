@@ -5,6 +5,7 @@
 
 import Foundation
 import Combine
+import os.log
 
 // MARK: - Data Models
 
@@ -136,12 +137,21 @@ final class TelemetryBridge: ObservableObject {
 
     @Published var snapshot: TelemetrySnapshot? = nil
     @Published var isRunning: Bool = false
+    /// Cumulative count of JSON decode failures. Observable from tests/UI.
+    @Published var decodeErrorCount: Int = 0
+    /// Last non-recoverable decode error string. Nil until the first failure.
+    @Published var lastDecodeError: String? = nil
+
+    /// Maximum buffered unparsed bytes before we drop and reset. A runaway
+    /// daemon or endlessly-malformed line must not inflate memory without bound.
+    static let maxBufferBytes: Int = 1_000_000
 
     private var process: Process?
     private var pipe: Pipe?
     private var buffer: Data = Data()
     private let decoder = JSONDecoder()
     private var readHandle: FileHandle?
+    private let log = OSLog(subsystem: "com.jarvis.telemetry", category: "Bridge")
 
     /// Resolves the daemon path using the most reliable method:
     /// derive from CommandLine.arguments[0] (works with launchd),
@@ -233,25 +243,118 @@ final class TelemetryBridge: ObservableObject {
     }
 
     func stop() {
-        readHandle?.closeFile()
-        process?.terminate()
-        process   = nil
-        pipe      = nil
+        guard isRunning else { return }
         isRunning = false
-        buffer    = Data()
+
+        // 1. Remove notification observer FIRST so stale chunks don't re-enter
+        //    the decoder after teardown has begun.
+        if let handle = readHandle {
+            NotificationCenter.default.removeObserver(
+                self,
+                name: .NSFileHandleDataAvailable,
+                object: handle
+            )
+        }
+
+        // 2. Close our read end of the pipe. The daemon's next write fails
+        //    with EPIPE, causing it to exit naturally. Do this BEFORE
+        //    dispatching the wait/kill to a background queue so main thread
+        //    returns in O(1) from applicationWillTerminate.
+        readHandle?.closeFile()
+        readHandle = nil
+
+        // 3. Drain the daemon on a background queue — SIGTERM → wait 1.5s →
+        //    SIGKILL if needed. Main thread must not block on Thread.sleep.
+        if let p = process {
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                guard let self = self else { return }
+                if p.isRunning {
+                    p.terminate()
+                    let deadline = Date().addingTimeInterval(1.5)
+                    while p.isRunning && Date() < deadline {
+                        Thread.sleep(forTimeInterval: 0.05)
+                    }
+                    if p.isRunning {
+                        NSLog("[TelemetryBridge] daemon did not exit in 1.5s — SIGKILL pid=\(p.processIdentifier)")
+                        kill(p.processIdentifier, SIGKILL)
+                        let killDeadline = Date().addingTimeInterval(0.5)
+                        while p.isRunning && Date() < killDeadline {
+                            Thread.sleep(forTimeInterval: 0.02)
+                        }
+                    }
+                    NSLog("[TelemetryBridge] daemon stopped (pid=\(p.processIdentifier))")
+                }
+                DispatchQueue.main.async { [weak self] in
+                    self?.process = nil
+                }
+                _ = self // silence the weak-self capture warning
+            }
+        }
+
+        pipe    = nil
+        buffer  = Data()
+    }
+
+    /// Public test hook: feed raw bytes through the buffer as though they had
+    /// arrived from the daemon's pipe. Unit tests drive EOF / overflow /
+    /// malformed-line scenarios via this surface.
+    func ingestForTesting(_ data: Data, isEOF: Bool = false) {
+        if isEOF || data.isEmpty {
+            handleEOF()
+            return
+        }
+        processChunk(data)
     }
 
     @objc private func handleDataAvailable(_ notification: Notification) {
         guard let handle = notification.object as? FileHandle else { return }
         let chunk = handle.availableData
-        guard !chunk.isEmpty else { return }
 
+        // EOF: empty chunk means the daemon's stdout was closed. R-5.
+        if chunk.isEmpty {
+            handleEOF()
+            return
+        }
+
+        processChunk(chunk)
+        handle.waitForDataInBackgroundAndNotify()
+    }
+
+    private func handleEOF() {
+        os_log(.info, log: log, "TelemetryBridge EOF — daemon pipe closed, marking isRunning=false")
+
+        // Detach notification observer and close the pipe — no auto-restart.
+        if let handle = readHandle {
+            NotificationCenter.default.removeObserver(
+                self,
+                name: .NSFileHandleDataAvailable,
+                object: handle
+            )
+            handle.closeFile()
+        }
+        readHandle = nil
+
+        DispatchQueue.main.async { [weak self] in
+            self?.isRunning = false
+        }
+    }
+
+    private func processChunk(_ chunk: Data) {
         buffer.append(chunk)
 
-        // Extract complete newline-delimited JSON objects from buffer
+        // R-6: cap buffer to prevent runaway memory if daemon emits no newline.
+        if buffer.count > Self.maxBufferBytes {
+            os_log(.error, log: log, "TelemetryBridge buffer overflow (%{public}d bytes), dropping", buffer.count)
+            buffer.removeAll(keepingCapacity: false)
+            return
+        }
+
+        // Extract complete newline-delimited JSON objects from buffer.
         while let newlineRange = buffer.range(of: Data([0x0A])) { // 0x0A = '\n'
             let lineData = buffer.subdata(in: buffer.startIndex..<newlineRange.lowerBound)
-            buffer.removeSubrange(buffer.startIndex...newlineRange.lowerBound)
+            // R-6: remove through AND INCLUDING the newline byte using
+            // half-open range [startIndex ..< upperBound).
+            buffer.removeSubrange(buffer.startIndex..<newlineRange.upperBound)
 
             // mactop --headless emits a JSON array wrapper when --count is used;
             // in infinite mode each line is a bare JSON object.
@@ -272,11 +375,15 @@ final class TelemetryBridge: ObservableObject {
                     self?.snapshot = s
                 }
             } catch {
-                // Silently skip malformed lines (startup noise, partial frames)
+                // R-20: track decode failures so tests/UI can observe them.
+                let desc = (error as NSError).localizedDescription
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    self.decodeErrorCount += 1
+                    self.lastDecodeError = desc
+                }
             }
         }
-
-        handle.waitForDataInBackgroundAndNotify()
     }
 
     deinit { stop() }

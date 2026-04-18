@@ -302,13 +302,9 @@ final class ReactorAnimationController: ObservableObject {
         // ── Continuous 60fps reactive update loop ──────────────────────────
         // This drives smooth interpolation of reactorLoad, coreFlare,
         // breathing, and energy ripples independent of the 1Hz telemetry tick.
+        storeRef = store
         lastContinuousUpdate = Date()
-        continuousTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self, weak store] _ in
-                guard let self, let store else { return }
-                self.continuousReactiveUpdate(store: store)
-            }
+        resumeContinuousTimer()
 
         // Battery ring progress follows BatteryMonitor directly so the R×0.92
         // ring on the Canvas always reflects the current charge level, even
@@ -522,9 +518,14 @@ final class ReactorAnimationController: ObservableObject {
     // Smooth interpolation engine that makes the reactor feel alive.
     // Attack/decay asymmetry: spikes ramp fast, decay is slow and organic.
 
+    /// Test-only: has the named canFire key been recorded yet?
+    func didFireForTesting(_ key: String) -> Bool {
+        return lastFiredAt[key] != nil
+    }
+
     /// Internal for testability — called at 60fps by the continuous timer.
-    func continuousReactiveUpdate(store: TelemetryStore) {
-        let now = Date()
+    /// R-31: `now` is injectable for deterministic test clocks.
+    func continuousReactiveUpdate(store: TelemetryStore, now: Date = Date()) {
         let dt = min(now.timeIntervalSince(lastContinuousUpdate), 0.1) // cap at 100ms
         lastContinuousUpdate = now
 
@@ -615,6 +616,12 @@ final class ReactorAnimationController: ObservableObject {
     /// Expanding cyan shockwave. `shockwaveProgress` ramps 0 → 1 over 1.2 s
     /// via a Timer-driven update so the Canvas can pick up intermediate
     /// values; `shockwaveActive` is then cleared.
+    ///
+    /// R-23: the Timer subscription is retained via `shockwaveCancellable`
+    /// so it can be cancelled on deinit or when a second shockwave overrides
+    /// the first. Without this retention the previous implementation leaked
+    /// one AnyCancellable per invocation.
+    private var shockwaveCancellable: AnyCancellable?
     private func fireShockwave() {
         guard !shockwaveInFlight else { return }
         shockwaveInFlight = true
@@ -622,20 +629,18 @@ final class ReactorAnimationController: ObservableObject {
         shockwaveProgress = 0.0
         let start = Date()
         let duration: TimeInterval = 1.2
-        var cancellable: AnyCancellable?
-        cancellable = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common)
+        shockwaveCancellable?.cancel()
+        shockwaveCancellable = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                guard let self else {
-                    cancellable?.cancel()
-                    return
-                }
+                guard let self else { return }
                 let t = Date().timeIntervalSince(start) / duration
                 if t >= 1.0 {
                     self.shockwaveProgress = 1.0
                     self.shockwaveActive = false
                     self.shockwaveInFlight = false
-                    cancellable?.cancel()
+                    self.shockwaveCancellable?.cancel()
+                    self.shockwaveCancellable = nil
                 } else {
                     self.shockwaveProgress = t
                 }
@@ -861,20 +866,49 @@ final class ReactorAnimationController: ObservableObject {
     /// During each event, `harmonicBlend` ramps 0→1 (0.5s), holds 1-2s, ramps 1→0 (0.5s).
     /// JarvisReactorCanvas uses this to lerp per-ring rotation offsets toward 0
     /// so all rings briefly spin in near-unison — a visual "resonance chord."
-    private func startHarmonicsScheduler() {
+    // R-24: pause/resume for the 60 Hz continuous reactive loop.
+    /// Weak reference to the last-bound TelemetryStore so resume() can re-wire.
+    private weak var storeRef: TelemetryStore?
+
+    /// Stops the 60 Hz continuous reactive timer. Safe to call multiple times.
+    func pause() {
+        continuousTimer?.cancel()
+        continuousTimer = nil
+    }
+
+    /// Re-arms the 60 Hz continuous reactive timer against the last-bound store.
+    func resume() {
+        guard continuousTimer == nil else { return }
+        resumeContinuousTimer()
+    }
+
+    private func resumeContinuousTimer() {
+        continuousTimer = Timer.publish(every: 1.0 / 60.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self, let store = self.storeRef else { return }
+                self.continuousReactiveUpdate(store: store)
+            }
+    }
+
+    /// R-25: single recursive re-randomising scheduler replaces the asymmetric
+    /// two-level implementation. Every fire picks a fresh random interval so
+    /// the harmonic resonance never locks into a fixed cadence.
+    private func scheduleNextHarmonic() {
         let interval = Double.random(in: 45...60)
+        harmonicTimer?.cancel()
         harmonicTimer = Timer.publish(every: interval, on: .main, in: .common)
             .autoconnect()
+            .first()
             .sink { [weak self] _ in
                 guard let self else { return }
                 self.triggerHarmonicSync()
-                // Reschedule with a new random interval
-                self.harmonicTimer?.cancel()
-                let nextInterval = Double.random(in: 45...60)
-                self.harmonicTimer = Timer.publish(every: nextInterval, on: .main, in: .common)
-                    .autoconnect()
-                    .sink { [weak self] _ in self?.triggerHarmonicSync() }
+                self.scheduleNextHarmonic()  // tail-call style re-randomise
             }
+    }
+
+    private func startHarmonicsScheduler() {
+        scheduleNextHarmonic()
     }
 
     private func triggerHarmonicSync() {

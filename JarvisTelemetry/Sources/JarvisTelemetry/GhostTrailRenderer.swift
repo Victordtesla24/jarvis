@@ -99,22 +99,24 @@ struct GhostRingCanvas: View {
             let gapFrac = 0.15
             let top     = -Double.pi / 2.0
 
+            // R-28: collapse 48 path allocations per trail into ONE by
+            // appending all segment arcs to a single Path before stroking.
             for (trailPhase, opacity) in trails {
                 let speedMul = speedMultiplier
                 let ph = trailPhase * speedMul
-                for i in 0..<48 {
-                    let segStart = Double(i) * segArc + top + ph * (pi2 / 100.0)
-                    let segEnd   = segStart + segArc * (1.0 - gapFrac)
-                    let ap = Path { p in
+                let path = Path { p in
+                    for i in 0..<48 {
+                        let segStart = Double(i) * segArc + top + ph * (pi2 / 100.0)
+                        let segEnd   = segStart + segArc * (1.0 - gapFrac)
                         p.addArc(center: c, radius: r1,
                                  startAngle: .radians(segStart),
                                  endAngle:   .radians(segEnd),
                                  clockwise: false)
                     }
-                    ctx.stroke(ap,
-                               with: .color(cyan.opacity(opacity)),
-                               style: StrokeStyle(lineWidth: 8, lineCap: .butt))
                 }
+                ctx.stroke(path,
+                           with: .color(cyan.opacity(opacity)),
+                           style: StrokeStyle(lineWidth: 8, lineCap: .butt))
             }
         }
         .allowsHitTesting(false)

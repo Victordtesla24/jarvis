@@ -22,23 +22,25 @@ cp "$BIN"  "$APPBUNDLE/Contents/MacOS/JarvisWallpaper"
 cp "$HTML" "$APPBUNDLE/Contents/Resources/jarvis-full-animation.html"
 
 INFO="$APPBUNDLE/Contents/Info.plist"
-printf '<?xml version="1.0" encoding="UTF-8"?>\n' > "$INFO"
-printf '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n' >> "$INFO"
-printf '<plist version="1.0"><dict>\n' >> "$INFO"
-printf '    <key>CFBundleExecutable</key><string>JarvisWallpaper</string>\n' >> "$INFO"
-printf '    <key>CFBundleIdentifier</key><string>com.jarvis.wallpaper</string>\n' >> "$INFO"
-printf '    <key>CFBundleName</key><string>JARVIS Wallpaper</string>\n' >> "$INFO"
-printf '    <key>CFBundleDisplayName</key><string>JARVIS Wallpaper</string>\n' >> "$INFO"
-printf '    <key>CFBundlePackageType</key><string>APPL</string>\n' >> "$INFO"
-printf '    <key>CFBundleShortVersionString</key><string>1.0</string>\n' >> "$INFO"
-printf '    <key>CFBundleVersion</key><string>1</string>\n' >> "$INFO"
-printf '    <key>LSMinimumSystemVersion</key><string>15.0</string>\n' >> "$INFO"
-printf '    <key>LSUIElement</key><true/>\n' >> "$INFO"
-printf '    <key>NSHighResolutionCapable</key><true/>\n' >> "$INFO"
-printf '    <key>NSPrincipalClass</key><string>NSApplication</string>\n' >> "$INFO"
-printf '    <key>NSAppTransportSecurity</key>\n' >> "$INFO"
-printf '    <dict><key>NSAllowsLocalNetworking</key><true/></dict>\n' >> "$INFO"
-printf '</dict></plist>\n' >> "$INFO"
+{
+  printf '<?xml version="1.0" encoding="UTF-8"?>\n'
+  printf '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+  printf '<plist version="1.0"><dict>\n'
+  printf '    <key>CFBundleExecutable</key><string>JarvisWallpaper</string>\n'
+  printf '    <key>CFBundleIdentifier</key><string>com.jarvis.wallpaper</string>\n'
+  printf '    <key>CFBundleName</key><string>JARVIS Wallpaper</string>\n'
+  printf '    <key>CFBundleDisplayName</key><string>JARVIS Wallpaper</string>\n'
+  printf '    <key>CFBundlePackageType</key><string>APPL</string>\n'
+  printf '    <key>CFBundleShortVersionString</key><string>1.0</string>\n'
+  printf '    <key>CFBundleVersion</key><string>1</string>\n'
+  printf '    <key>LSMinimumSystemVersion</key><string>15.0</string>\n'
+  printf '    <key>LSUIElement</key><true/>\n'
+  printf '    <key>NSHighResolutionCapable</key><true/>\n'
+  printf '    <key>NSPrincipalClass</key><string>NSApplication</string>\n'
+  printf '    <key>NSAppTransportSecurity</key>\n'
+  printf '    <dict><key>NSAllowsLocalNetworking</key><true/></dict>\n'
+  printf '</dict></plist>\n'
+} > "$INFO"
 
 chmod +x "$APPBUNDLE/Contents/MacOS/JarvisWallpaper"
 echo "==> Done: $APPBUNDLE"

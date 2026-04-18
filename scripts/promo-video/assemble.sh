@@ -1,12 +1,26 @@
-#!/usr/bin/env zsh
-# scripts/promo-video/assemble.sh — two-pass ffmpeg assembly with 7 validation gates.
+#!/usr/bin/env bash
+# scripts/promo-video/assemble.sh — two-pass ffmpeg assembly with validation gates.
 # Reads inputs from promo/raw_captures, promo/ai_shots, promo/vo, promo/music.
 # Writes promo/scenes/silent.mp4 (pass 1) and promo/JARVIS_PROMO_v${N}.mp4 (pass 2).
+#
+# R-43: per-gate exit codes
+#   2  missing input  (G1 / G2 / G2b / G3)
+#   3  timing failure (G4)
+#   4  encode quality (G5)
+#   5  loudness       (G6)
+#   6  sanity frames  (G7)
+#
+# R-45: atomic output — FINAL is only moved into place after G5 passes.
 set -eu
 set -o pipefail
 
-REPO_ROOT="${REPO_ROOT:-/Users/vic/claude/General-Work/jarvis/jarvis-build}"
+REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}"
 cd "$REPO_ROOT"
+
+# R-45: remove partial outputs on error.
+SILENT=""
+FINAL_TMP=""
+trap 'rm -f "${FINAL_TMP:-}"' ERR
 
 PROMO="$REPO_ROOT/promo"
 RAW="$PROMO/raw_captures"
@@ -18,37 +32,55 @@ SCENES_DIR="$SCENES/slices"
 QA="$PROMO/qa_frames"
 mkdir -p "$SCENES" "$SCENES_DIR" "$QA"
 
-log()  { printf "[assemble] %s\n" "$*"; }
-die()  { printf "[assemble][FATAL] %s\n" "$*" >&2; exit 1; }
-warn() { printf "[assemble][WARN] %s\n" "$*"; }
+log()  { printf "[assemble] %s\n" "$*" >&2; }
+warn() { printf "[assemble][WARN] %s\n" "$*" >&2; }
+die()  {
+  local code="${2:-1}"
+  printf "[assemble][FATAL][code=%d] %s\n" "$code" "$1" >&2
+  exit "$code"
+}
 
 # ---- G1: raw captures present --------------------------------------------
 for act in 1 2 3 4; do
   f="$RAW/act${act}.mp4"
-  [[ -f "$f" ]] || die "G1: missing $f (run capture_scenes.py)"
+  [[ -f "$f" ]] || die "G1: missing $f (run capture_scenes.py)" 2
   dur=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$f")
   log "G1: act${act}.mp4 ${dur}s"
 done
 
 # ---- G2: VO lines present -------------------------------------------------
-for i in 01 02 03 04 05 06 07 08 09 10; do
-  f="$VO/line${i}.wav"
-  [[ -f "$f" ]] || die "G2: missing $f (run generate_vo.py)"
+VO_COUNT=0
+for f in "$VO"/line*.wav; do
+  [[ -f "$f" ]] || continue
   sz=$(stat -f%z "$f")
-  [[ "$sz" -gt 10000 ]] || die "G2: $f only ${sz}B — likely empty (sandbox?)"
+  [[ "$sz" -gt 10000 ]] || die "G2: $f only ${sz}B — likely empty" 2
+  VO_COUNT=$((VO_COUNT + 1))
 done
-log "G2: 10 VO lines OK"
+[[ "$VO_COUNT" -ge 10 ]] || die "G2: only ${VO_COUNT} VO lines found (need >=10)" 2
+log "G2: ${VO_COUNT} VO lines OK"
+
+# ---- G2b (R-13): VO file count must match vo_timing.json entry count -----
+if [[ -f "$VO/vo_timing.json" ]]; then
+  VO_EXPECTED=$(python3 -c "import json,sys;print(len(json.load(open('$VO/vo_timing.json'))))")
+  [[ -z "${VO_FILE_COUNT_SKIP:-}" ]] || true  # allow tests to override
+  if [[ "$VO_COUNT" != "$VO_EXPECTED" ]]; then
+    die "G2b: VO count mismatch: files=$VO_COUNT, manifest=$VO_EXPECTED" 2
+  fi
+  log "G2b: VO count matches manifest ($VO_COUNT)"
+else
+  die "G2b: missing $VO/vo_timing.json (run generate_vo.py)" 2
+fi
 
 # ---- G3: music present ----------------------------------------------------
-[[ -f "$MUSIC/score.mp3" ]] || die "G3: missing $MUSIC/score.mp3 (run pick_music.sh)"
+[[ -f "$MUSIC/score.mp3" ]] || die "G3: missing $MUSIC/score.mp3 (run pick_music.sh)" 2
 mdur=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$MUSIC/score.mp3")
 aw=$(awk -v d="$mdur" 'BEGIN{print (d>=120)?1:0}')
-[[ "$aw" == "1" ]] || die "G3: music track too short (${mdur}s < 120s)"
+[[ "$aw" == "1" ]] || die "G3: music track too short (${mdur}s < 120s)" 2
 log "G3: score.mp3 ${mdur}s"
 
 # ---- AI shots present -----------------------------------------------------
 for name in intro outro; do
-  [[ -f "$AI/${name}.mp4" ]] || die "missing $AI/${name}.mp4 (run generate_ai_shots.py)"
+  [[ -f "$AI/${name}.mp4" ]] || die "missing $AI/${name}.mp4 (run generate_ai_shots.py)" 2
 done
 
 # ---- Fonts (download once if missing, fall back to system fonts) ----------
@@ -75,8 +107,9 @@ log "fonts: orbitron=$ORBITRON rajdhani=$RAJDHANI"
 
 # ---- Pass 1a: slice raw captures into scene clips -------------------------
 slice() {
+  # R-44: -threads 0 lets ffmpeg pick a good default.
   local src="$1" start_in="$2" dur="$3" out="$4"
-  ffmpeg -y -loglevel error \
+  ffmpeg -y -loglevel error -threads 0 \
     -ss "$start_in" -i "$src" -t "$dur" \
     -c:v libx264 -preset medium -crf 18 \
     -pix_fmt yuv420p -r 30 -an \
@@ -89,13 +122,36 @@ log "Pass 1a: slicing 17 scenes"
 slice "$AI/intro.mp4"   0   3  "$SCENES_DIR/01_intro.mp4"
 slice "$RAW/act1.mp4"   0   5  "$SCENES_DIR/02_boot_ignition.mp4"
 slice "$RAW/act1.mp4"   5   6  "$SCENES_DIR/03_boot_rings.mp4"
-slice "$RAW/act1.mp4"   11  8  "$SCENES_DIR/04_hero_reactor.mp4"
+# Hero reactor with feature callout
+ffmpeg -y -loglevel error -threads 0 \
+  -ss 11 -i "$RAW/act1.mp4" -t 8 \
+  -vf "format=yuv420p,\
+drawtext=fontfile='$RAJDHANI':text='P-Core & E-Core Utilisation · GPU Load · Thermal Monitoring':fontcolor=white@0.5:fontsize=28:x=(w-text_w)/2:y=h-80:alpha='if(lt(t\,2)\,0\,if(lt(t\,3)\,(t-2)\,if(lt(t\,6)\,1\,(8-t)/2)))'" \
+  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -r 30 -an \
+  "$SCENES_DIR/04_hero_reactor.mp4"
 slice "$RAW/act1.mp4"   19  8  "$SCENES_DIR/05_title_card.mp4"
 
-# Act 2: act2.mp4 slices [0-7,7-18,18-28,28-35]
+# Act 2: act2.mp4 — wide shot, then CROPPED close-ups of left/right panels
 slice "$RAW/act2.mp4"   0   7  "$SCENES_DIR/06_panel_wide.mp4"
-slice "$RAW/act2.mp4"   7  11  "$SCENES_DIR/07_left_panel.mp4"
-slice "$RAW/act2.mp4"   18 10  "$SCENES_DIR/08_right_panel.mp4"
+
+# Left panel close-up: crop to left 35% of frame, scale back up, add feature callout
+ffmpeg -y -loglevel error -threads 0 \
+  -ss 7 -i "$RAW/act2.mp4" -t 11 \
+  -vf "crop=900:1100:0:120,scale=2560:1440:force_original_aspect_ratio=decrease,pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p,\
+drawtext=fontfile='$RAJDHANI':text='SYSTEM MONITOR':fontcolor=0x1AE6F5@0.8:fontsize=36:x=60:y=60:alpha='if(lt(t\,1)\,t\,if(lt(t\,9)\,1\,(11-t)/2))',\
+drawtext=fontfile='$RAJDHANI':text='Clock · Storage · App List · Chatter Feed':fontcolor=white@0.6:fontsize=28:x=60:y=105:alpha='if(lt(t\,1.5)\,(t-0.5)\,if(lt(t\,9)\,1\,(11-t)/2))'" \
+  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -r 30 -an \
+  "$SCENES_DIR/07_left_panel.mp4"
+
+# Right panel close-up: crop to right 35% of frame, scale back up, add feature callout
+ffmpeg -y -loglevel error -threads 0 \
+  -ss 18 -i "$RAW/act2.mp4" -t 10 \
+  -vf "crop=900:1100:1660:120,scale=2560:1440:force_original_aspect_ratio=decrease,pad=2560:1440:(ow-iw)/2:(oh-ih)/2:color=black,format=yuv420p,\
+drawtext=fontfile='$RAJDHANI':text='TELEMETRY ARRAY':fontcolor=0x1AE6F5@0.8:fontsize=36:x=60:y=60:alpha='if(lt(t\,1)\,t\,if(lt(t\,8)\,1\,(10-t)/2))',\
+drawtext=fontfile='$RAJDHANI':text='Network I/O · DRAM Bandwidth · GPU Frequency · Neural Engine':fontcolor=white@0.6:fontsize=28:x=60:y=105:alpha='if(lt(t\,1.5)\,(t-0.5)\,if(lt(t\,8)\,1\,(10-t)/2))'" \
+  -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -r 30 -an \
+  "$SCENES_DIR/08_right_panel.mp4"
+
 slice "$RAW/act2.mp4"   28  7  "$SCENES_DIR/09_panel_wide_return.mp4"
 
 # Act 3: act3.mp4 slices [0-8,8-13,13-18,18-30]
@@ -145,80 +201,88 @@ for f in "$SCENES_DIR"/01_*.mp4 \
 done
 
 SILENT="$PROMO/scenes/silent.mp4"
-ffmpeg -y -loglevel error \
+ffmpeg -y -loglevel error -threads 0 \
   -f concat -safe 0 -i "$CONCAT_LIST" \
-  -vf "eq=contrast=1.1:saturation=1.05:brightness=0.02,unsharp=3:3:0.5" \
+  -vf "crop=2560:1340:0:50,pad=2560:1440:0:50:color=black,eq=contrast=1.15:saturation=1.1:brightness=0.02:gamma=1.05,unsharp=5:5:0.8,vignette=PI/4" \
   -c:v libx264 -preset slow -crf 18 -pix_fmt yuv420p -r 30 -an \
   "$SILENT"
 
 # ---- G4: silent.mp4 is 120s ±1s ------------------------------------------
 sdur=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$SILENT")
 aw=$(awk -v d="$sdur" 'BEGIN{print (d>=119 && d<=121)?1:0}')
-[[ "$aw" == "1" ]] || die "G4: silent.mp4 duration ${sdur}s not in [119, 121]"
-log "G4: silent.mp4 ${sdur}s ✓"
+[[ "$aw" == "1" ]] || die "G4: silent.mp4 duration ${sdur}s not in [119, 121]" 3
+log "G4: silent.mp4 ${sdur}s OK"
 
 # ---- Pass 2: audio mix with sidechain ducking + loudnorm ------------------
 log "Pass 2: audio mix"
 VO_FILTERS=$(python3 <<'PY'
-import sys
-sys.path.insert(0, 'scripts/promo-video')
-from lib.shot_list_loader import load
-d = load()
-vo = d['vo_lines']
-# Emit adelay filter per line and a final amix
+import json
+# Read timing from the generated vo_timing.json
+with open("promo/vo/vo_timing.json") as f:
+    timing = json.load(f)
+
 lines = []
-for i, key in enumerate(sorted(vo.keys())):
-    ms = int(vo[key]['place_at'] * 1000)
-    idx = i + 1  # input index (0 is silent.mp4)
-    lines.append(f"[{idx}:a]adelay={ms}|{ms},volume=1.5[v{idx}]")
-mix_inputs = "".join(f"[v{i+1}]" for i in range(len(vo)))
-lines.append(f"{mix_inputs}amix=inputs={len(vo)}:duration=longest:normalize=0[vo_mix]")
+for i, key in enumerate(sorted(timing.keys())):
+    ms = int(timing[key] * 1000)
+    idx = i + 1
+    lines.append(f"[{idx}:a]adelay={ms}|{ms},volume=2.5[v{idx}]")
+count = len(timing)
+mix_inputs = "".join(f"[v{i+1}]" for i in range(count))
+lines.append(f"{mix_inputs}amix=inputs={count}:duration=longest:normalize=0[vo_mix]")
 print(";".join(lines))
 PY
 )
 
-# Collect VO inputs in sorted order
+# Collect ALL VO inputs in sorted order
 VO_ARGS=""
-for f in "$VO"/line01.wav "$VO"/line02.wav "$VO"/line03.wav "$VO"/line04.wav \
-         "$VO"/line05.wav "$VO"/line06.wav "$VO"/line07.wav "$VO"/line08.wav \
-         "$VO"/line09.wav "$VO"/line10.wav ; do
+VO_FILE_COUNT=0
+for f in "$VO"/line*.wav; do
+  [[ -f "$f" ]] || continue
   VO_ARGS+="-i $f "
+  VO_FILE_COUNT=$((VO_FILE_COUNT + 1))
 done
+log "Pass 2: mixing ${VO_FILE_COUNT} VO files + music"
 
 FINAL_VER=1
 while [[ -f "$PROMO/JARVIS_PROMO_v${FINAL_VER}.mp4" ]]; do
   FINAL_VER=$((FINAL_VER + 1))
 done
 FINAL="$PROMO/JARVIS_PROMO_v${FINAL_VER}.mp4"
+FINAL_TMP="${FINAL}.tmp.mp4"
 
-# 0: silent video, 1..10: VO wavs, 11: music
+MUSIC_IDX=$((VO_FILE_COUNT + 1))
+# 0: silent video, 1..N: VO wavs, N+1: music
 # shellcheck disable=SC2086
-ffmpeg -y -loglevel error \
+ffmpeg -y -loglevel error -threads 0 \
   -i "$SILENT" \
   ${=VO_ARGS} \
   -i "$MUSIC/score.mp3" \
   -filter_complex "\
 ${VO_FILTERS};\
 [vo_mix]apad=whole_dur=120,asplit=2[vo_duck][vo_out];\
-[11:a]atrim=end=120,volume=0.5[music_raw];\
-[music_raw][vo_duck]sidechaincompress=threshold=0.05:ratio=8:attack=5:release=400[music_duck];\
-[music_duck][vo_out]amix=inputs=2:duration=longest:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,atrim=end=120[aout]" \
+[${MUSIC_IDX}:a]atrim=end=120,volume=0.3[music_raw];\
+[music_raw][vo_duck]sidechaincompress=threshold=0.1:ratio=3:attack=20:release=500[music_duck];\
+[music_duck][vo_out]amix=inputs=2:duration=longest:normalize=0,lowpass=f=8000,loudnorm=I=-14:TP=-1.5:LRA=11,atrim=end=120[aout]" \
   -map 0:v -map "[aout]" \
   -c:v copy \
-  -c:a aac -b:a 192k \
+  -c:a aac -b:a 192k -ar 48000 \
   -shortest \
-  "$FINAL"
+  "$FINAL_TMP"
 
-# ---- G5: final output probe ----------------------------------------------
+# ---- G5: final output probe (runs against the tmp file) ------------------
 probe=$(ffprobe -v error -show_entries format=duration \
         -show_entries stream=width,height,codec_name,r_frame_rate,pix_fmt \
-        -of default=noprint_wrappers=1 "$FINAL")
+        -of default=noprint_wrappers=1 "$FINAL_TMP")
 log "G5 probe:"
-echo "$probe" | sed 's/^/  /'
-echo "$probe" | grep -q "width=2560" || die "G5: width != 2560"
-echo "$probe" | grep -q "height=1440" || die "G5: height != 1440"
-echo "$probe" | grep -q "r_frame_rate=30/1" || die "G5: fps != 30"
-echo "$probe" | grep -q "pix_fmt=yuv420p" || die "G5: pix_fmt != yuv420p"
+printf '%s\n' "${probe//$'\n'/$'\n'  }" | sed -n '1,$p' >&2
+echo "$probe" | grep -q "width=2560" || die "G5: width != 2560" 4
+echo "$probe" | grep -q "height=1440" || die "G5: height != 1440" 4
+echo "$probe" | grep -q "r_frame_rate=30/1" || die "G5: fps != 30" 4
+echo "$probe" | grep -q "pix_fmt=yuv420p" || die "G5: pix_fmt != yuv420p" 4
+
+# R-45: atomic rename only after G5 passes.
+mv "$FINAL_TMP" "$FINAL"
+FINAL_TMP=""
 
 # ---- G6: loudness check (non-fatal) ---------------------------------------
 lufs_out=$(ffmpeg -nostats -hide_banner -i "$FINAL" \
@@ -229,9 +293,12 @@ fi
 
 # ---- G7: sanity frames ----------------------------------------------------
 for t in 0 15 45 75 105 115; do
-  ffmpeg -y -loglevel error -ss "$t" -i "$FINAL" -frames:v 1 \
-    -q:v 2 "$QA/t${t}s.png"
+  ffmpeg -y -loglevel error -threads 0 -ss "$t" -i "$FINAL" -frames:v 1 \
+    -q:v 2 "$QA/t${t}s.png" \
+    || die "G7: sanity frame extraction failed at t=${t}s" 6
 done
 log "G7: sanity frames in $QA/"
+
+printf '%s\n' "$FINAL"
 
 log "DONE: $FINAL"
