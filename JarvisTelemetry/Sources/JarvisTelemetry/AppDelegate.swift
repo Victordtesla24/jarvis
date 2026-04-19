@@ -662,6 +662,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         NSLog("[AppDelegate] fast-user-switch observers installed")
+
+        // ── Living-shrine wake exhale: 600ms canvas-stack breath-in on
+        //    NSWorkspace.didWakeNotification (lid open / idle wake). This is
+        //    complementary to the full-boot triggers above — it provides a
+        //    subtle visual "yawn" for sleep-wake events that don't otherwise
+        //    cross the lock or session boundary. Debounced to ignore the 2-3
+        //    rapid-fire wake notifications macOS posts on lid-open.
+        wsCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in self.injectWakeExhale() }
+        }
+        NSLog("[AppDelegate] wake-exhale observer installed (didWakeNotification)")
+    }
+
+    // MARK: - Living-Shrine Wake Exhale
+
+    /// Debounce timestamp for wake-exhale (macOS posts didWakeNotification 2-3×
+    /// rapidly on lid-open).
+    private var lastWakeExhaleAt: Date = .distantPast
+
+    /// Trigger the 600ms canvas-stack breath-in on every running WKWebView.
+    private func injectWakeExhale() {
+        let now = Date()
+        guard now.timeIntervalSince(lastWakeExhaleAt) > 1.5 else {
+            NSLog("[AppDelegate] wake-exhale debounced (within 1.5s of previous)")
+            return
+        }
+        lastWakeExhaleAt = now
+        NSLog("[AppDelegate] 🌬 wake exhale → JS runWakeExhale()")
+        for wv in webViews {
+            wv.evaluateJavaScript(
+                "if (window.runWakeExhale) runWakeExhale();",
+                completionHandler: nil
+            )
+        }
     }
 
     // MARK: - Real Screen-Lock Handler (animated wallpaper rotation path)

@@ -88,3 +88,11 @@ mcp.json
 # ── Per-machine docs that override repo defaults ────────────────────────────
 LICENSE
 CLAUDE.md
+# Playwright MCP session artifacts
+.playwright-mcp/
+
+# Assembled .app bundle (built per-machine from build-app.sh)
+JarvisWallpaper.app/
+
+# Session session.json placeholder dir
+data/
