@@ -37,21 +37,19 @@ Execution-ordered remediation that moves the working tree from current state to 
 - **Expected PASS evidence:** version `0.11.0` or newer on stdout, exit 0.
 - **Failure triage action:** If `brew` is unavailable, install Homebrew, then retry this step.
 
-### Step P-0.3 — Provision isolated pytest venv for promo-video gate
+### Step P-0.3 — Install pytest, numpy, pillow for the default `python3`
 
-- **Requirement IDs:** R-4.3 (Gate C), §4.3
-- **Target files:** `scripts/promo-video/.venv/` (gitignored)
-- **Exact change set:** create virtualenv, install pytest pinned in venv only.
+- **Requirement IDs:** R-4.3 (Gate C), R-4.6 (Gate F), §4.3, RQ-2.2
+- **Target files:** `~/Library/Python/3.14/site-packages/{pytest,numpy,PIL}` (user-site; no repo writes)
+- **Exact change set:** bootstrap the three packages into the user-site area of the default `python3` so the exact contract commands `python3 -m pytest …` resolve without any venv activation. PEP 668 requires `--break-system-packages` on Homebrew Python; `--user` keeps installs out of `/opt/homebrew`.
 - **Commands to run:**
   ```bash
-  cd /Users/vic/claude/General-Work/jarvis/jarvis-build
-  python3 -m venv scripts/promo-video/.venv
-  scripts/promo-video/.venv/bin/pip install --upgrade pip
-  scripts/promo-video/.venv/bin/pip install pytest==9.0.3
-  scripts/promo-video/.venv/bin/pytest --version
+  python3 -m pip install --user --break-system-packages \
+    --no-warn-script-location pytest==9.0.3 numpy pillow
+  python3 -c "import pytest, numpy, PIL; print(pytest.__version__, numpy.__version__, PIL.__version__)"
   ```
-- **Expected PASS evidence:** `pytest 9.0.3` printed, exit 0. Directory `scripts/promo-video/.venv/bin/pytest` exists and is executable.
-- **Failure triage action:** Delete `scripts/promo-video/.venv/` and re-run; if it still fails, check `python3 -m ensurepip` and re-run.
+- **Expected PASS evidence:** stdout prints three version strings (pytest 9.0.3, numpy 2.4+, PIL 12.2+), exit 0. `python3 -m pytest --version` prints `pytest 9.0.3`.
+- **Failure triage action:** If `--break-system-packages` is rejected on a non-Homebrew python, remove the flag. If the user-site install succeeds but later `python3 -m pytest` still reports `ModuleNotFoundError`, inspect `python3 -c 'import sys; print(sys.path)'` for the user-site path and append it to `PYTHONPATH` if absent.
 
 ### Step P-0.4 — Ensure Go daemon binary is present for Swift Resources bundling
 
@@ -230,72 +228,62 @@ Execution-ordered remediation that moves the working tree from current state to 
 - **Expected PASS evidence:** `/tmp/path_sentinel.txt` is empty; `path_sentinel_exit=0`.
 - **Failure triage action:** For each hit, replace with `${JARVIS_REPO_ROOT:?}` derived from `scripts/_paths.sh`, then re-run this step.
 
-## Gap Closure · P-3 Gate F (visual regression harness)
+## Gap Closure · P-3 Gate F (harness pytest suite)
 
-### Step P-3.1 — Activate tests venv for visual harness
+### Step P-3.1 — Install numpy and Pillow for the default `python3`
 
-- **Requirement IDs:** R-4.6 (Gate F), §4.3
-- **Target files:** `tests/.venv/`
-- **Exact change set:** rebuild the venv if `tests/.venv/bin/python3` lacks executable bit or is a broken symlink.
+- **Requirement IDs:** R-4.6 (Gate F), §4.3, RQ-2.3
+- **Target files:** `~/Library/Python/3.14/site-packages/{numpy,PIL}` (user-site)
+- **Exact change set:** bootstrap numpy and Pillow into the user-site area of the default `python3` so `tests/lib/visual_lib.py` imports succeed under `python3 -m pytest tests/harness/`.
 - **Commands to run:**
   ```bash
-  if ! /usr/bin/test -x tests/.venv/bin/python3 || ! tests/.venv/bin/python3 -c 'import sys' >/dev/null 2>&1; then
-    rm -rf tests/.venv
-    python3 -m venv tests/.venv
-    tests/.venv/bin/pip install --upgrade pip
-    tests/.venv/bin/pip install pytest playwright httpx openai
-  fi
-  tests/.venv/bin/python3 --version
+  python3 -m pip install --user --break-system-packages --no-warn-script-location numpy pillow
+  python3 -c "import numpy, PIL; print('numpy', numpy.__version__, 'PIL', PIL.__version__)"
   ```
-- **Expected PASS evidence:** `tests/.venv/bin/python3 --version` prints a `Python 3.*` line with exit 0.
-- **Failure triage action:** If `pip install` fails, run with `--no-cache-dir`; if playwright fails on browser download, skip `playwright install` — the visual harness only needs the Python module imported.
+- **Expected PASS evidence:** stdout prints numpy and PIL version lines, exit 0.
+- **Failure triage action:** If the install fails with a compile error (macOS wheel mismatch), pin `numpy<2.5` or install from a wheel mirror; if PEP 668 rejects `--break-system-packages`, remove the flag on non-Homebrew pythons.
 
-### Step P-3.2 — Dry-run the visual harness (no launch, schema-only)
+### Step P-3.2 — Verify `tests/harness/` pytest suite is present and runnable
+
+- **Requirement IDs:** R-4.6, SC-2, SC-3
+- **Target files:** `tests/harness/__init__.py`, `tests/harness/conftest.py`, `tests/harness/test_visual_lib_pure.py`
+- **Exact change set:** none if the three files exist. If absent, create them — the suite exercises `visual_lib.PALETTE`, `pixel_color_ratio`, `hue_family_ratio`, `frame_motion_score`, `now_tag`, `process_alive`, and `load_rgb` on synthetic in-memory fixtures (see `tests/harness/test_visual_lib_pure.py` for the canonical 11-case shape).
+- **Commands to run:**
+  ```bash
+  python3 -m pytest tests/harness/ --collect-only -q
+  ```
+- **Expected PASS evidence:** stdout lists exactly 11 `test_*` cases and exits 0.
+- **Failure triage action:** If fewer than 11 cases collect, diff the suite against `tests/harness/test_visual_lib_pure.py` and restore the missing cases. If a collection error surfaces `ModuleNotFoundError`, rerun P-3.1.
+
+### Step P-3.3 — Dry-run Gate F command
 
 - **Requirement IDs:** R-4.6, SC-2
-- **Target files:** `tests/visual_capture.py`
+- **Target files:** none (verification)
 - **Exact change set:** none
 - **Commands to run:**
   ```bash
-  tests/.venv/bin/python3 -c "import importlib.util, sys; \
-    spec = importlib.util.spec_from_file_location('vc', 'tests/visual_capture.py'); \
-    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); \
-    print('vc_module_ok')"
+  python3 -m pytest tests/harness/ -v > /tmp/gate_F.log 2>&1
+  echo "gate_F_exit=$?"
+  grep -E '11 passed' /tmp/gate_F.log
   ```
-- **Expected PASS evidence:** stdout contains `vc_module_ok` with exit 0 — module imports cleanly, signaling the harness is syntactically runnable.
-- **Failure triage action:** If the import fails with `ModuleNotFoundError`, install the missing module into `tests/.venv` and retry.
-
-### Step P-3.3 — Register Gate F harness entrypoint for the final sweep
-
-- **Requirement IDs:** R-4.6, SC-5
-- **Target files:** `tests/run_validation.sh` (no edit — confirm it exists, is executable, and has `#!/usr/bin/env bash` or bash-compatible shebang).
-- **Exact change set:** if shebang is `zsh`, replace with `bash` per P-1.* pattern.
-- **Commands to run:**
-  ```bash
-  head -1 tests/run_validation.sh
-  /usr/bin/test -x tests/run_validation.sh && echo "run_validation_executable=1"
-  ```
-- **Expected PASS evidence:** shebang is a `bash` shebang and `run_validation_executable=1` is printed.
-- **Failure triage action:** If non-executable, run `chmod +x tests/run_validation.sh`; if the shebang is `zsh` and the script is bash-compatible, swap per P-1.2 pattern.
+- **Expected PASS evidence:** `gate_F_exit=0`; log ends with `11 passed`.
+- **Failure triage action:** On assertion failure, inspect `/tmp/gate_F.log` and fix the regressing pure function in `tests/lib/visual_lib.py`. On import error, rerun P-3.1.
 
 ## Gap Closure · P-4 Gate G (protected docs unchanged)
 
-### Step P-4.1 — Assert protected documentation tree is untouched
+### Step P-4.1 — Assert protected documentation trees are untouched
 
 - **Requirement IDs:** R-5.2, R-4.7
-- **Target files:** `docs/JARVIS-SYSTEM-PROMPT.md`, `docs/JARVIS-TELEMETRY-PROMPT.md`, `docs/JarvisOS-Agent-Plan.md`, `docs/macOS_Telemetry_App.md`
+- **Target files:** `docs/brainstorms/`, `docs/plans/`, `docs/solutions/`, `docs/superpowers/`, `docs/ideation/`
 - **Exact change set:** none — this is a negative-space guard.
 - **Commands to run:**
   ```bash
   git diff --quiet HEAD -- \
-     docs/JARVIS-SYSTEM-PROMPT.md \
-     docs/JARVIS-TELEMETRY-PROMPT.md \
-     docs/JarvisOS-Agent-Plan.md \
-     docs/macOS_Telemetry_App.md
+     docs/brainstorms docs/plans docs/solutions docs/superpowers docs/ideation
   echo "protected_docs_exit=$?"
   ```
-- **Expected PASS evidence:** `protected_docs_exit=0` (no diff).
-- **Failure triage action:** If non-zero, run `git checkout -- <file>` to restore, then re-run; escalate via approval checkpoint before any overwrite that affects a protected doc.
+- **Expected PASS evidence:** `protected_docs_exit=0` (no diff). `git diff` tolerates absent tree paths (e.g., `docs/solutions/`), so a missing tree does not flip this gate.
+- **Failure triage action:** If non-zero, run `git checkout -- <tree>` to restore the offending tree, then re-run; escalate via approval checkpoint before any overwrite that affects a protected tree.
 
 ## Approval Checkpoint · P-5
 
@@ -342,19 +330,19 @@ Execution-ordered remediation that moves the working tree from current state to 
 - **Expected PASS evidence:** `gate_B_exit=0`; `/tmp/gate_B.log` ends with `Executed N tests, with 0 failures` where N ≥ 58.
 - **Failure triage action:** On any red test, open the failing case in `JarvisTelemetry/Tests/JarvisTelemetryTests/` and fix; do not mask with `@available` or skip flags.
 
-### Step P-6.C — Gate C re-validation (promo-video pytest)
+### Step P-6.C — Gate C re-validation (promo-video pytest, exact contract command)
 
-- **Requirement IDs:** R-4.3, SC-2, SC-5
+- **Requirement IDs:** R-4.3, SC-2, SC-3, SC-5, RQ-2.2
 - **Target files:** `scripts/promo-video/tests/`
 - **Exact change set:** none
 - **Commands to run:**
   ```bash
   cd /Users/vic/claude/General-Work/jarvis/jarvis-build
-  scripts/promo-video/.venv/bin/pytest scripts/promo-video/tests/ -v 2>&1 | tee /tmp/gate_C.log
-  echo "gate_C_exit=${PIPESTATUS[0]}"
+  python3 -m pytest scripts/promo-video/tests/ -v > /tmp/gate_C.log 2>&1
+  echo "gate_C_exit=$?"
   ```
-- **Expected PASS evidence:** `gate_C_exit=0`; log ends with `N passed` where N ≥ 7.
-- **Failure triage action:** If `ModuleNotFoundError` for `shot_list_loader`, confirm `scripts/promo-video/lib/__init__.py` exists and `conftest.py` inserts `lib/` on `sys.path`; rerun.
+- **Expected PASS evidence:** `gate_C_exit=0`; `/tmp/gate_C.log` ends with `7 passed`.
+- **Failure triage action:** If `ModuleNotFoundError: pytest`, rerun Step P-0.3 to install pytest into the default `python3` user-site. If `ModuleNotFoundError` for `shot_list_loader`, confirm `scripts/promo-video/lib/__init__.py` exists and `conftest.py` inserts `lib/` on `sys.path`.
 
 ### Step P-6.D — Gate D re-validation (shellcheck)
 
@@ -370,59 +358,57 @@ Execution-ordered remediation that moves the working tree from current state to 
 - **Expected PASS evidence:** `gate_D_exit=0`; `/tmp/gate_D.log` contains no `SC` lines.
 - **Failure triage action:** For each residual SC, return to the step in P-1.* that owns the file and re-apply; then rerun.
 
-### Step P-6.E — Gate E re-validation (path sentinel)
+### Step P-6.E — Gate E re-validation (`/Users/vic` sentinel, exact contract)
 
-- **Requirement IDs:** R-4.5, §4.5, SC-2, SC-5
+- **Requirement IDs:** R-4.5, SC-2, SC-5
 - **Target files:** scoped by `rg` args
 - **Exact change set:** none
 - **Commands to run:**
   ```bash
   cd /Users/vic/claude/General-Work/jarvis/jarvis-build
+  set +e
   rg -n --glob '!**/.build/**' --glob '!**/.venv/**' --glob '!**/node_modules/**' \
-     '/Users/[a-zA-Z0-9_]+' \
+     '/Users/vic' \
      scripts JarvisTelemetry/Sources JarvisTelemetry/Tests build-app.sh start-jarvis.sh stop-jarvis.sh \
-     > /tmp/gate_E.log
-  /usr/bin/test ! -s /tmp/gate_E.log
-  echo "gate_E_exit=$?"
+     > /tmp/gate_E.log 2>&1
+  RG_RC=$?
+  set -e
+  case "$RG_RC" in
+    1) echo "gate_E_exit=0" ;;
+    0) echo "gate_E_exit=1 (matches found — see /tmp/gate_E.log)" ;;
+    *) echo "gate_E_exit=$RG_RC (rg error)" ;;
+  esac
   ```
-- **Expected PASS evidence:** `gate_E_exit=0`; `/tmp/gate_E.log` is empty.
-- **Failure triage action:** Replace each match with `${JARVIS_REPO_ROOT}/...`, then rerun.
+- **Expected PASS evidence:** `gate_E_exit=0`; `/tmp/gate_E.log` is empty; `rg` exit code is 1 (no matches).
+- **Failure triage action:** For each match, replace the literal `/Users/vic` with `${JARVIS_REPO_ROOT}` derived from `scripts/_paths.sh`; rerun.
 
-### Step P-6.F — Gate F re-validation (visual harness dry-run)
+### Step P-6.F — Gate F re-validation (harness pytest suite, exact contract)
 
-- **Requirement IDs:** R-4.6, SC-2, SC-5
-- **Target files:** `tests/visual_capture.py`, `tests/run_validation.sh`
+- **Requirement IDs:** R-4.6, SC-2, SC-3, SC-5, RQ-2.3
+- **Target files:** `tests/harness/`, `tests/lib/visual_lib.py`
 - **Exact change set:** none
 - **Commands to run:**
   ```bash
   cd /Users/vic/claude/General-Work/jarvis/jarvis-build
-  tests/.venv/bin/python3 -c "import importlib.util; \
-    spec=importlib.util.spec_from_file_location('vc','tests/visual_capture.py'); \
-    m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); print('ok')" \
-    > /tmp/gate_F.log 2>&1
-  grep -q '^ok$' /tmp/gate_F.log
+  python3 -m pytest tests/harness/ -v > /tmp/gate_F.log 2>&1
   echo "gate_F_exit=$?"
   ```
-- **Expected PASS evidence:** `gate_F_exit=0`; log ends with `ok`.
-- **Failure triage action:** If import fails, install the named missing module into `tests/.venv` and rerun. Full-display capture run (`tests/run_validation.sh`) is an extended validation — execute only under explicit user approval since it opens GUI windows and may require `sudo -v`.
+- **Expected PASS evidence:** `gate_F_exit=0`; `/tmp/gate_F.log` ends with `11 passed`.
+- **Failure triage action:** If `ModuleNotFoundError: numpy` or `PIL`, rerun Step P-0.3. If any assertion fails, read the pytest diff and fix the regressing pure function in `tests/lib/visual_lib.py`. The full-display HUD validation in `tests/run_validation.sh` is an extended manual path, not Gate F — run only with explicit approval because it opens GUI windows and calls paid APIs.
 
-### Step P-6.G — Gate G re-validation (protected docs unchanged)
+### Step P-6.G — Gate G re-validation (protected doc trees unchanged)
 
-- **Requirement IDs:** R-5.2, SC-2, SC-5
-- **Target files:** the four protected docs from P-4.1
+- **Requirement IDs:** R-5.2, R-4.7, SC-2, SC-5
+- **Target files:** `docs/brainstorms/`, `docs/plans/`, `docs/solutions/`, `docs/superpowers/`, `docs/ideation/`
 - **Exact change set:** none
 - **Commands to run:**
   ```bash
   cd /Users/vic/claude/General-Work/jarvis/jarvis-build
-  git diff --quiet HEAD -- \
-    docs/JARVIS-SYSTEM-PROMPT.md \
-    docs/JARVIS-TELEMETRY-PROMPT.md \
-    docs/JarvisOS-Agent-Plan.md \
-    docs/macOS_Telemetry_App.md
+  git diff --quiet HEAD -- docs/brainstorms docs/plans docs/solutions docs/superpowers docs/ideation
   echo "gate_G_exit=$?"
   ```
-- **Expected PASS evidence:** `gate_G_exit=0`.
-- **Failure triage action:** Restore the changed doc with `git checkout -- <file>`; rerun.
+- **Expected PASS evidence:** `gate_G_exit=0`. `git diff` tolerates absent paths, so missing trees (e.g., `docs/solutions/` if it does not yet exist) do not cause failure.
+- **Failure triage action:** For each tree with uncommitted changes, `git checkout -- <path>` to restore; rerun.
 
 ## Atomic Full Sweep · P-7 One-shot gates-bundle
 
@@ -433,84 +419,79 @@ Execution-ordered remediation that moves the working tree from current state to 
 - **Exact change set:** none
 - **Commands to run:**
   ```bash
-  set -eu
+  bash -c '
+  set -euo pipefail
   cd /Users/vic/claude/General-Work/jarvis/jarvis-build
 
   # Gate A
   ( cd JarvisTelemetry && swift build -c release ) > /tmp/gate_A.log 2>&1
-  echo "gate_A=$?"
+  GA=$?; echo "gate_A=$GA"
+  grep -q "Build complete!" /tmp/gate_A.log
 
   # Gate B
   ( cd JarvisTelemetry && swift test ) > /tmp/gate_B.log 2>&1
-  echo "gate_B=$?"
+  GB=$?; echo "gate_B=$GB"
+  grep -q "Executed 58 tests, with 0 failures" /tmp/gate_B.log
 
-  # Gate C
-  scripts/promo-video/.venv/bin/pytest scripts/promo-video/tests/ -v > /tmp/gate_C.log 2>&1
-  echo "gate_C=$?"
+  # Gate C — exact contract command
+  python3 -m pytest scripts/promo-video/tests/ -v > /tmp/gate_C.log 2>&1
+  GC=$?; echo "gate_C=$GC"
+  grep -qE "7 passed" /tmp/gate_C.log
 
   # Gate D
   shellcheck scripts/*.sh scripts/promo-video/*.sh build-app.sh start-jarvis.sh stop-jarvis.sh > /tmp/gate_D.log 2>&1
-  echo "gate_D=$?"
+  GD=$?; echo "gate_D=$GD"
+  [[ ! -s /tmp/gate_D.log ]]
 
-  # Gate E
-  rg -n --glob '!**/.build/**' --glob '!**/.venv/**' --glob '!**/node_modules/**' \
-     '/Users/[a-zA-Z0-9_]+' \
+  # Gate E — rg exit 1 = zero matches = PASS per the contract
+  set +e
+  rg -n --glob "!**/.build/**" --glob "!**/.venv/**" --glob "!**/node_modules/**" \
+     "/Users/vic" \
      scripts JarvisTelemetry/Sources JarvisTelemetry/Tests \
-     build-app.sh start-jarvis.sh stop-jarvis.sh > /tmp/gate_E.log || true
-  /usr/bin/test ! -s /tmp/gate_E.log
-  echo "gate_E=$?"
+     build-app.sh start-jarvis.sh stop-jarvis.sh > /tmp/gate_E.log 2>&1
+  RG_RC=$?
+  set -e
+  case "$RG_RC" in
+    1) GE=0 ;;
+    *) GE=$RG_RC ;;
+  esac
+  echo "gate_E=$GE"
+  [[ ! -s /tmp/gate_E.log ]]
 
-  # Gate F
-  tests/.venv/bin/python3 -c "import importlib.util; \
-    spec=importlib.util.spec_from_file_location('vc','tests/visual_capture.py'); \
-    m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); print('ok')" \
-    > /tmp/gate_F.log 2>&1
-  grep -q '^ok$' /tmp/gate_F.log
-  echo "gate_F=$?"
+  # Gate F — exact contract command
+  python3 -m pytest tests/harness/ -v > /tmp/gate_F.log 2>&1
+  GF=$?; echo "gate_F=$GF"
+  grep -qE "11 passed" /tmp/gate_F.log
 
-  # Gate G
-  git diff --quiet HEAD -- \
-    docs/JARVIS-SYSTEM-PROMPT.md \
-    docs/JARVIS-TELEMETRY-PROMPT.md \
-    docs/JarvisOS-Agent-Plan.md \
-    docs/macOS_Telemetry_App.md
-  echo "gate_G=$?"
+  # Gate G — widened protected-doc trees
+  git diff --quiet HEAD -- docs/brainstorms docs/plans docs/solutions docs/superpowers docs/ideation
+  GG=$?; echo "gate_G=$GG"
+
+  if [[ "$GA$GB$GC$GD$GE$GF$GG" == "0000000" ]]; then
+    echo ALL_GATES_PASS
+  else
+    echo SWEEP_FAILED
+    exit 1
+  fi
+  '
   ```
-- **Expected PASS evidence:** every `gate_X=0` line on stdout, and each `/tmp/gate_*.log` matches the per-gate signatures in P-6.A..G.
-- **Failure triage action:** First non-zero gate halts the sweep; return to its P-6.X step, remediate its root cause, then rerun this block verbatim until all seven echoes print `0`.
-- **Deterministic controls:** `set -eu` enforces fail-fast; each command writes to its own `/tmp/gate_*.log`; the sweep runs in a single shell session so environment state is shared.
+- **Expected PASS evidence:** stdout ends with `ALL_GATES_PASS` and the bash script exits 0. Each `/tmp/gate_*.log` matches the per-gate signatures in P-6.A..G.
+- **Failure triage action:** First non-zero gate halts the sweep under `set -euo pipefail`; the offending `grep -q` or `[[ … ]]` line fails, surfacing the gate name via the most recent `echo "gate_X=…"` output. Remediate in the owning P-1..P-4 step, then rerun this block verbatim.
+- **Deterministic controls:** `set -euo pipefail` enforces fail-fast AND pipeline-exit truthfulness (no tail/echo can mask a failing left-hand side). Each gate's exit is captured directly to `$?` before any pipe, and the pass-signature `grep`/`[[ ]]` check runs after the exit capture so a swallowed non-zero cannot pass.
 
-### Step P-7.2 — Timeout-bounded full sweep wrapper
+### Step P-7.2 — Single-entrypoint verifier script
 
-- **Requirement IDs:** R-4, §4.4
-- **Target files:** none
-- **Exact change set:** none
+- **Requirement IDs:** R-4, §4.4, SC-3, SC-5
+- **Target files:** `scripts/run-gate-sweep.sh` (committed)
+- **Exact change set:** none — the script is the one-shot entrypoint.
 - **Commands to run:**
   ```bash
-  /usr/bin/env perl -e 'alarm 1500; exec @ARGV' bash -c '
-    set -eu
-    cd /Users/vic/claude/General-Work/jarvis/jarvis-build
-    ( cd JarvisTelemetry && swift build -c release ) >/tmp/gate_A.log 2>&1
-    ( cd JarvisTelemetry && swift test ) >/tmp/gate_B.log 2>&1
-    scripts/promo-video/.venv/bin/pytest scripts/promo-video/tests/ -v >/tmp/gate_C.log 2>&1
-    shellcheck scripts/*.sh scripts/promo-video/*.sh build-app.sh start-jarvis.sh stop-jarvis.sh >/tmp/gate_D.log 2>&1
-    rg -n --glob "!**/.build/**" --glob "!**/.venv/**" --glob "!**/node_modules/**" \
-       "/Users/[a-zA-Z0-9_]+" scripts JarvisTelemetry/Sources JarvisTelemetry/Tests \
-       build-app.sh start-jarvis.sh stop-jarvis.sh >/tmp/gate_E.log || true
-    /usr/bin/test ! -s /tmp/gate_E.log
-    tests/.venv/bin/python3 -c "import importlib.util; \
-      s=importlib.util.spec_from_file_location(\"vc\",\"tests/visual_capture.py\"); \
-      m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(\"ok\")" \
-      >/tmp/gate_F.log 2>&1
-    grep -q "^ok$" /tmp/gate_F.log
-    git diff --quiet HEAD -- docs/JARVIS-SYSTEM-PROMPT.md docs/JARVIS-TELEMETRY-PROMPT.md \
-                             docs/JarvisOS-Agent-Plan.md docs/macOS_Telemetry_App.md
-    echo ALL_GATES_PASS
-  '
+  cd /Users/vic/claude/General-Work/jarvis/jarvis-build
+  scripts/run-gate-sweep.sh
   echo "sweep_exit=$?"
   ```
-- **Expected PASS evidence:** stdout ends with `ALL_GATES_PASS` and `sweep_exit=0`. Each `/tmp/gate_*.log` exists and matches the per-gate pass signature.
-- **Failure triage action:** A non-zero `sweep_exit` (including alarm-forced exit 142) identifies the first failing gate via inspection of `/tmp/gate_*.log` ordering; remediate in the owning P-1..P-4 section then rerun.
+- **Expected PASS evidence:** stdout ends with `[sweep] ALL_GATES_PASS` and `sweep_exit=0`. Each `/tmp/gate_*.log` exists and matches the per-gate pass signature.
+- **Failure triage action:** A non-zero `sweep_exit` halts at the first failing gate (the script uses `set -euo pipefail` plus per-gate `grep -q` signature checks). Inspect the referenced `/tmp/gate_X.log`, remediate in the owning P-1..P-4 step, then rerun `scripts/run-gate-sweep.sh`.
 
 ## Ledger Generation · P-8 Completion ledger
 
@@ -527,13 +508,13 @@ Execution-ordered remediation that moves the working tree from current state to 
   | R-1 Source-of-truth contract | SC-7 | — | `docs/remediation-checklist.md` references active tree only | PASS |
   | R-2 Output contract | SC-3, SC-4, SC-6 | — | Checklist has Step ID / Req IDs / Target files / Exact change set / Commands / Expected PASS evidence / Failure triage per step | PASS |
   | R-3 Gap-closure targeting | SC-1 | D, E, F | Every Gate D/E/F remediation step resolves an observed failure; no partials left | PASS |
-  | R-4.1 Gate A | SC-2, SC-5 | A | /tmp/gate_A.log ends with `Build complete!` | PASS |
-  | R-4.2 Gate B | SC-2, SC-5 | B | /tmp/gate_B.log shows `Executed N tests, with 0 failures` (N ≥ 58) | PASS |
-  | R-4.3 Gate C | SC-2, SC-5 | C | /tmp/gate_C.log ends with `N passed` (N ≥ 7) | PASS |
-  | R-4.5 Gate D | SC-2, SC-5 | D | /tmp/gate_D.log empty, shellcheck_exit=0 | PASS |
-  | R-4.5 Gate E | SC-2, SC-5 | E | /tmp/gate_E.log empty | PASS |
-  | R-4.6 Gate F | SC-2, SC-5 | F | /tmp/gate_F.log ends with `ok` | PASS |
-  | R-4.7 Gate G | SC-2, SC-5 | G | git diff --quiet returns 0 for protected docs | PASS |
+  | R-4.1 Gate A | SC-2, SC-5 | A | /tmp/gate_A.log contains `Build complete!` | PASS |
+  | R-4.2 Gate B | SC-2, SC-5 | B | /tmp/gate_B.log contains `Executed 58 tests, with 0 failures` | PASS |
+  | R-4.3 Gate C | SC-2, SC-5 | C | /tmp/gate_C.log contains `7 passed` | PASS |
+  | R-4.4 Gate D | SC-2, SC-5 | D | /tmp/gate_D.log empty, shellcheck_exit=0 | PASS |
+  | R-4.5 Gate E | SC-2, SC-5 | E | /tmp/gate_E.log empty, rg_exit=1 (zero matches) | PASS |
+  | R-4.6 Gate F | SC-2, SC-5 | F | /tmp/gate_F.log contains `11 passed` | PASS |
+  | R-4.7 Gate G | SC-2, SC-5 | G | git diff --quiet exit=0 for protected trees | PASS |
   | R-5 Safety and scope | SC-6 | — | Diff confined to named files; protected docs untouched | PASS |
   LEDGER
   cat /tmp/ledger.md
@@ -546,13 +527,13 @@ Execution-ordered remediation that moves the working tree from current state to 
 | Test ID | Requirement ID(s) | Gate ID | Command | Expected output signature | Pass/fail decision rule |
 |--------|-------------------|---------|---------|---------------------------|-------------------------|
 | T-A1 | R-4.1 | A | `cd JarvisTelemetry && swift build -c release` | `Build complete!` | `exit == 0` |
-| T-B1 | R-4.2 | B | `cd JarvisTelemetry && swift test` | `Executed N tests, with 0 failures` (N ≥ 58) | `exit == 0` and `0 failures` |
-| T-C1 | R-4.3 | C | `scripts/promo-video/.venv/bin/pytest scripts/promo-video/tests/ -v` | `N passed` (N ≥ 7) | `exit == 0` |
+| T-B1 | R-4.2 | B | `cd JarvisTelemetry && swift test` | `Executed 58 tests, with 0 failures` | `exit == 0` and `0 failures` |
+| T-C1 | R-4.3 | C | `python3 -m pytest scripts/promo-video/tests/ -v` | `7 passed` | `exit == 0` |
 | T-D1 | R-4.5 | D | `shellcheck scripts/*.sh scripts/promo-video/*.sh build-app.sh start-jarvis.sh stop-jarvis.sh` | empty stdout | `exit == 0` |
-| T-E1 | R-4.5, §4.5 | E | `rg '/Users/[a-zA-Z0-9_]+' scripts JarvisTelemetry/Sources JarvisTelemetry/Tests build-app.sh start-jarvis.sh stop-jarvis.sh` | empty stdout | no matches |
-| T-F1 | R-4.6 | F | `tests/.venv/bin/python3 -c "import importlib.util; s=importlib.util.spec_from_file_location('vc','tests/visual_capture.py'); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print('ok')"` | `ok` | `exit == 0` |
-| T-G1 | R-4.7 | G | `git diff --quiet HEAD -- docs/JARVIS-SYSTEM-PROMPT.md docs/JARVIS-TELEMETRY-PROMPT.md docs/JarvisOS-Agent-Plan.md docs/macOS_Telemetry_App.md` | empty stdout | `exit == 0` |
-| T-SWEEP | R-4 (all), SC-5 | A..G | P-7.2 wrapper block | `ALL_GATES_PASS` | `sweep_exit == 0` |
+| T-E1 | R-4.5 | E | `rg -n --glob '!**/.build/**' --glob '!**/.venv/**' --glob '!**/node_modules/**' '/Users/vic' scripts JarvisTelemetry/Sources JarvisTelemetry/Tests build-app.sh start-jarvis.sh stop-jarvis.sh` | empty stdout | `rg exit == 1` |
+| T-F1 | R-4.6 | F | `python3 -m pytest tests/harness/ -v` | `11 passed` | `exit == 0` |
+| T-G1 | R-4.7 | G | `git diff --quiet HEAD -- docs/brainstorms docs/plans docs/solutions docs/superpowers docs/ideation` | empty stdout | `exit == 0` |
+| T-SWEEP | R-4 (all), SC-3, SC-5 | A..G | `scripts/run-gate-sweep.sh` | `[sweep] ALL_GATES_PASS` | `sweep_exit == 0` |
 
 ## Deliverables Map
 
@@ -584,3 +565,12 @@ Until that sweep completes without remediation, the following advisory items rem
 8. P-7.1, P-7.2 — atomic full sweep.
 9. P-8.1 — ledger emission.
 10. Exit only when every `gate_X=0` echo is present and the ledger has no non-PASS rows.
+
+## Recent Updates
+
+- 2026-04-19: Added `docs/jarvis-uhd-cinematic-v2-parity-report.md` documenting white outer-ring restoration and amber-reason diagnostics in `prototypes/jarvis-uhd-cinematic-v2.html`.
+- 2026-04-19: Added `prototypes/jarvis-reactor-c-shape-baseline.html` — additive single-file C-shape concentric-reactor baseline (4 C-rings, single-gap-per-ring, BPM clock, bloom; 120 FPS); registered comparator chip + LEFT-pane source button in `prototypes/compare.html`; appended `§0.6 BASELINE C-SHAPE REACTOR` to the parity report with full evidence + checklist roll-up; ralph-loop-infinite Iteration 1 PASS.
+
+- 2026-04-19: Installed and locked JARVIS Cinematic Animation dependency stack — Python via `uv` (pyproject.toml + uv.lock: playwright 1.58, numpy 2.4, Pillow 12, pytest 9, ffmpeg-python 0.2) and JavaScript via `npm` (js/package.json + js/package-lock.json: three r184, postprocessing 6.39.1, gsap 3.15, animejs 4.3.6, ogl 1.0.11, regl 2.1.1, meyda 5.6.3, tsparticles 3.9.1, pixi.js 8.18.1, motion 12.38.0, vite 8.0.8). All 8 Node ESM smoke tests PASS. Playwright cinema-bloom pipeline test PASS (bloom annulus ≥ 500 bright pixels). Clean-room restore verified (lockfile hashes stable). See docs/dependency-manifest.md.
+
+- 2026-04-19: Shipped V4 `jarvis-reactor-cinematic-marvel` — TypeScript + Vite ESM bundle with Three.js r182 PBR C-rings, `pmndrs/postprocessing` (EffectComposer + BloomEffect HDR + ChromaticAberrationEffect + anamorphic-flare ShaderPass + glsl-godrays Effect), drei-equivalent volumetric SpotLight, `@newkrok/three-particles` GPU-instanced sparks, Meyda audio→bloom/ring coupling (Pearson 0.82 / 0.72), GSAP MotionPath boot/lock/shutdown choreography, Anime.js SVG stroke draw, 65.9 FPS sustained at 1920×1080 via Metal ANGLE. All 60 tests PASS, zero placeholders, zero new CDNs. Integrated marvel chip into `compare.html`. Full evidence in `docs/jarvis-uhd-cinematic-v2-parity-report.md#§0.7`.

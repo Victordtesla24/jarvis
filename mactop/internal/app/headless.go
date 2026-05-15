@@ -449,10 +449,96 @@ func getHeadlessNetworkLinks() HeadlessNetworkLinks {
 	return links
 }
 
+// collectHeadlessTickCount counts how many headless samples have been
+// collected. Used to stratify slow-changing collectors (process list,
+// disk volumes, network link table, Thunderbolt topology, RDMA device
+// list) to one-in-four ticks. CPU/GPU/memory/thermal still sample every
+// tick. Pure CPU win — the cached values are reused on intermediate
+// ticks so the JSON schema is unchanged.
+var collectHeadlessTickCount uint64
+
+// Cached slow-changing fields, refreshed every collectStratifyEvery
+// ticks. Preserves output schema while cutting per-tick syscalls by
+// ~75% for users (like JARVIS) that don't display these fields.
+var (
+	cachedHeadlessProcesses    []HeadlessProcess
+	cachedHeadlessNetworkLinks HeadlessNetworkLinks
+	cachedHeadlessVolumes      []HeadlessVolume
+	cachedTBNetTotalIn         float64
+	cachedTBNetTotalOut        float64
+	cachedRDMAStatus           RDMAStatus
+)
+
+const collectStratifyEvery = 4
+
+// refreshSlowTBRDMA samples Thunderbolt network stats + RDMA every Nth
+// tick. Both walk IOKit registries and rarely change tick-to-tick.
+// Returns the (cached or freshly-sampled) totals + RDMAStatus.
+func refreshSlowTBRDMA(tbInfo *ThunderboltOutput, refreshSlow bool) (float64, float64, RDMAStatus) {
+	if !refreshSlow {
+		return cachedTBNetTotalIn, cachedTBNetTotalOut, cachedRDMAStatus
+	}
+	var tbNetTotalIn, tbNetTotalOut float64
+	tbNetStats := GetThunderboltNetStats()
+	for _, stat := range tbNetStats {
+		tbNetTotalIn += stat.BytesInPerSec
+		tbNetTotalOut += stat.BytesOutPerSec
+	}
+	mapTBNetStatsToBuses(tbNetStats, tbInfo)
+	rdmaStatus := CheckRDMAAvailable()
+	mapRDMADevicesToBuses(rdmaStatus.Devices, tbInfo)
+	cachedTBNetTotalIn = tbNetTotalIn
+	cachedTBNetTotalOut = tbNetTotalOut
+	cachedRDMAStatus = rdmaStatus
+	return tbNetTotalIn, tbNetTotalOut, rdmaStatus
+}
+
+// refreshSlowEnumerations samples the top-20 process list, network
+// link table, and volume list every Nth tick. PID enumeration via
+// sysctl(KERN_PROC_ALL) and statfs walks are the dominant per-tick
+// daemon cost; the HUD render path does not consume these fields, so
+// stratifying yields a large CPU win.
+func refreshSlowEnumerations(gpuActive float64, refreshSlow bool) ([]HeadlessProcess, HeadlessNetworkLinks, []HeadlessVolume) {
+	if !refreshSlow {
+		return cachedHeadlessProcesses, cachedHeadlessNetworkLinks, cachedHeadlessVolumes
+	}
+	var headlessProcesses []HeadlessProcess
+	if procs, err := getProcessList(gpuActive); err == nil {
+		limit := min(len(procs), 20)
+		for _, p := range procs[:limit] {
+			headlessProcesses = append(headlessProcesses, HeadlessProcess{
+				PID:     p.PID,
+				Command: p.Command,
+				CPU:     p.CPU,
+				GPU:     p.GPU,
+				Memory:  p.Memory,
+				RSS:     p.RSS,
+			})
+		}
+	}
+	networkLinks := getHeadlessNetworkLinks()
+	var headlessVolumes []HeadlessVolume
+	for _, v := range getVolumes() {
+		headlessVolumes = append(headlessVolumes, HeadlessVolume{
+			Name:    v.Name,
+			TotalGB: v.Total,
+			UsedGB:  v.Used,
+			UsedPct: v.UsedPct,
+		})
+	}
+	cachedHeadlessProcesses = headlessProcesses
+	cachedHeadlessNetworkLinks = networkLinks
+	cachedHeadlessVolumes = headlessVolumes
+	return headlessProcesses, networkLinks, headlessVolumes
+}
+
 func collectHeadlessData(tbInfo *ThunderboltOutput, sysInfo SystemInfo) HeadlessOutput {
 	m := sampleSocMetrics(updateInterval)
 	mem := getMemoryMetrics()
 	netDisk := getNetDiskMetrics()
+	tickIdx := collectHeadlessTickCount
+	collectHeadlessTickCount++
+	refreshSlow := tickIdx%collectStratifyEvery == 0
 
 	// ── JARVIS Custom Metric Collection ──────────────────────────────────────
 	chipLabel := sysInfo.Name
@@ -497,18 +583,9 @@ func collectHeadlessData(tbInfo *ThunderboltOutput, sysInfo SystemInfo) Headless
 	m.SystemPower = residualSystem
 	m.TotalPower = totalPower
 
-	tbNetStats := GetThunderboltNetStats()
-	var tbNetTotalIn, tbNetTotalOut float64
-	for _, stat := range tbNetStats {
-		tbNetTotalIn += stat.BytesInPerSec
-		tbNetTotalOut += stat.BytesOutPerSec
-	}
-
-	mapTBNetStatsToBuses(tbNetStats, tbInfo)
-
-	// Get RDMA status and map devices to TB buses
-	rdmaStatus := CheckRDMAAvailable()
-	mapRDMADevicesToBuses(rdmaStatus.Devices, tbInfo)
+	// Thunderbolt network stats + RDMA only refresh every Nth tick.
+	// Both involve IOKit registry walks that rarely change tick-to-tick.
+	tbNetTotalIn, tbNetTotalOut, rdmaStatus := refreshSlowTBRDMA(tbInfo, refreshSlow)
 
 	// Calculate TFLOPs
 	var fp32TFLOPs, fp16TFLOPs float64
@@ -518,35 +595,9 @@ func collectHeadlessData(tbInfo *ThunderboltOutput, sysInfo SystemInfo) Headless
 		fp16TFLOPs = fp32TFLOPs * 2
 	}
 
-	// Collect per-process metrics (top 20 by CPU, includes GPU time)
-	var headlessProcesses []HeadlessProcess
-	if procs, err := getProcessList(m.GPUActive); err == nil {
-		limit := min(len(procs), 20)
-		for _, p := range procs[:limit] {
-			headlessProcesses = append(headlessProcesses, HeadlessProcess{
-				PID:     p.PID,
-				Command: p.Command,
-				CPU:     p.CPU,
-				GPU:     p.GPU,
-				Memory:  p.Memory,
-				RSS:     p.RSS,
-			})
-		}
-	}
-
-	// Collect network link speed info
-	networkLinks := getHeadlessNetworkLinks()
-
-	// Collect disk volume info
-	var headlessVolumes []HeadlessVolume
-	for _, v := range getVolumes() {
-		headlessVolumes = append(headlessVolumes, HeadlessVolume{
-			Name:    v.Name,
-			TotalGB: v.Total,
-			UsedGB:  v.Used,
-			UsedPct: v.UsedPct,
-		})
-	}
+	// Per-process metrics, network link speeds, and disk volumes all
+	// rarely change tick-to-tick. Stratified into one helper.
+	headlessProcesses, networkLinks, headlessVolumes := refreshSlowEnumerations(m.GPUActive, refreshSlow)
 
 	orderedTemps := buildHeadlessTempGroups(m.TempSensors, sysInfo)
 	headlessFans := buildHeadlessFans(m.Fans)

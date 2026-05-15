@@ -1,0 +1,54 @@
+[
+  {
+    "width": 375,
+    "height": 812,
+    "console_errors": [],
+    "request_failed": [],
+    "layout_probe": {
+      "hasHOverflow": false,
+      "hasVOverflow": false,
+      "width": 375,
+      "height": 812
+    },
+    "screenshot": "/Users/vic/claude/General-Work/jarvis/jarvis-build/docs/smoke-results/ralph-loop-visual/jarvis-375.png"
+  },
+  {
+    "width": 768,
+    "height": 812,
+    "console_errors": [],
+    "request_failed": [],
+    "layout_probe": {
+      "hasHOverflow": false,
+      "hasVOverflow": false,
+      "width": 768,
+      "height": 812
+    },
+    "screenshot": "/Users/vic/claude/General-Work/jarvis/jarvis-build/docs/smoke-results/ralph-loop-visual/jarvis-768.png"
+  },
+  {
+    "width": 1280,
+    "height": 1080,
+    "console_errors": [],
+    "request_failed": [],
+    "layout_probe": {
+      "hasHOverflow": false,
+      "hasVOverflow": false,
+      "width": 1280,
+      "height": 1080
+    },
+    "screenshot": "/Users/vic/claude/General-Work/jarvis/jarvis-build/docs/smoke-results/ralph-loop-visual/jarvis-1280.png"
+  },
+  {
+    "width": 1920,
+    "height": 1080,
+    "console_errors": [],
+    "request_failed": [],
+    "layout_probe": {
+      "hasHOverflow": false,
+      "hasVOverflow": false,
+      "width": 1920,
+      "height": 1080
+    },
+    "screenshot": "/Users/vic/claude/General-Work/jarvis/jarvis-build/docs/smoke-results/ralph-loop-visual/jarvis-1920.png"
+  }
+]

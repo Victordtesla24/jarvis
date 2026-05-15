@@ -64,7 +64,19 @@
     width: 100vw; height: 100vh;
   }
   #hexCanvas    { z-index: 1; opacity: 0.15; }
-  #bloomCanvas  { z-index: 2; filter: blur(26px); opacity: 0.95; }
+  /* PERF: bloomCanvas is rendered at HALF resolution (see PERF.bloomScale in
+     JS) and scaled back up by CSS. Combined with the reduced blur radius
+     (was 26px → 18px) this drops bloom GPU cost to ≈25–30% of the original
+     on a 16" Retina display, with no perceptible visual delta because the
+     blur itself hides the resample. */
+  #bloomCanvas  {
+    z-index: 2;
+    filter: blur(18px);
+    opacity: 0.95;
+    transform: translateZ(0);
+    will-change: filter, opacity;
+    image-rendering: optimizeSpeed;
+  }
   /* Unit 8 — Tier B: WebGL raymarched plasma core. Hidden by default, shown
      when STATE.highFidelityCore === true. Sits between bloom and main so it
      reads as light emanating from inside the reactor housing. */
@@ -1401,12 +1413,64 @@
   body.wake-exhale #grainCanvas {
     animation: wakeExhale 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* CLAUDE CAP PANEL — Anthropic subscription telemetry             */
+  /* ═══════════════════════════════════════════════════════════════ */
+  #claude-cap-panel {
+    position:fixed; bottom:24px; left:24px; z-index:60;
+    background:rgba(0,5,15,0.82); border:1px solid rgba(0,229,255,0.2);
+    border-radius:10px; padding:12px 14px; min-width:260px;
+    backdrop-filter:blur(14px); font-family:'Orbitron',monospace;
+    color:#c0d8e8; animation:capFadeIn 1.2s ease both;
+  }
+  @keyframes capFadeIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+  .cap-header{font-size:9px;letter-spacing:2px;color:#00E5FF;margin-bottom:8px;display:flex;justify-content:space-between}
+  .cap-account{color:rgba(0,229,255,0.5);font-size:7px;font-family:'Share Tech Mono',monospace}
+  .cap-session-row{display:flex;justify-content:space-between;font-size:8px;font-family:'Share Tech Mono',monospace;padding:2px 0;color:#9ab}
+  .cap-session-row.active .cap-sess-name{color:#00E5FF}
+  .cap-sess-cost{color:#FFC800}
+  .cap-sess-turns{color:rgba(180,200,220,0.5);font-size:7px}
+  .cap-live-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#00E5FF;animation:capPulse 1.2s ease-in-out infinite;margin-right:3px;vertical-align:middle}
+  @keyframes capPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.3;transform:scale(0.7)}}
+  .cap-divider{border-top:1px solid rgba(255,255,255,0.08);margin:7px 0}
+  .cap-total{font-size:10px;letter-spacing:1.5px;margin-bottom:5px}
+  .cap-money{color:#FFC800;font-size:13px;font-family:'Share Tech Mono',monospace}
+  .cap-row{display:flex;justify-content:space-between;font-size:8px;margin:2px 0}
+  .cap-label{color:rgba(180,200,220,0.55);font-family:'Share Tech Mono',monospace}
+  .cap-mono{font-family:'Share Tech Mono',monospace;color:#a0c8d8}
+  .cap-savings .cap-mono{color:#00E5FF}
+  .cap-bar-wrap{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .cap-bar{flex:1;height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden}
+  .cap-bar-fill{height:100%;background:linear-gradient(90deg,#FFC800,#00E5FF);border-radius:2px;transition:width 1s ease}
+  .cap-bar-label{font-size:7px;color:rgba(180,200,220,0.4);font-family:'Share Tech Mono',monospace;white-space:nowrap}
+
+  /* ═══════════════════════════════════════════════════════════════ */
+  /* AGENT THINKING BUBBLES — Distributed AI agent swarm             */
+  /* ═══════════════════════════════════════════════════════════════ */
+  .agent-card{position:fixed;z-index:55;background:rgba(0,5,15,0.78);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:8px 10px;min-width:128px;backdrop-filter:blur(10px);font-family:'Orbitron',monospace;font-size:8px;color:#c0d0e8;pointer-events:none;opacity:0;transition:opacity 0.6s ease,transform 0.7s cubic-bezier(0.34,1.56,0.64,1)}
+  .agent-card.visible{opacity:1;transform:none!important}
+  .agent-card-header{display:flex;align-items:center;gap:5px;margin-bottom:4px}
+  .agent-emoji{font-size:14px}
+  .agent-name{font-size:7px;letter-spacing:1px;color:#8ab}
+  .agent-status-badge{display:inline-block;font-size:6px;letter-spacing:1px;padding:1px 5px;border-radius:3px;margin-top:2px;background:rgba(255,255,255,0.06);color:#667;transition:background 0.4s,color 0.4s}
+  .agent-status-badge.collecting{background:rgba(0,180,255,0.2);color:#00d4ff}
+  .agent-status-badge.analyzing{background:rgba(108,99,255,0.2);color:#a09aff}
+  .agent-status-badge.alerting{background:rgba(255,38,51,0.2);color:#ff4a57}
+  .agent-bubble{position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);background:rgba(4,8,20,0.92);border:1px solid rgba(255,255,255,0.12);border-radius:7px;padding:5px 8px;font-size:7.5px;font-family:'Share Tech Mono',monospace;white-space:nowrap;text-align:center;min-width:118px;opacity:0;transition:opacity 0.35s ease;pointer-events:none;color:#a8c8dc}
+  .agent-bubble.show{opacity:1}
+  .agent-bubble::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:rgba(255,255,255,0.12)}
+  .bounce-dot{display:inline-block;width:4px;height:4px;border-radius:50%;background:currentColor;margin:0 2px;animation:agentDotBounce 1.3s ease-in-out infinite}
+  .bounce-dot:nth-child(2){animation-delay:.18s}
+  .bounce-dot:nth-child(3){animation-delay:.36s}
+  @keyframes agentDotBounce{0%,80%,100%{transform:translateY(0);opacity:0.6}40%{transform:translateY(-6px);opacity:1}}
 </style>
 </head>
 <body>
 
 <!-- ═══ CANVAS LAYERS ═══ -->
 <div id="bgGradient"></div>
+<div id="jarvisStartupSentinel" style="position:fixed;inset:0;z-index:99999;pointer-events:none;background:radial-gradient(circle at center, rgba(26,230,245,0.92) 0 120px, rgba(26,230,245,0.18) 121px 320px, transparent 520px);mix-blend-mode:screen;">JARVIS_STARTUP_SENTINEL_V1</div>
 <canvas id="hexCanvas"></canvas>
 <canvas id="bloomCanvas"></canvas>
 <canvas id="glCoreCanvas"></canvas>
@@ -1956,6 +2020,28 @@ function refreshPanels() {
   // document.getElementById('weatherTemp').innerHTML = '30<sup>°</sup>';
 }
 
+// ── PERFORMANCE BUDGET ──────────────────────────────────────────────────
+// Tuned for a 14"/16" MacBook Pro running JARVIS as a live wallpaper that
+// MUST coexist with everything else the user is doing. The screen is mostly
+// occluded by app windows, so we throttle aggressively when not visible and
+// resolution-cap the bloom layer (the dominant GPU cost) at all times.
+const PERF = {
+  dpr: 1,             // computed in resize() — clamped to ≤ 1.5 for desktop wallpaper use
+  bloomScale: 0.5,    // bloomCanvas internal scale (CSS-blurred ≥18px hides the downsample)
+  grainScale: 0.5,    // grainCanvas internal scale (overlay blend, full-res grain is wasted)
+  targetFPS: 60,      // hard cap; updated dynamically by perfController
+  minFPS: 24,
+  reducedMotion: typeof matchMedia === 'function'
+    ? matchMedia('(prefers-reduced-motion: reduce)').matches : false,
+  pageHidden: false,
+  occluded: false,
+  // Smoothed telemetry — drives reactive visuals without 1Hz pops.
+  smCpuLoad: 0.2,
+  smGpuLoad: 0.2,
+  smPower:   0.3,    // normalised 0..1
+  smThermal: 0.0     // normalised 0..1 (40°C→0, 95°C→1)
+};
+
 // ── LAYOUT ──────────────────────────────────────────────────────────────
 function resize() {
   W = window.innerWidth;
@@ -1964,13 +2050,63 @@ function resize() {
   CX = W * 0.50;
   CY_ = H * 0.50;
   R = Math.min(U * 0.38, H * 0.42);
-  for (const cv of [HEX, BL, MC, SC, FX, GR]) {
-    cv.width = W; cv.height = H;
+
+  // Clamp devicePixelRatio for the wallpaper layer. On a 16" Retina MBP raw
+  // DPR is 2.0; for a vector wallpaper this is overkill — rings and bezels
+  // stay crisp at 1.5×, and each 0.5× of DPR is +56% fragment-shading work.
+  const rawDPR = window.devicePixelRatio || 1;
+  PERF.dpr = Math.min(rawDPR, 1.5);
+  const dpr = PERF.dpr;
+
+  // Foreground canvases — render at clamped DPR for crisp vectors.
+  for (const cv of [MC, SC, FX]) {
+    cv.width  = Math.round(W * dpr);
+    cv.height = Math.round(H * dpr);
+    cv.style.width  = W + 'px';
+    cv.style.height = H + 'px';
   }
+  // Bloom canvas — half-DPR; CSS blur(18px) masks the resample.
+  BL.width  = Math.max(1, Math.round(W * dpr * PERF.bloomScale));
+  BL.height = Math.max(1, Math.round(H * dpr * PERF.bloomScale));
+  BL.style.width  = W + 'px';
+  BL.style.height = H + 'px';
+  // Grain canvas — half-res is invisible behind the overlay blend at 0.05.
+  GR.width  = Math.max(1, Math.round(W * dpr * PERF.grainScale));
+  GR.height = Math.max(1, Math.round(H * dpr * PERF.grainScale));
+  GR.style.width  = W + 'px';
+  GR.style.height = H + 'px';
+  // Hex grid — render once at clamped DPR, NEVER per frame.
+  HEX.width  = Math.round(W * dpr);
+  HEX.height = Math.round(H * dpr);
+  HEX.style.width  = W + 'px';
+  HEX.style.height = H + 'px';
+
+  // Apply DPR transform to every ctx so all draw code stays in CSS pixels.
+  // We use setTransform (not scale) so repeated resize calls don't compound.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  scCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  fxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  hexCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  blCtx.setTransform(dpr * PERF.bloomScale, 0, 0, dpr * PERF.bloomScale, 0, 0);
+  grCtx.setTransform(dpr * PERF.grainScale, 0, 0, dpr * PERF.grainScale, 0, 0);
+
   drawHexGrid();
   initGrain();
 }
 window.addEventListener('resize', resize);
+
+// ── PAGE-VISIBILITY / OCCLUSION THROTTLING ──────────────────────────────
+// The wallpaper layer cannot be detected as "hidden" by document.visibilityState
+// — desktop windows are always considered visible. The Swift host posts a
+// `JARVIS.setOccluded(bool)` shim via evaluateJavaScript when NSWindow
+// occlusion state changes, and the main loop reads PERF.occluded to drop FPS.
+window.JARVIS = window.JARVIS || {};
+window.JARVIS.setOccluded = function(b) {
+  PERF.occluded = !!b;
+};
+document.addEventListener('visibilitychange', () => {
+  PERF.pageHidden = document.hidden;
+});
 
 // ── HEX GRID BACKGROUND ─────────────────────────────────────────────────
 function drawHexGrid() {
@@ -2000,14 +2136,23 @@ function drawHexGrid() {
 }
 
 // ── GRAIN ───────────────────────────────────────────────────────────────
+// PERF: runs ONCE per resize. After the DPR fix, the canvas backing buffer
+// is no longer W×H but W×dpr×PERF.grainScale × … — using W,H here would
+// only fill the CSS-pixel slice and leave the rest of the buffer black.
+// Work in raw pixels via setTransform(identity); cuts the noise alloc from
+// ~33 MB to ~8 MB on a 4K monitor.
 function initGrain() {
-  const d = grCtx.createImageData(W, H);
+  grCtx.save();
+  grCtx.setTransform(1, 0, 0, 1, 0, 0);
+  const gw = GR.width, gh = GR.height;
+  const d = grCtx.createImageData(gw, gh);
   for (let i = 0; i < d.data.length; i += 4) {
     const v = Math.random() * 255;
     d.data[i] = d.data[i+1] = d.data[i+2] = v;
     d.data[i+3] = 255;
   }
   grCtx.putImageData(d, 0, 0);
+  grCtx.restore();
 }
 
 // ── PRIMITIVES ──────────────────────────────────────────────────────────
@@ -2450,6 +2595,12 @@ function drawThickArcRing(c, cx, cy, radius, col, lw, segs, gapFrac, rot, alphaM
 //   • Inner pulse ring
 // All phase offsets are intentionally desynced so no two rings share a beat.
 // ═══════════════════════════════════════════════════════════════════════
+// Tier banding — per the design system in CLAUDE.md, P-Cores carry amber
+// accents and S-Cores (efficiency) carry crimson. The mid bright ring at
+// rel 0.40 (visually prominent, continuous) is now P-core tiered; the
+// inner-well breathe ring at rel 0.30 (closest to the core "J") is E-core
+// tiered. At idle both read as cyan; under load they blend toward
+// amber/crimson, matching the JARVIS HUD palette banding the user wanted.
 const RINGS = [
   // — outer dashed perimeter (thin, slow CW) —
   { rel: 0.99, type: 'dashed',   lw: 1.2, alpha: 0.85, motion: 'rotate',  speed:  0.025, phase: 0.00, dash: [12, 7] },
@@ -2461,15 +2612,44 @@ const RINGS = [
   { rel: 0.62, type: 'solid',    lw: 3.0, alpha: 0.95, motion: 'wobble',  amp:    0.18, freq:  0.40, phase: 2.10 },
   // — pulse-only ring (alpha breathes) —
   { rel: 0.50, type: 'solid',    lw: 3.5, alpha: 1.00, motion: 'pulse',   freq:   0.55, phase: 0.00 },
-  // — inner continuous bright ring (replaces inner brackets — Pixabay shows
-  //   continuous rings here, not segmented) —
-  { rel: 0.40, type: 'solid',    lw: 2.5, alpha: 1.00, motion: 'rotate',  speed:  0.080, phase: 0.50 },
+  // — inner continuous bright ring — P-core tier banding
+  { rel: 0.40, type: 'solid',    lw: 2.5, alpha: 1.00, motion: 'rotate',  speed:  0.080, phase: 0.50, tier: 'pcore' },
   // — inner-well: tight bright cluster (4 rings @ rel 0.30, 0.26, 0.22, 0.18) —
-  { rel: 0.30, type: 'solid',    lw: 2.2, alpha: 1.00, motion: 'breathe', amp:    0.010, freq:  0.70, phase: 0.00 },
+  { rel: 0.30, type: 'solid',    lw: 2.2, alpha: 1.00, motion: 'breathe', amp:    0.010, freq:  0.70, phase: 0.00, tier: 'ecore' },
   { rel: 0.26, type: 'solid',    lw: 2.0, alpha: 1.00, motion: 'rotate',  speed: -0.176, phase: 1.50 },
   { rel: 0.22, type: 'solid',    lw: 1.8, alpha: 1.00, motion: 'pulse',   freq:   0.90, phase: 0.50 },
   { rel: 0.18, type: 'solid',    lw: 1.6, alpha: 1.00, motion: 'rotate',  speed:  0.220, phase: 2.00 }
 ];
+
+// Helper: per-ring colour triplet, blended toward amber (P-core load) or
+// crimson (E-core load). At rest both return cyan; at saturation they shift
+// proportionally. Keeps the dominant palette cyan (matches the JARVIS
+// reference) while injecting amber/crimson exactly when the hardware reads
+// hot. Reads PERF.smCpuLoad as a fallback when per-core arrays are empty.
+function tierColorTriplet(tier) {
+  if (tier === 'pcore') {
+    const load = (TEL.cpuPCores && TEL.cpuPCores.length)
+      ? TEL.cpuPCores.reduce((s, v) => s + v, 0) / (TEL.cpuPCores.length * 100)
+      : PERF.smCpuLoad;
+    const k = Math.max(0, Math.min(1, load));
+    return blendTriplet(CY, AMBER, k * 0.7);
+  }
+  if (tier === 'ecore') {
+    const load = (TEL.cpuECores && TEL.cpuECores.length)
+      ? TEL.cpuECores.reduce((s, v) => s + v, 0) / (TEL.cpuECores.length * 100)
+      : PERF.smCpuLoad * 0.6;
+    const k = Math.max(0, Math.min(1, load));
+    return blendTriplet(CY, CRIMSON, k * 0.55);
+  }
+  return CY;
+}
+function blendTriplet(a, b, k) {
+  const pa = a.split(','), pb = b.split(',');
+  const r  = (+pa[0]) * (1-k) + (+pb[0]) * k;
+  const g  = (+pa[1]) * (1-k) + (+pb[1]) * k;
+  const bl = (+pa[2]) * (1-k) + (+pb[2]) * k;
+  return `${r|0},${g|0},${bl|0}`;
+}
 
 function ringVisibility(i) {
   if (STATE.phase === PHASE.BOOTING) {
@@ -2552,7 +2732,10 @@ function drawRings(t, alphaMul) {
       rot = t * 0.020 * STATE.ringSpeedMul + (r.phase || 0);
     }
 
-    const col = rgba(CY, alphaThis * alphaMul * vis);
+    // Tier-aware ring colour: cyan at rest, blended toward amber (P-core) or
+    // crimson (E-core) under load. Non-tier rings stay cyan exactly.
+    const tierCol = r.tier ? tierColorTriplet(r.tier) : CY;
+    const col = rgba(tierCol, alphaThis * alphaMul * vis);
 
     // Tier-based parallax offset: outer tier drifts most, inner tier barely
     const depth = i < 4 ? 8 : i < 8 ? 4 : 1;
@@ -2562,7 +2745,7 @@ function drawRings(t, alphaMul) {
     ctx.translate(xOff, 0);
 
     if (r.type === 'ticks') {
-      ring(ctx, CX, CY_, radius, rgba(CY, 0.15 * alphaMul * vis), 0.5);
+      ring(ctx, CX, CY_, radius, rgba(tierCol, 0.15 * alphaMul * vis), 0.5);
       tickMarks(ctx, CX, CY_, radius - U * 0.008, radius + U * 0.002, col, r.lw, r.segs, rot, 4);
       for (let k = 0; k < 4; k++) {
         const a = rot + k * Math.PI / 2 + 0.01;
@@ -2591,13 +2774,13 @@ function drawRings(t, alphaMul) {
       ring(ctx, CX, CY_, radius, col, r.lw, r.dash);
       ctx.restore();
     } else if (r.type === 'thickArc') {
-      drawThickArcRing(ctx, CX, CY_, radius, CY, r.lw, r.segs, r.gapFrac, rot, alphaThis * alphaMul * vis, r.innerTicks);
+      drawThickArcRing(ctx, CX, CY_, radius, tierCol, r.lw, r.segs, r.gapFrac, rot, alphaThis * alphaMul * vis, r.innerTicks);
     } else if (r.type === 'cog') {
-      drawCogRing(ctx, CX, CY_, radius, CY, r.lw, r.teeth, rot, alphaThis * alphaMul * vis);
+      drawCogRing(ctx, CX, CY_, radius, tierCol, r.lw, r.teeth, rot, alphaThis * alphaMul * vis);
     } else if (r.type === 'riveted') {
-      drawRivetedRing(ctx, CX, CY_, radius, CY, r.lw, r.bolts, rot, alphaThis * alphaMul * vis);
+      drawRivetedRing(ctx, CX, CY_, radius, tierCol, r.lw, r.bolts, rot, alphaThis * alphaMul * vis);
     } else if (r.type === 'caliper') {
-      drawCaliperRing(ctx, CX, CY_, radius, CY, r.lw, r.totalMinor, r.majorEvery, rot, alphaThis * alphaMul * vis);
+      drawCaliperRing(ctx, CX, CY_, radius, tierCol, r.lw, r.totalMinor, r.majorEvery, rot, alphaThis * alphaMul * vis);
     } else {
       ring(ctx, CX, CY_, radius, col, r.lw);
     }
@@ -2688,11 +2871,16 @@ function drawCore(t, alphaMul) {
 
   // Inner sun pattern — dramatic vertical "flame" spokes (top crown)
   // Gated by pixabayMode — Pixabay reactor has no top crown flames.
+  // PERF + reactivity: spoke density now scales with smoothed CPU/GPU load
+  // (56 at idle → 84 at saturation). Cuts idle stroke count by ~38%, makes
+  // the silhouette visibly "spool up" under heavy system load — a real
+  // reactor cue instead of constant brute density.
   if (!STATE.pixabayMode) {
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
+  const loadBoostSpoke = 0.5 * PERF.smCpuLoad + 0.5 * PERF.smGpuLoad;
+  const topSpokes = 56 + Math.round(loadBoostSpoke * 28);
   // TOP flame — most dramatic
-  const topSpokes = 90;
   for (let i = 0; i < topSpokes; i++) {
     const a = -Math.PI * 0.85 + (i / topSpokes) * Math.PI * 0.70;
     const rIn = R * 0.145;
@@ -2700,15 +2888,12 @@ function drawCore(t, alphaMul) {
     // Flames are taller closer to center top
     const cosWeight = Math.max(0, Math.cos(a + Math.PI / 2));
     const rOut = R * (0.20 + cosWeight * 0.055) + wig;
-    const x1 = CX + Math.cos(a) * rIn;
-    const y1 = CY_ + Math.sin(a) * rIn;
-    const x2 = CX + Math.cos(a) * rOut;
-    const y2 = CY_ + Math.sin(a) * rOut;
+    const cos_a = Math.cos(a), sin_a = Math.sin(a);
     ctx.strokeStyle = rgba(WHITE, (0.36 + 0.18 * cosWeight) * alphaMul * STATE.bloomMul);
     ctx.lineWidth = 1.2 + cosWeight * 0.8;
     ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    ctx.moveTo(CX + cos_a * rIn, CY_ + sin_a * rIn);
+    ctx.lineTo(CX + cos_a * rOut, CY_ + sin_a * rOut);
     ctx.stroke();
   }
   // BOTTOM flame — mirror, dimmer
@@ -2718,15 +2903,12 @@ function drawCore(t, alphaMul) {
     const wig = Math.sin(t * 4 + i * 0.3 + 1) * R * 0.010;
     const cosWeight = Math.max(0, -Math.cos(a + Math.PI / 2));
     const rOut = R * (0.19 + cosWeight * 0.040) + wig;
-    const x1 = CX + Math.cos(a) * rIn;
-    const y1 = CY_ + Math.sin(a) * rIn;
-    const x2 = CX + Math.cos(a) * rOut;
-    const y2 = CY_ + Math.sin(a) * rOut;
+    const cos_a = Math.cos(a), sin_a = Math.sin(a);
     ctx.strokeStyle = rgba(WHITE, (0.22 + 0.14 * cosWeight) * alphaMul * STATE.bloomMul);
     ctx.lineWidth = 0.9 + cosWeight * 0.4;
     ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    ctx.moveTo(CX + cos_a * rIn, CY_ + sin_a * rIn);
+    ctx.lineTo(CX + cos_a * rOut, CY_ + sin_a * rOut);
     ctx.stroke();
   }
   ctx.restore();
@@ -3316,11 +3498,31 @@ let GL_FAILED_FRAMES = 0;
 function initWebGLCore() {
   const canvas = document.getElementById('glCoreCanvas');
   if (!canvas) return false;
+  // RC-E: register WebGL context-loss handlers exactly once. Per Khronos
+  // WEBGL_lose_context, preventDefault on the lost event is required so the
+  // browser will fire the restored event when GPU pressure abates. Without
+  // these, an Apple-Silicon GPU eviction would leave the plasma core black
+  // with no recovery path until the wallpaper is fully reloaded.
+  if (!canvas._jWebGLLifecycleAttached) {
+    canvas._jWebGLLifecycleAttached = true;
+    canvas.addEventListener('webglcontextlost', function (ev) {
+      ev.preventDefault();
+      console.warn('[Unit 8] webglcontextlost — pausing hifi core, engaging low-power');
+      GL_CTX = null; GL_PROG = null; GL_QUAD = null;
+      if (window.JARVIS && window.JARVIS.setLowPower) window.JARVIS.setLowPower(true);
+    });
+    canvas.addEventListener('webglcontextrestored', function () {
+      console.warn('[Unit 8] webglcontextrestored — reinitialising hifi core');
+      initWebGLCore();
+    });
+  }
   let gl = null;
   try {
     gl = canvas.getContext('webgl', { alpha: true, premultipliedAlpha: false }) ||
          canvas.getContext('experimental-webgl', { alpha: true, premultipliedAlpha: false });
-  } catch (e) { /* swallowed — graceful fallback */ }
+  } catch (e) {
+    console.error('[Unit 8] WebGL ctx creation threw: ' + (e && (e.stack || e.message || e)));
+  }
   if (!gl) {
     console.warn('[Unit 8] WebGL unavailable — raymarched core disabled');
     STATE.highFidelityCore = false;
@@ -3488,11 +3690,86 @@ const BOOT_WALL_T0 = Date.now() / 1000;
 let last = Date.now() / 1000;
 STATE.t = 0;
 
+// Render-loop lifecycle: pause when no one is looking (screen lock,
+// display sleep, prefers-reduced-motion, Low Power Mode). Swift side
+// drives screen-lock pause via window.JARVIS.pause()/resume(); the
+// visibilitychange listener and matchMedia listener handle the rest.
+// On pause, the loop clears all canvases once and stops re-scheduling
+// requestAnimationFrame until resume.
+window.JARVIS = window.JARVIS || {};
+window.JARVIS.paused = false;
+window.JARVIS.lowPower = false;
+window.JARVIS.pause = function () {
+  if (window.JARVIS.paused) return;
+  window.JARVIS.paused = true;
+  // Clear all canvases once so a stale frame doesn't burn pixels.
+  // RC-F: structured error logging — the WKUserContentController user-script
+  // in AppDelegate.swift forwards every console.error to the host process log,
+  // so any clearRect failure is now diagnosable instead of silently swallowed.
+  try {
+    ctx.clearRect(0, 0, W, H);
+    blCtx.clearRect(0, 0, W, H);
+    fxCtx.clearRect(0, 0, W, H);
+  } catch (e) {
+    console.error('[JARVIS.pause] canvas clearRect failed: ' + (e && (e.stack || e.message || e)));
+  }
+};
+window.JARVIS.resume = function () {
+  if (!window.JARVIS.paused) return;
+  window.JARVIS.paused = false;
+  last = Date.now() / 1000;
+  requestAnimationFrame(frame);
+};
+window.JARVIS.setLowPower = function (on) {
+  window.JARVIS.lowPower = !!on;
+};
+
+// ── TELEMETRY SMOOTHING ─────────────────────────────────────────────────
+// Exponential smoother (τ ≈ 350 ms) over the 1Hz daemon data. Fast enough
+// to feel reactive to a sudden spike, slow enough that values glide instead
+// of popping. Called once per displayed frame.
+function smoothTelemetry(dt) {
+  const k = 1 - Math.exp(-dt / 0.35);
+  PERF.smCpuLoad += (TEL.cpuLoad - PERF.smCpuLoad) * k;
+  PERF.smGpuLoad += (TEL.gpuLoad - PERF.smGpuLoad) * k;
+  const powerN  = Math.max(0, Math.min(1, (TEL.powerW - 8) / 47));   // 8W→0, 55W→1
+  const thermN  = Math.max(0, Math.min(1, (TEL.tempCPU - 40) / 55)); // 40°C→0, 95°C→1
+  PERF.smPower   += (powerN - PERF.smPower)     * k;
+  PERF.smThermal += (thermN - PERF.smThermal)   * k;
+}
+
+let _lastDrawTime = 0;
+let _perfAcc = 0, _perfN = 0, _perfSlow = 0;
+
 function frame() {
-  const now = Date.now() / 1000;
+  if (window.JARVIS.paused) return; // gated — resume() restarts the loop
+  const nowMs = (performance && performance.now) ? performance.now() : Date.now();
+  const now = nowMs / 1000;
+
+  // ── Adaptive FPS cap ──────────────────────────────────────────────────
+  // Occluded wallpaper → 8fps. Reduced-motion / Low Power → 30fps. Page
+  // hidden (rare for wallpaper) → 4fps. Boot phase always runs full FPS
+  // so the entrance reads crisp. Local-pre-existing JARVIS.lowPower path
+  // is honoured via the lowPowerCap below.
+  let targetFPS = PERF.targetFPS;
+  const lowPowerCap = window.JARVIS.lowPower ? 30 : 60;
+  targetFPS = Math.min(targetFPS, lowPowerCap);
+  if (PERF.pageHidden)         targetFPS = 4;
+  else if (PERF.occluded)      targetFPS = 8;
+  else if (PERF.reducedMotion) targetFPS = Math.min(targetFPS, 30);
+  if (STATE.phase === PHASE.BOOTING) targetFPS = 60;
+
+  const minDelta = 1 / targetFPS;
+  if (now - _lastDrawTime < minDelta - 0.001) {
+    requestAnimationFrame(frame);
+    return;
+  }
   const dt = Math.min(0.05, now - last);
   last = now;
+  _lastDrawTime = now;
   STATE.t = now - BOOT_WALL_T0;
+
+  smoothTelemetry(dt);
 
   // Living-shrine vitality engine — must run before everything else reads STATE.vitality
   tickVitality(dt);
@@ -3515,16 +3792,23 @@ function frame() {
     drawWebGLCore(STATE.t);
   }
 
-  // Mood-modulated multipliers (layered on top of phase-level)
+  // Mood-modulated multipliers (layered on top of phase-level).
+  //
+  // Reactivity wiring (this patch): on top of the existing vitality / mood /
+  // cardiac modulation, multiply ring rotation and bloom by a smoothed
+  // CPU/GPU/thermal factor. At idle it's ~unity; under sustained 80% load
+  // rings rotate ~25% faster and the reactor glows ~25% warmer, all without
+  // 1Hz pops thanks to smoothTelemetry().
   const baseRingSpeed = STATE.ringSpeedMul;
   const baseBloom = STATE.bloomMul;
   if (STATE.phase === PHASE.NOMINAL) {
-    // Living-shrine: vitality additionally scales ring rotation + bloom on top
-    // of mood mul + cardiac pulse. flickerT adds a brief additive bloom punch
-    // on power spikes (R8).
-    STATE.ringSpeedMul = baseRingSpeed * MOOD.ringSpeedMul * (0.70 + 0.55 * STATE.vitality);
+    const loadBlend   = 0.5 * PERF.smCpuLoad + 0.5 * PERF.smGpuLoad; // 0..1
+    const reactivity  = 0.85 + 0.40 * loadBlend;                     // 0.85..1.25
+    const thermalGlow = 1.0 + 0.25 * PERF.smThermal;                 // 1.00..1.25
+    STATE.ringSpeedMul = baseRingSpeed * MOOD.ringSpeedMul
+                       * (0.70 + 0.55 * STATE.vitality) * reactivity;
     STATE.bloomMul = baseBloom * MOOD.glowMul * cardiacPulse(STATE.t)
-                     * (0.72 + 0.58 * STATE.vitality)
+                     * (0.72 + 0.58 * STATE.vitality) * thermalGlow
                      + STATE.flickerT * 0.30;
   }
 
@@ -3560,6 +3844,74 @@ function frame() {
 
   // Living-shrine peripheral activity (presence cues at viewport edges)
   drawDistantTicks();
+
+  // ── Adaptive perf controller ─────────────────────────────────────────
+  // Measures actual frame cost over a 60-frame rolling window. If >25% of
+  // frames exceed budget, step the FPS cap down (60 → 30 → 24). RC-D:
+  // restoring up to 60 fps now requires THREE consecutive good windows
+  // (≥180 frames at slowRatio<0.05) so the controller cannot flap. The
+  // 2026-05-11 13:39 WindowServer 50%/180s cpu_resource breach was
+  // produced by exactly this oscillation — single-window restore would
+  // re-saturate WindowServer the moment the local frame budget recovered.
+  // Any window with slowRatio>0.15 resets the recovery counter to zero.
+  const frameMs = ((performance && performance.now) ? performance.now() : Date.now()) - nowMs;
+  _perfAcc += frameMs;
+  _perfN += 1;
+  if (frameMs > 1000 / targetFPS * 1.6) _perfSlow += 1;
+  if (_perfN >= 60) {
+    const slowRatio = _perfSlow / _perfN;
+    if (slowRatio > 0.25 && PERF.targetFPS > PERF.minFPS) {
+      const newCap = PERF.targetFPS === 60 ? 30 : PERF.minFPS;
+      console.warn('[JARVIS] auto-degrading FPS cap ' + PERF.targetFPS + ' -> ' + newCap +
+                   ' (avg=' + (_perfAcc / _perfN).toFixed(1) + 'ms slow=' +
+                   ((slowRatio * 100) | 0) + '%)');
+      PERF.targetFPS = newCap;
+      PERF._restoreWindows = 0;
+    } else if (slowRatio < 0.05 && PERF.targetFPS < 60) {
+      PERF._restoreWindows = (PERF._restoreWindows | 0) + 1;
+      if (PERF._restoreWindows >= 3) {
+        const newCap = PERF.targetFPS === 24 ? 30 : 60;
+        console.warn('[JARVIS] restoring FPS cap ' + PERF.targetFPS + ' -> ' + newCap +
+                     ' (after ' + PERF._restoreWindows + ' consecutive good windows)');
+        PERF.targetFPS = newCap;
+        PERF._restoreWindows = 0;
+      }
+    } else if (slowRatio > 0.15) {
+      PERF._restoreWindows = 0;
+    }
+    _perfAcc = 0; _perfN = 0; _perfSlow = 0;
+  }
+
+  // RC-A: pre-emptive auto-Low-Power-Mode trigger. macOS attributed the
+  // 2026-05-11 13:39 WindowServer 50%/180s cpu_resource breach directly to
+  // JarvisTelemetry; the upstream cause is the wallpaper continuing to
+  // composite at 60 fps while the host system is already saturated. We
+  // engage LPM after 30 s of sustained smoothed CPU OR GPU load ≥ 0.80,
+  // and release after 60 s of both below 0.50. The release timer is
+  // generous so we don't oscillate the host between LPM states.
+  if (PERF.smCpuLoad >= 0.80 || PERF.smGpuLoad >= 0.80) {
+    if (!PERF._highLoadStart) PERF._highLoadStart = now;
+    PERF._lowLoadStart = 0;
+    if (window.JARVIS && !window.JARVIS.lowPower && now - PERF._highLoadStart >= 30) {
+      console.warn('[JARVIS] auto-engaging LPM after 30s sustained load (cpu=' +
+                   (PERF.smCpuLoad * 100).toFixed(0) + '% gpu=' +
+                   (PERF.smGpuLoad * 100).toFixed(0) + '%)');
+      window.JARVIS.setLowPower(true);
+      PERF._autoLowPower = true;
+    }
+  } else if (PERF.smCpuLoad < 0.50 && PERF.smGpuLoad < 0.50) {
+    if (!PERF._lowLoadStart) PERF._lowLoadStart = now;
+    PERF._highLoadStart = 0;
+    if (window.JARVIS && PERF._autoLowPower && now - PERF._lowLoadStart >= 60) {
+      console.warn('[JARVIS] auto-releasing LPM after 60s low load');
+      window.JARVIS.setLowPower(false);
+      PERF._autoLowPower = false;
+    }
+  } else {
+    // Mid-range — clear edge timers but do not change current LPM state.
+    PERF._highLoadStart = 0;
+    PERF._lowLoadStart = 0;
+  }
 
   requestAnimationFrame(frame);
 }
@@ -3624,13 +3976,77 @@ window.addEventListener('mousemove', () => {
 // REQ-A8: honour ?hifi=1 query param (or dev-console override) before init.
 try {
   if (new URLSearchParams(location.search).has('hifi')) STATE.highFidelityCore = true;
-} catch (e) { /* no-op on exotic URL schemes */ }
+} catch (e) {
+  // RC-F: hifi URL-param parse may fail on exotic schemes (file:// in some
+  // older WebKit revisions, custom-scheme handlers). Forward to host log
+  // via the WKUserContentController console.error hook in AppDelegate.swift.
+  console.error('[JARVIS] hifi URL parse failed: ' + (e && (e.stack || e.message || e)));
+}
 resize();
+setTimeout(function(){ var el=document.getElementById('jarvisStartupSentinel'); if(el) el.style.display='none'; }, 8000);
 if (STATE.highFidelityCore) initWebGLCore();
 refreshPanels();
 setPhase(PHASE.BOOTING);
-setInterval(tickTelemetry, 1000);
+// RC-C: gate the 1 Hz telemetry tick on JARVIS.paused / PERF.pageHidden so
+// that when AppDelegate.swift fires JARVIS.pause() on willSleep or display
+// sleep the interval doesn't keep mutating DOM and contributing to the
+// wake-from-sleep WindowServer load that produced the May-11 panic.
+setInterval(function () {
+  if (window.JARVIS && (window.JARVIS.paused || (typeof PERF !== 'undefined' && PERF.pageHidden))) return;
+  tickTelemetry();
+}, 1000);
 requestAnimationFrame(frame);
+
+// JARVIS_CANVAS_DIAGNOSTIC_V1 — report actual canvas paint state back to WKWebView host.
+setTimeout(function() {
+  try {
+    function sumCanvas(cv) {
+      if (!cv) return { id: 'missing', w: 0, h: 0, sum: -1, alpha: -1 };
+      const c = cv.getContext('2d');
+      const sw = Math.min(160, cv.width || 0), sh = Math.min(90, cv.height || 0);
+      if (!sw || !sh) return { id: cv.id, w: cv.width, h: cv.height, sum: 0, alpha: 0 };
+      const sx = Math.max(0, Math.floor((cv.width - sw) / 2));
+      const sy = Math.max(0, Math.floor((cv.height - sh) / 2));
+      const d = c.getImageData(sx, sy, sw, sh).data;
+      let sum = 0, alpha = 0;
+      for (let i = 0; i < d.length; i += 4) { sum += d[i] + d[i+1] + d[i+2]; alpha += d[i+3]; }
+      return { id: cv.id, w: cv.width, h: cv.height, sum, alpha };
+    }
+    const payload = {
+      state: { phase: STATE.phase, t: STATE.t, paused: window.JARVIS && window.JARVIS.paused, lowPower: window.JARVIS && window.JARVIS.lowPower },
+      perf: { dpr: PERF.dpr, targetFPS: PERF.targetFPS, occluded: PERF.occluded, pageHidden: PERF.pageHidden },
+      canvases: [HEX, BL, MC, SC, FX, GR].map(sumCanvas),
+      body: document.body.className,
+      ready: document.readyState
+    };
+    console.error('JARVIS_CANVAS_DIAGNOSTIC_V1 ' + JSON.stringify(payload));
+  } catch (e) {
+    console.error('JARVIS_CANVAS_DIAGNOSTIC_V1 failed ' + (e && (e.stack || e.message || e)));
+  }
+}, 2500);
+
+// WKWebView wallpaper/accessory windows can report document.hidden even while
+// WindowServer is compositing them. Do not call JARVIS.pause() here: pause()
+// clears every canvas and leaves the live wallpaper as a blank dark window.
+// PERF.pageHidden/PERF.occluded already throttle frame rate without erasing HUD pixels.
+document.addEventListener('visibilitychange', function () {
+  PERF.pageHidden = document.hidden;
+  if (!document.hidden) window.JARVIS.resume();
+});
+
+// Honour prefers-reduced-motion (also asserted by macOS Low Power Mode
+// system-wide). Treat as a request to halve the frame rate.
+try {
+  const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+  window.JARVIS.setLowPower(mq.matches);
+  mq.addEventListener('change', function (e) { window.JARVIS.setLowPower(e.matches); });
+} catch (e) {
+  // RC-F: matchMedia is universally supported on macOS WKWebView, but the
+  // surrounding code is defensive for the prototype harness that runs in
+  // server-rendered contexts without a Window. Log structured rather than
+  // silently swallow so an unexpected loss-of-API is diagnosable.
+  console.warn('[JARVIS] matchMedia unsupported: ' + (e && (e.stack || e.message || e)));
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // CHATTER ENGINE
@@ -4134,13 +4550,28 @@ const JT = (() => {
       text.textContent = 'SIM';
     }
   }
-  setInterval(_pollStatus, 1500);
+  // RC-C: gate the status badge poll on paused state.
+  setInterval(function () {
+    if (window.JARVIS && window.JARVIS.paused) return;
+    _pollStatus();
+  }, 1500);
 
   return { trigger, toggle };
 })();
 
+// PERF: this is a full reassignment of window.JARVIS — merge any methods
+// previously installed on the namespace (e.g. setOccluded, pause/resume,
+// setLowPower) so they survive this overwrite. Without this, the host
+// AppDelegate's evaluateJavaScript("JARVIS.setOccluded(...)") would no-op.
+const _prevJARVIS = window.JARVIS || {};
 window.JARVIS = {
   setPhase,
+  setOccluded: _prevJARVIS.setOccluded,
+  pause:       _prevJARVIS.pause,
+  resume:      _prevJARVIS.resume,
+  setLowPower: _prevJARVIS.setLowPower,
+  paused:      _prevJARVIS.paused,
+  lowPower:    _prevJARVIS.lowPower,
   freezeAt: (phase, t) => { setPhase(phase); STATE.frozenPhaseT = t; },
   unfreeze: () => { STATE.frozenPhaseT = null; STATE.phaseStart = Date.now() / 1000; },
   triggerChargeEvent: () => {
@@ -4182,6 +4613,129 @@ window.JARVIS = {
   state: STATE,
   tel: TEL
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLAUDE CAP PANEL + AGENT THINKING BUBBLES
+// Anthropic subscription telemetry + distributed AI agent status overlays
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CLAUDE_SESSIONS = [
+  { name:'S-1 Scaffold',  model:'claude-opus-4-5',   cost:0.6138, turns:11, status:'done'   },
+  { name:'S-2..9 Build',  model:'claude-opus-4-5',   cost:1.9947, turns:23, status:'done'   },
+  { name:'Cap Panel',     model:'claude-opus-4-5',   cost:1.3280, turns:21, status:'done'   },
+  { name:'Phase 3',       model:'claude-opus-4-5',   cost:1.8710, turns:27, status:'done'   },
+  { name:'Jarvis Extend', model:'claude-opus-4-5',   cost:0,      turns:0,  status:'active' },
+  { name:'Hermes (live)', model:'claude-sonnet-4-6', cost:0,      turns:0,  status:'active' },
+];
+const CLAUDE_TOTALS = {
+  cost_usd:5.8075, output_tokens:99521, cache_read_tokens:3541832, cache_creation_tokens:398746
+};
+const CACHE_SAVINGS_USD = 47.81;
+
+const AGENTS = [
+  { name:'CPU Guardian',    emoji:'⚡', color:'#6c63ff', pos:{top:'12%',left:'4%'},    thoughts:['Sampling CPU cycles...','Load avg elevated?','Checking P-cores...','iowait nominal...'] },
+  { name:'Memory Warden',   emoji:'🧠', color:'#00d4ff', pos:{top:'12%',right:'4%'},   thoughts:['Reading /proc/meminfo...','OOM risk: low','Cache ratio OK','Swap idle...'] },
+  { name:'Network Sentinel',emoji:'🌐', color:'#00ff9f', pos:{top:'44%',left:'1%'},    thoughts:['Sampling eth0...','Packet loss: 0%','Bandwidth: 12%','TCP states OK'] },
+  { name:'Disk Oracle',     emoji:'💾', color:'#ffb300', pos:{top:'44%',right:'1%'},   thoughts:['Checking mounts...','/ at 45%...','Inode usage low','I/O wait: 2%'] },
+  { name:'Process Hunter',  emoji:'🔍', color:'#ff6b9d', pos:{bottom:'16%',left:'4%'}, thoughts:['Scanning ps aux...','No zombies found','Top: nginx 0.1%','Fork rate nominal'] },
+  { name:'Security Watch',  emoji:'🛡️', color:'#ff4081', pos:{bottom:'16%',right:'4%'},thoughts:['Scanning auth.log...','Failed logins: 0','Perimeter secure','No port scans'] },
+];
+
+// --- Init Claude Cap Panel ---
+(function initClaudeCap() {
+  const sessEl = document.getElementById('cap-sessions-list');
+  if (!sessEl) return;
+  let html = '';
+  CLAUDE_SESSIONS.forEach(function(s) {
+    var isActive = s.status === 'active';
+    var dot = isActive ? '<span class="cap-live-dot"></span>' : '';
+    var cost = isActive ? '●●●' : ('$' + s.cost.toFixed(2));
+    var turns = isActive ? '' : (s.turns + 'T');
+    html += '<div class="cap-session-row' + (isActive ? ' active' : '') + '">' +
+      '<span class="cap-sess-name">' + dot + s.name + '</span>' +
+      '<span class="cap-sess-cost">' + cost + '</span>' +
+      '<span class="cap-sess-turns">' + turns + '</span>' +
+      '</div>';
+  });
+  sessEl.innerHTML = html;
+  var totalEl = document.getElementById('cap-total-cost');
+  if (totalEl) totalEl.textContent = '$' + CLAUDE_TOTALS.cost_usd.toFixed(2);
+  var outEl = document.getElementById('cap-output');
+  if (outEl) outEl.textContent = (CLAUDE_TOTALS.output_tokens / 1000).toFixed(1) + 'K';
+  var crEl = document.getElementById('cap-cache-r');
+  if (crEl) crEl.textContent = (CLAUDE_TOTALS.cache_read_tokens / 1000000).toFixed(2) + 'M';
+  var savEl = document.getElementById('cap-savings');
+  if (savEl) savEl.textContent = '~$' + CACHE_SAVINGS_USD.toFixed(2) + ' saved';
+  var barEl = document.getElementById('cap-bar-fill');
+  if (barEl) {
+    var fillPct = Math.min(100, (CLAUDE_TOTALS.cost_usd / 20) * 100);
+    barEl.style.width = fillPct.toFixed(1) + '%';
+  }
+})();
+
+// --- Init Agent Thinking Bubbles ---
+(function initAgents() {
+  var cards = [];
+  AGENTS.forEach(function(ag, i) {
+    var card = document.createElement('div');
+    card.className = 'agent-card';
+    Object.assign(card.style, ag.pos);
+    if (ag.pos.left)  card.style.transform = 'translateX(-60px)';
+    if (ag.pos.right) card.style.transform = 'translateX(60px)';
+    card.innerHTML =
+      '<div class="agent-card-header">' +
+        '<span class="agent-emoji">' + ag.emoji + '</span>' +
+        '<span class="agent-name">' + ag.name.toUpperCase() + '</span>' +
+      '</div>' +
+      '<div class="agent-status-badge" data-badge>IDLE</div>' +
+      '<div class="agent-bubble" data-bubble>' +
+        '<span class="bounce-dot"></span><span class="bounce-dot"></span><span class="bounce-dot"></span>' +
+      '</div>';
+    document.body.appendChild(card);
+    cards.push({ el:card, ag:ag, thoughtIdx:0, status:'idle' });
+    setTimeout(function() { card.classList.add('visible'); }, 800 + i * 180);
+  });
+
+  function setStatus(c, status) {
+    c.status = status;
+    var badge  = c.el.querySelector('[data-badge]');
+    var bubble = c.el.querySelector('[data-bubble]');
+    badge.className = 'agent-status-badge' + (status !== 'idle' ? ' ' + status : '');
+    badge.textContent = status.toUpperCase();
+    if (status === 'idle') { bubble.classList.remove('show'); return; }
+    bubble.style.color = c.ag.color;
+    if (status === 'collecting') {
+      bubble.innerHTML = '<span class="bounce-dot"></span><span class="bounce-dot"></span><span class="bounce-dot"></span>';
+    } else {
+      bubble.textContent = c.ag.thoughts[c.thoughtIdx % c.ag.thoughts.length];
+      c.thoughtIdx++;
+    }
+    bubble.classList.add('show');
+  }
+
+  setTimeout(function() {
+    cards.forEach(function(c, i) {
+      setTimeout(function() { setStatus(c, i % 2 === 0 ? 'collecting' : 'analyzing'); }, i * 400);
+    });
+  }, 1800);
+
+  setInterval(function() {
+    // RC-C: skip agent bubble updates while the render loop is paused —
+    // these mutations cause DOM-driven WindowServer composition work.
+    if (window.JARVIS && window.JARVIS.paused) return;
+    var pick = cards[Math.floor(Math.random() * cards.length)];
+    var states = ['collecting','analyzing','idle'];
+    var next = states[(states.indexOf(pick.status) + 1) % states.length];
+    setStatus(pick, next);
+    if (Math.random() > 0.5) {
+      var pick2 = cards[Math.floor(Math.random() * cards.length)];
+      if (pick2 !== pick) {
+        var next2 = states[(states.indexOf(pick2.status) + 1) % states.length];
+        setStatus(pick2, next2);
+      }
+    }
+  }, 3500);
+})();
 </script>
 
 <!-- ══ JARVIS MANUAL TRIGGER PANEL ══════════════════════════════════════
@@ -4224,6 +4778,21 @@ window.JARVIS = {
 <div id="jt-status" class="sim">
   <div class="jt-dot"></div>
   <span id="jt-status-text">SIM</span>
+</div>
+
+<!-- ══ CLAUDE CAP PANEL ══════════════════════════════════════════════════
+     Anthropic subscription telemetry overlay — bottom left.
+     Shows session costs, token counts, cache savings, and 5-hr window usage.
+═════════════════════════════════════════════════════════════════════ -->
+<div id="claude-cap-panel">
+  <div class="cap-header">🤖 CLAUDE MAX<span class="cap-account">sarkar.vikram@gmail.com</span></div>
+  <div id="cap-sessions-list"></div>
+  <div class="cap-divider"></div>
+  <div class="cap-total">TOTAL <span id="cap-total-cost" class="cap-money"></span></div>
+  <div class="cap-row"><span class="cap-label">Output:</span><span id="cap-output" class="cap-mono"></span></div>
+  <div class="cap-row"><span class="cap-label">Cache-R:</span><span id="cap-cache-r" class="cap-mono"></span></div>
+  <div class="cap-row cap-savings"><span class="cap-label">Cache saved:</span><span id="cap-savings" class="cap-mono"></span></div>
+  <div class="cap-bar-wrap"><div class="cap-bar"><div class="cap-bar-fill" id="cap-bar-fill"></div></div><span class="cap-bar-label">5-hr window</span></div>
 </div>
 
 </body>

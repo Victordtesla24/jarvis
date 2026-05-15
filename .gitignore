@@ -38,10 +38,16 @@ mactop_backup/
 .coverage
 htmlcov/
 
-# ── Node / npm (none currently, future-proofing) ────────────────────────────
+# ── Node / npm ──────────────────────────────────────────────────────────────
 node_modules/
 package-lock.json
 package.json
+# Allow the locked manifests for the animation stack (HC-5 requires commit)
+!js/package.json
+!js/package-lock.json
+
+# ── Vite build artifacts (regenerable; HC-10) ───────────────────────────────
+prototypes/dist/
 
 # ── IDEs & editor state ─────────────────────────────────────────────────────
 .vscode/
@@ -66,7 +72,6 @@ mcp-debug.log
 logs/
 state/
 tmp/
-
 # ── Generated media assets (regenerable via scripts/promo-video/) ───────────
 *.png
 *.jpeg
@@ -88,11 +93,19 @@ mcp.json
 # ── Per-machine docs that override repo defaults ────────────────────────────
 LICENSE
 CLAUDE.md
+CHANGELOG.md
+CONTRIBUTING.md
+SECURITY.md
+.editorconfig
+
 # Playwright MCP session artifacts
 .playwright-mcp/
 
 # Assembled .app bundle (built per-machine from build-app.sh)
 JarvisWallpaper.app/
 
-# Session session.json placeholder dir
+# Session / per-machine state
 data/
+.ruff_cache/
+.mypy_cache/
+

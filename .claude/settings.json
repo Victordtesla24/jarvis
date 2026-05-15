@@ -1,4 +1,59 @@
 {
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "ralph-loop-infinite",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[RALPH-LOOP-INFINITE] User explicitly invoked /ralph-loop-infinite — mandatory loop enforced' >> .ralph-infinite.log && date >> .ralph-infinite.log",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mengram auto-recall",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'INPUT=$(cat 2>/dev/null || echo \"\"); TS=$(date \"+%Y-%m-%d %H:%M:%S\"); LOG=.ralph-infinite.log; if echo \"$INPUT\" | grep -qiE \"COMPLETE|ralph.*loop.*complete|all.*tasks.*pass|loop.*exit|cancel-ralph\"; then echo \"[$TS] COMPLETE — ralph-loop-infinite clean exit\" >> $LOG; elif echo \"$INPUT\" | grep -qiE \"ralph-loop-infinite|LOOP-INFINITE: ACTIVE|Iteration [0-9]\"; then echo \"[$TS] LOOP-STOP — iteration stop (loop continuing)\" >> $LOG; else echo \"[$TS] BYPASS DETECTED — Stop fired WITHOUT ralph-loop-infinite active\" >> $LOG; fi'",
+            "timeout": 10,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "mengram auto-save --every 3",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mengram auto-context",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
   "enabledPlugins": {
     "frontend-design@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
@@ -25,6 +80,24 @@
     "code-review@claude-plugins-official": true,
     "code-simplifier@claude-plugins-official": true,
     "microsoft-docs@claude-plugins-official": true,
-    "coderabbit@claude-plugins-official": true
-  }
+    "coderabbit@claude-plugins-official": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "mcp-server-dev@claude-plugins-official": true,
+    "hookify@claude-plugins-official": true,
+    "csharp-lsp@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "atomic-agents@claude-plugins-official": true,
+    "data-engineering@claude-plugins-official": true,
+    "pydantic-ai@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "compound-engineering-plugin": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/EveryInc/compound-engineering-plugin.git"
+      },
+      "autoUpdate": true
+    }
+  },
+  "effortLevel": "xhigh"
 }

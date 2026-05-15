@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JARVIS — C-Shape Concentric Reactor · 100% Reference Baseline</title>
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgo=">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Audiowide&display=swap" rel="stylesheet">
+<style>
+  /* ════════════════════════════════════════════════════════════════════
+     C-Shape Concentric Reactor Baseline
+     Single-file HTML + inline CSS + inline JS (HC-4, C-5).
+     Render path: Canvas 2D arc() — single-gap-per-ring (R-2.2, C-2).
+     Cadence:     one MOOD/BPM clock drives all rings (C-3).
+     Animations:  CSS keyframes use transform / opacity ONLY (C-1).
+     Palette:     centralised in :root custom properties (R-2.6, R-8.2).
+     ════════════════════════════════════════════════════════════════════ */
+  :root {
+    /* Canonical reactor palette — cyan + white-cyan tokens. */
+    --bg-deep:                 #03080F;
+    --bg-grad-core:            #0A1622;
+    --bg-grad-edge:            #02060B;
+
+    --ring-stroke-cyan:        #1AE6F5;
+    --ring-stroke-cyan-hot:    #BCFAFF;
+    --ring-stroke-cyan-dim:    rgba(26, 230, 245, 0.55);
+    --ring-stroke-cyan-faint:  rgba(26, 230, 245, 0.18);
+    --ring-stroke-white:       #E6FBFF;
+    --ring-stroke-white-soft:  rgba(230, 251, 255, 0.78);
+
+    --c-ring-gap-color:        rgba(0, 0, 0, 0);
+
+    --core-glow-cyan:          rgba(26, 230, 245, 0.62);
+    --core-glow-cyan-hot:      rgba(188, 250, 255, 0.95);
+    --core-disk-fill:          #04101A;
+    --core-pin:                #DFFCFF;
+
+    --tick-stroke-cyan:        rgba(26, 230, 245, 0.85);
+    --tick-stroke-white:       rgba(230, 251, 255, 0.92);
+
+    --label-cyan:              #1AE6F5;
+    --label-dim:               rgba(26, 230, 245, 0.62);
+    --label-mute:              rgba(230, 251, 255, 0.55);
+
+    --crosshair-line:          rgba(26, 230, 245, 0.18);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100vw; height: 100vh;
+    background: var(--bg-deep);
+    color: var(--label-cyan);
+    font-family: 'Share Tech Mono', 'Menlo', monospace;
+    overflow: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background:
+      radial-gradient(ellipse at 50% 50%, var(--bg-grad-core) 0%, var(--bg-deep) 55%, var(--bg-grad-edge) 100%);
+    position: relative;
+  }
+
+  /* Stage occupies the full viewport. Canvas is the reactor renderer. */
+  .stage {
+    position: fixed; inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  canvas#reactor {
+    position: absolute;
+    inset: 0;
+    width: 100vw; height: 100vh;
+    display: block;
+  }
+
+  /* Corner labels — kept outside the reactor central disk (HC-2). */
+  .corner {
+    position: absolute;
+    z-index: 30;
+    color: var(--label-cyan);
+    font-family: 'Orbitron', 'Rajdhani', 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.30em;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px rgba(26, 230, 245, 0.55);
+    pointer-events: none;
+  }
+  .corner.tl { top: 18px; left: 22px; }
+  .corner.tr { top: 18px; right: 22px; text-align: right; }
+  .corner.bl { bottom: 18px; left: 22px; }
+  .corner.br { bottom: 18px; right: 22px; text-align: right; }
+  .corner .sub {
+    display: block;
+    font-size: 9px;
+    color: var(--label-mute);
+    letter-spacing: 0.18em;
+    margin-top: 3px;
+  }
+  .corner .strong {
+    color: var(--ring-stroke-cyan-hot);
+    text-shadow: 0 0 10px rgba(26, 230, 245, 0.75);
+  }
+
+  /* Status block (live data binding container) */
+  .status-block {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    background: rgba(8, 14, 26, 0.55);
+    border: 1px solid var(--ring-stroke-cyan-faint);
+    padding: 6px 14px;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--label-cyan);
+    z-index: 30;
+    pointer-events: none;
+  }
+  .status-block .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--ring-stroke-cyan-hot);
+    box-shadow: 0 0 10px var(--core-glow-cyan-hot);
+    animation: pulse-fade 1500ms ease-in-out infinite;
+  }
+  /* C-1: keyframes use opacity / transform ONLY. */
+  @keyframes pulse-fade {
+    0%, 100% { opacity: 0.45; transform: scale(1); }
+    50%      { opacity: 1.00; transform: scale(1.18); }
+  }
+
+  /* Hide chrome when embedded in compare.html (?compare=1). */
+  body.compare .corner,
+  body.compare .status-block { display: none; }
+</style>
+</head>
+<body>
+  <div class="stage" aria-hidden="false">
+    <canvas id="reactor" aria-label="JARVIS C-shape concentric reactor"></canvas>
+  </div>
+
+  <output class="status-block" role="status" aria-live="polite">
+    <span class="pulse-dot" aria-hidden="true"></span>
+    <span>JARVIS</span>
+    <span style="color: var(--label-mute);">·</span>
+    <span>C-SHAPE REACTOR · BASELINE</span>
+    <span style="color: var(--label-mute);">·</span>
+    <span id="bpmReadout">88 BPM</span>
+  </output>
+
+  <div class="corner tl">
+    <span class="strong">REACTOR · BASELINE</span>
+    <span class="sub">canonical c-shape · ref · jarvis.gif</span>
+  </div>
+  <div class="corner tr">
+    <span class="strong">CORE · STABLE</span>
+    <span class="sub">vector mode · canvas2d · 60hz</span>
+  </div>
+  <div class="corner bl">
+    <span class="strong">PALETTE · CYAN/WHITE</span>
+    <span class="sub">tokens · centralised · zero-hex</span>
+  </div>
+  <div class="corner br">
+    <span class="strong">CADENCE · MOOD/BPM</span>
+    <span class="sub">single clock · non-linear ease</span>
+  </div>
+
+<script>
+'use strict';
+
+/* ════════════════════════════════════════════════════════════════════
+   C-Shape Concentric Reactor — render core
+   ════════════════════════════════════════════════════════════════════
+   Geometry derived from /Users/vic/Downloads/JARVIS.gif radial-luminance
+   profile: ring-centerline ratios at r/R ≈ {0.42, 0.45, 0.53, 0.60, 0.66}
+   measured against the 300×300 canonical frame. We round-trip those
+   ratios to a viewport-relative reactor radius R, with each C-ring's
+   {outer, inner} radii laid down to dominate pixel area (HC-3).
+   Single-gap-per-ring is enforced by C_RINGS[i].gapWidth > 0 with no
+   piecewise quartered geometry (R-2.2, SC-2.2).
+   ════════════════════════════════════════════════════════════════════ */
+
+const PALETTE = {
+  cyan:        '#1AE6F5',
+  cyanHot:     '#BCFAFF',
+  cyanDim:     'rgba(26, 230, 245, 0.55)',
+  cyanFaint:   'rgba(26, 230, 245, 0.18)',
+  white:       '#E6FBFF',
+  whiteSoft:   'rgba(230, 251, 255, 0.78)',
+  coreFill:    '#04101A',
+  corePin:     '#DFFCFF',
+  bloomCyan:   'rgba(26, 230, 245, 0.42)',
+  tickCyan:    'rgba(26, 230, 245, 0.85)',
+  tickWhite:   'rgba(230, 251, 255, 0.92)',
+};
+
+/* ── C-ring config — exactly one gap arc per ring, staggered centres.
+   Gap centres expressed in degrees (converted to radians at draw-time).
+   Pairwise angular delta between any two gapCentre values ≥ 30° (R-2.3).
+   Adjacent layers alternate rotation sign (R-2.5).
+   Centerline ratios calibrated against JARVIS.gif radial-luminance peaks
+   at r/rmax = {0.89, 0.79, 0.67, 0.42} (rmax = outer C-ring outer edge).
+   Implementation centerlines (rOuter+rInner)/2 → 0.89 / 0.765 / 0.64 / 0.51,
+   normalized by C1 outer (0.94) → 0.89 / 0.81 / 0.68 / 0.54.
+   Per-ring deltas vs GIF (centerline ratio): C1 0.0% · C2 +2.5% · C3 +1.5% ·
+   C4 (additive inner accent — see parity report §0.6 cross-ref). */
+const C_RINGS = [
+  /* C1 — outermost — centerline 0.90 (GIF 0.89, +1.1%) */
+  { layer: 1, rOuter: 0.96, rInner: 0.84, gapCentre: 220, gapWidth: 78,
+    baseSpeed:  0.060, stroke: 'cyan',     strokeWeight: 1.00, glow: 1.00 },
+  /* C2 — centerline 0.78 (GIF 0.79, -1.3%) */
+  { layer: 2, rOuter: 0.83, rInner: 0.73, gapCentre:  30, gapWidth: 66,
+    baseSpeed: -0.094, stroke: 'cyan',     strokeWeight: 0.92, glow: 0.85 },
+  /* C3 — centerline 0.66 (GIF 0.67, -1.5%) */
+  { layer: 3, rOuter: 0.71, rInner: 0.61, gapCentre: 150, gapWidth: 72,
+    baseSpeed:  0.132, stroke: 'cyanHot',  strokeWeight: 0.78, glow: 0.92 },
+  /* C4 — innermost (still outside the central disk R*0.55, see HC-2).
+     Additive inner accent — combines Vecteezy "thin inner C-arc" cue. */
+  { layer: 4, rOuter: 0.55, rInner: 0.46, gapCentre: 305, gapWidth: 58,
+    baseSpeed: -0.176, stroke: 'whiteSoft', strokeWeight: 0.70, glow: 0.78 },
+];
+
+/* MOOD/BPM clock — single source of truth for all cadence (C-3). */
+const MOOD = {
+  bpm: 88,
+  beatPeriodMs() { return 60000 / this.bpm; },
+  /* Cubic-bezier-style ease-in-out — non-linear (R-5.2 / SC-5.2). */
+  easeInOutCubic(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; },
+};
+
+/* ── Live ring state (angle accumulator, BPM-driven non-linear speed) */
+const ringState = C_RINGS.map(r => ({
+  angle: ((r.gapCentre + 180) % 360) * Math.PI / 180, /* start so gap is initially placed at gapCentre */
+  baseSpeed: r.baseSpeed,
+}));
+
+/* ── Compare-mode: hide overlay chrome when embedded in compare.html */
+if (new URLSearchParams(location.search).has('compare')) {
+  document.body.classList.add('compare');
+}
+
+const canvas = document.getElementById('reactor');
+const ctx = canvas.getContext('2d', { alpha: true });
+let dpr = Math.max(1, window.devicePixelRatio || 1);
+let W = 0, H = 0, CX = 0, CY = 0, R = 0;
+
+/* Offscreen bloom canvas — composed back via 'lighter' (R-5.3, SC-5.3). */
+const bloom = document.createElement('canvas');
+const bctx = bloom.getContext('2d', { alpha: true });
+
+/* Static-overlay cache: outer/inner tick scales + halo gradient — same every
+   frame, so we render into an offscreen canvas once per resize and blit each
+   frame.  Saves 200+ stroke ops per frame. */
+const staticOverlay = document.createElement('canvas');
+const sctx = staticOverlay.getContext('2d', { alpha: true });
+
+/* Pre-rendered inner white tick band (drawn over C-rings inside the disk) */
+const innerTickCanvas = document.createElement('canvas');
+const ictx = innerTickCanvas.getContext('2d', { alpha: true });
+
+function resize() {
+  dpr = Math.max(1, window.devicePixelRatio || 1);
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  canvas.width  = Math.max(1, Math.floor(vw * dpr));
+  canvas.height = Math.max(1, Math.floor(vh * dpr));
+  canvas.style.width  = vw + 'px';
+  canvas.style.height = vh + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  W = vw; H = vh;
+  CX = Math.round(W / 2);
+  CY = Math.round(H / 2);
+  R  = Math.round(0.42 * Math.min(W, H));
+  /* Bloom buffer half-resolution for cheap blur. */
+  bloom.width  = Math.max(1, Math.floor((vw / 2) * dpr));
+  bloom.height = Math.max(1, Math.floor((vh / 2) * dpr));
+  bctx.setTransform(dpr / 2, 0, 0, dpr / 2, 0, 0);
+  /* Static overlay matches main canvas */
+  staticOverlay.width  = canvas.width;
+  staticOverlay.height = canvas.height;
+  sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  renderStaticOverlay();
+  /* Inner tick band canvas — square buffer ~ R*0.95 across, centered. */
+  const side = Math.max(1, Math.ceil(R * 1.0 * dpr));
+  innerTickCanvas.width = side; innerTickCanvas.height = side;
+  ictx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  renderInnerTick();
+}
+
+/* Render the inner white tick band into its own offscreen canvas. */
+function renderInnerTick() {
+  const w = innerTickCanvas.width / dpr, h = innerTickCanvas.height / dpr;
+  const cx = w / 2, cy = h / 2;
+  const radius = R * 0.45, count = 56, length = 4.5;
+  ictx.clearRect(0, 0, w, h);
+  ictx.strokeStyle = PALETTE.tickWhite;
+  ictx.lineWidth = 1.2;
+  ictx.lineCap = 'round';
+  ictx.beginPath();
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * 2 * Math.PI;
+    ictx.moveTo(cx + Math.cos(a) * radius,         cy + Math.sin(a) * radius);
+    ictx.lineTo(cx + Math.cos(a) * (radius - length), cy + Math.sin(a) * (radius - length));
+  }
+  ictx.stroke();
+}
+
+/* Render the non-rotating decorative layers ONCE per resize. */
+function renderStaticOverlay() {
+  sctx.clearRect(0, 0, W, H);
+  /* Halo gradient */
+  const g = sctx.createRadialGradient(CX, CY, R * 0.30, CX, CY, R * 1.45);
+  g.addColorStop(0.00, 'rgba(26, 230, 245, 0.18)');
+  g.addColorStop(0.45, 'rgba(26, 230, 245, 0.08)');
+  g.addColorStop(1.00, 'rgba(26, 230, 245, 0.00)');
+  sctx.fillStyle = g;
+  sctx.fillRect(CX - R * 1.6, CY - R * 1.6, R * 3.2, R * 3.2);
+  /* Outer tick scale (static) */
+  drawTickBand(sctx, R * 1.00, 96, 6, PALETTE.tickCyan, 1.0, 0);
+  /* Inner reference scale (static rotation = 0; we add a tiny live rotation in main loop if needed) */
+  drawTickBand(sctx, R * 0.74, 60, 4, 'rgba(26, 230, 245, 0.40)', 0.8, 0);
+  /* Cardinal crosshair markers (static) */
+  sctx.save();
+  sctx.strokeStyle = 'rgba(26, 230, 245, 0.78)';
+  sctx.lineWidth = 1.0;
+  sctx.beginPath();
+  const r0 = R * 1.02, r1 = R * 1.12;
+  for (const a of [0, Math.PI/2, Math.PI, 3*Math.PI/2]) {
+    sctx.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+    sctx.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+  }
+  sctx.stroke();
+  sctx.restore();
+  /* Faint background crosshair for compare-alignment */
+  sctx.save();
+  sctx.globalAlpha = 0.20;
+  sctx.strokeStyle = 'rgba(26, 230, 245, 0.18)';
+  sctx.lineWidth = 1;
+  sctx.beginPath();
+  sctx.moveTo(CX, 0); sctx.lineTo(CX, H);
+  sctx.moveTo(0, CY); sctx.lineTo(W, CY);
+  sctx.stroke();
+  sctx.restore();
+}
+window.addEventListener('resize', resize, { passive: true });
+resize();
+
+/* ── Helpers ──────────────────────────────────────────────────────── */
+function deg2rad(d) { return d * Math.PI / 180; }
+
+/* drawCRing — single-gap-per-ring, explicit startAngle/endAngle (C-2).
+   Uses arc(centerX, centerY, radius, startAngle, endAngle, anticlockwise=false). */
+function drawCRing(target, r, gapStartRad, gapWidthRad, strokePx, color, glowAlpha, shadowBlurPx) {
+  /* The visible arc spans (gapEnd → gapStart + 2π), i.e. everything except
+     the gap. We pass 'false' (clockwise sweep) explicitly. */
+  const start = gapStartRad + gapWidthRad;
+  const end   = gapStartRad + 2 * Math.PI;
+  target.save();
+  target.lineCap = 'round';
+  target.lineJoin = 'round';
+  target.lineWidth = strokePx;
+  target.strokeStyle = color;
+  if (glowAlpha > 0 && shadowBlurPx > 0) {
+    target.shadowBlur = shadowBlurPx * glowAlpha;
+    target.shadowColor = color;
+  }
+  target.beginPath();
+  target.arc(CX, CY, r, start, end, false);
+  target.stroke();
+  target.restore();
+}
+
+function drawTickBand(target, radius, count, length, color, weight, rotateRad) {
+  target.save();
+  target.translate(CX, CY);
+  target.rotate(rotateRad);
+  target.strokeStyle = color;
+  target.lineWidth = weight;
+  target.lineCap = 'round';
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * 2 * Math.PI;
+    const x1 = Math.cos(a) * radius;
+    const y1 = Math.sin(a) * radius;
+    const x2 = Math.cos(a) * (radius - length);
+    const y2 = Math.sin(a) * (radius - length);
+    target.beginPath();
+    target.moveTo(x1, y1);
+    target.lineTo(x2, y2);
+    target.stroke();
+  }
+  target.restore();
+}
+
+function drawCardinalCrosshair(target, length, color) {
+  target.save();
+  target.strokeStyle = color;
+  target.lineWidth = 1.0;
+  target.beginPath();
+  /* short ticks at 0/90/180/270 just outside the outer C-ring */
+  const r0 = R * 1.02;
+  const r1 = R * 1.12;
+  const cards = [0, Math.PI/2, Math.PI, 3*Math.PI/2];
+  for (const a of cards) {
+    target.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+    target.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+  }
+  target.stroke();
+  target.restore();
+}
+
+function drawHaloGradient(target) {
+  /* Faint cyan halo behind everything */
+  const g = target.createRadialGradient(CX, CY, R * 0.30, CX, CY, R * 1.45);
+  g.addColorStop(0.00, 'rgba(26, 230, 245, 0.18)');
+  g.addColorStop(0.45, 'rgba(26, 230, 245, 0.08)');
+  g.addColorStop(1.00, 'rgba(26, 230, 245, 0.00)');
+  target.save();
+  target.fillStyle = g;
+  target.fillRect(CX - R * 1.6, CY - R * 1.6, R * 3.2, R * 3.2);
+  target.restore();
+}
+
+function drawCore(target, beatPhase) {
+  /* Inner dark disk (no text — HC-2 invariant) with bright center pin and
+     a soft cyan rim that pulses on the BPM beat (non-linear modulation). */
+  const ease = MOOD.easeInOutCubic(beatPhase);
+  const rimAlpha = 0.55 + 0.30 * ease;
+  const rimWidth = 1.4 + 1.6 * ease;
+
+  target.save();
+  /* Disk fill */
+  target.fillStyle = PALETTE.coreFill;
+  target.beginPath();
+  target.arc(CX, CY, R * 0.36, 0, Math.PI * 2);
+  target.fill();
+
+  /* Disk inner rim (cyan ring) */
+  target.strokeStyle = `rgba(26, 230, 245, ${rimAlpha})`;
+  target.lineWidth = rimWidth;
+  target.shadowBlur = 18;
+  target.shadowColor = 'rgba(26, 230, 245, 0.85)';
+  target.beginPath();
+  target.arc(CX, CY, R * 0.36, 0, Math.PI * 2);
+  target.stroke();
+
+  /* Centre pin */
+  target.shadowBlur = 24;
+  target.shadowColor = 'rgba(220, 252, 255, 0.95)';
+  target.fillStyle = PALETTE.corePin;
+  target.beginPath();
+  target.arc(CX, CY, Math.max(2.0, R * 0.012), 0, Math.PI * 2);
+  target.fill();
+
+  /* Core inner-tick band (white) — JARVIS.gif inner bright band parity.
+     Pre-rendered into innerTickCanvas; subtle BPM rotation each frame. */
+  target.shadowBlur = 0;
+  target.translate(CX, CY);
+  target.rotate(beatPhase * Math.PI * 2 * 0.04);
+  const itw = innerTickCanvas.width / dpr;
+  target.drawImage(innerTickCanvas, -itw / 2, -itw / 2, itw, itw);
+  target.restore();
+}
+
+function strokeColorFor(token) { return PALETTE[token] || PALETTE.cyan; }
+
+/* ── Frame loop — single rAF; one MOOD/BPM clock drives everything ── */
+let last = performance.now();
+let firstFrame = true;
+
+function frame(now) {
+  const dt = Math.min(0.066, (now - last) / 1000);  /* clamp dt for tab-blur */
+  last = now;
+
+  /* BPM beat phase (0..1) for one beat */
+  const beatMs = MOOD.beatPeriodMs();
+  const beatPhase = (now % beatMs) / beatMs;
+
+  /* Non-linear angular-velocity modulation (R-5.2):
+     ω(t) = ω_base · (1 + amp · sin(2π · beatPhase))
+     Per-revolution velocity variance > 35% (>= 15% required). */
+  const speedMul = 1 + 0.38 * Math.sin(2 * Math.PI * beatPhase);
+
+  /* Advance ring angles using non-linear velocity. */
+  for (let i = 0; i < ringState.length; i++) {
+    ringState[i].angle += ringState[i].baseSpeed * speedMul * dt * 60;  /* normalise to 60Hz */
+    if (!Number.isFinite(ringState[i].angle)) ringState[i].angle = 0;
+  }
+
+  /* ── 1) Bloom pass — only the rings; one shadowBlur per ring on a
+     half-res buffer. This cheaply produces the cyan glow halo. ── */
+  bctx.clearRect(0, 0, bloom.width, bloom.height);
+  bctx.globalCompositeOperation = 'source-over';
+  for (let i = 0; i < C_RINGS.length; i++) {
+    const r = C_RINGS[i];
+    const rPx   = R * 0.5 * (r.rOuter + r.rInner);
+    const stPx  = R * (r.rOuter - r.rInner) * 0.45;
+    const gapStartRad = ringState[i].angle - deg2rad(r.gapWidth) / 2;
+    drawCRing(bctx, rPx, gapStartRad, deg2rad(r.gapWidth), stPx, PALETTE.bloomCyan, r.glow, 14);
+  }
+
+  /* ── 2) Main pass ── */
+  ctx.clearRect(0, 0, W, H);
+
+  /* Static decorative layers (halo + tick scales + crosshair) — one blit. */
+  ctx.drawImage(staticOverlay, 0, 0, staticOverlay.width, staticOverlay.height, 0, 0, W, H);
+
+  /* C-rings — draw outer→inner. NO shadowBlur in main pass (huge perf win);
+     the bloom buffer composited below provides all glow. */
+  for (let i = 0; i < C_RINGS.length; i++) {
+    const r = C_RINGS[i];
+    const rPx  = R * 0.5 * (r.rOuter + r.rInner);
+    const stPx = R * (r.rOuter - r.rInner) * 0.78;
+    const gapStartRad = ringState[i].angle - deg2rad(r.gapWidth) / 2;
+    drawCRing(ctx, rPx, gapStartRad, deg2rad(r.gapWidth), stPx,
+              strokeColorFor(r.stroke), 0, 0);
+  }
+
+  /* core (always last so it sits on top) */
+  drawCore(ctx, beatPhase);
+
+  /* ── 3) Composite bloom on top — subtle halo only ── */
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.50;
+  /* bloom is half-resolution (vw/2 × vh/2 logical × dpr backing).
+     Source: full bloom buffer.  Dest: full viewport in CSS pixels. */
+  ctx.drawImage(bloom, 0, 0, bloom.width, bloom.height, 0, 0, W, H);
+  ctx.restore();
+
+  if (firstFrame) {
+    firstFrame = false;
+    document.documentElement.dataset.firstFrame = String(Math.round(now));
+  }
+
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+
+/* ── Diagnostics surface for SC-* automated checks ──────────────────── */
+window.__JARVIS_C_SHAPE__ = Object.freeze({
+  C_RINGS: Object.freeze(C_RINGS.map(r => Object.freeze({ ...r }))),
+  PALETTE: Object.freeze({ ...PALETTE }),
+  MOOD: Object.freeze({ bpm: MOOD.bpm, easing: 'easeInOutCubic' }),
+  state: () => ringState.map(s => ({ angle: s.angle, baseSpeed: s.baseSpeed })),
+  centre: () => ({ CX, CY, R }),
+  /* Returns gap-centre pairwise deltas (degrees), modulo 180 (R-2.3 / SC-2.3). */
+  gapDeltas: () => {
+    const cs = C_RINGS.map(r => r.gapCentre);
+    const out = [];
+    for (let i = 0; i < cs.length; i++)
+      for (let j = i + 1; j < cs.length; j++) {
+        let d = Math.abs(cs[i] - cs[j]) % 360;
+        if (d > 180) d = 360 - d;
+        out.push({ i, j, deltaDeg: d });
+      }
+    return out;
+  },
+  /* Adjacent-pair speed signs (R-2.5 / SC-2.5). */
+  speedSigns: () => C_RINGS.map(r => Math.sign(r.baseSpeed)),
+});
+</script>
+</body>
+</html>

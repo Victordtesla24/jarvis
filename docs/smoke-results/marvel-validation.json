@@ -1,0 +1,291 @@
+{
+  "T-4_HTTP200": "PASS \u2014 all 5 URLs 200",
+  "T-37_viewport_captures": {
+    "1280x720": {
+      "path": "docs/jarvis-uhd-cinematic-v2-parity/marvel/marvel-1280.png",
+      "console_errors": 0,
+      "exists": true,
+      "size": 374192
+    },
+    "1920x1080": {
+      "path": "docs/jarvis-uhd-cinematic-v2-parity/marvel/marvel-1920.png",
+      "console_errors": 0,
+      "exists": true,
+      "size": 601762
+    },
+    "2560x1440": {
+      "path": "docs/jarvis-uhd-cinematic-v2-parity/marvel/marvel-2560.png",
+      "console_errors": 0,
+      "exists": true,
+      "size": 849307
+    },
+    "3840x2160": {
+      "path": "docs/jarvis-uhd-cinematic-v2-parity/marvel/marvel-3840.png",
+      "console_errors": 0,
+      "exists": true,
+      "size": 1455780
+    }
+  },
+  "T-56_pixel_dominance": {
+    "size": [
+      1920,
+      1080
+    ],
+    "annulus_bright": 221,
+    "core_bright": 38,
+    "total_bright": 25463
+  },
+  "T-10_scene_introspection": {
+    "coreRings": [
+      {
+        "name": "coreRingInner",
+        "metalness": 0.82,
+        "roughness": 0.22,
+        "emissiveIntensity": 3.1700053658234353,
+        "emissive": "#1ae6f5"
+      },
+      {
+        "name": "coreRingMid",
+        "metalness": 0.82,
+        "roughness": 0.22,
+        "emissiveIntensity": 2.0400030661848203,
+        "emissive": "#1ae6f5"
+      },
+      {
+        "name": "coreRingOuter",
+        "metalness": 0.82,
+        "roughness": 0.22,
+        "emissiveIntensity": 1.3750019163655127,
+        "emissive": "#1ae6f5"
+      }
+    ],
+    "particleCount": 80,
+    "phase": "NOMINAL",
+    "bloomMul": 0.5500038327310253,
+    "ringSpeedMul": 1.0999999999999888,
+    "audioFallback": "silent",
+    "hasJT": true,
+    "bodyPhaseClass": "phase-nominal",
+    "cameraZ": 9
+  },
+  "T-17_svg_inventory": {
+    "paths": 20,
+    "circles": 22,
+    "leafDurs": [
+      2.4,
+      2.6,
+      2.8,
+      3,
+      2.2,
+      2.5,
+      2.5,
+      2.8,
+      3.2,
+      3.4,
+      3.6,
+      3.8,
+      2.3,
+      2.7,
+      2.9,
+      3.1,
+      2.4,
+      2.6,
+      2.8,
+      3,
+      2.5,
+      2.8
+    ],
+    "leafDursMin": 2.2
+  },
+  "T-20_disk_text_overlap": {
+    "R": 194.4,
+    "offenders": [],
+    "offenderCount": 0
+  },
+  "T-40_T-43_dom_scan": {
+    "teleFound": [
+      "cpuPct",
+      "gpuPct",
+      "memPct",
+      "tempC",
+      "powerW",
+      "netRate"
+    ],
+    "modes": [
+      "HOME",
+      "SEC",
+      "DIAG",
+      "NET",
+      "MEDIA"
+    ],
+    "hasExpectedModes": true,
+    "tlCalendar": true,
+    "leftPower": true,
+    "leftComm": true,
+    "amberTexts": [
+      "CPU LOAD 12% \u00b7 NOMINAL",
+      "MEM 48% \u00b7 STABLE",
+      "THERM 42C \u00b7 STABLE",
+      "PWR 15W \u00b7 IDLE BAND"
+    ]
+  },
+  "T-44_trigger_panel": [
+    {
+      "kind": "cpu",
+      "before": "12",
+      "after": "92",
+      "particles_before": 80,
+      "particles_after": 80,
+      "changed": true
+    },
+    {
+      "kind": "gpu",
+      "before": "8",
+      "after": "96",
+      "particles_before": 80,
+      "particles_after": 80,
+      "changed": true
+    },
+    {
+      "kind": "memory",
+      "before": "48",
+      "after": "88",
+      "particles_before": 80,
+      "particles_after": 80,
+      "changed": true
+    },
+    {
+      "kind": "thermal",
+      "before": "42",
+      "after": "94",
+      "particles_before": 80,
+      "particles_after": 80,
+      "changed": true
+    },
+    {
+      "kind": "power",
+      "before": "15",
+      "after": "48",
+      "particles_before": 80,
+      "particles_after": 80,
+      "changed": true
+    },
+    {
+      "kind": "charge",
+      "before": "72",
+      "after": "72",
+      "particles_before": 80,
+      "particles_after": 144,
+      "changed": true
+    },
+    {
+      "kind": "network",
+      "before": "0.0",
+      "after": "75.0",
+      "particles_before": 144,
+      "particles_after": 144,
+      "changed": true
+    },
+    {
+      "kind": "disk",
+      "before": "75.0",
+      "after": "85.0",
+      "particles_before": 123,
+      "particles_after": 99,
+      "changed": true
+    }
+  ],
+  "T-22_pearson_bloom_bass": 0.8213404720381765,
+  "T-23_pearson_speed_midtreb": 0.7195033799260555,
+  "T-24_silent_fallback": true,
+  "T-46_hover_neural_line": {
+    "before": 1.2,
+    "after": 2.2,
+    "delta": 1.0000000000000002
+  },
+  "T-47_keyboard": [
+    {
+      "key": "Space",
+      "phase": "BOOT"
+    },
+    {
+      "key": "Enter",
+      "phase": "SHUTDOWN"
+    },
+    {
+      "key": "KeyB",
+      "phase": "SHUTDOWN"
+    },
+    {
+      "key": "KeyC",
+      "phase": "SHUTDOWN"
+    },
+    {
+      "key": "KeyR",
+      "phase": "SHUTDOWN"
+    },
+    {
+      "key": "KeyL",
+      "phase": "LOCK"
+    }
+  ],
+  "T-48_getAnimations": 0,
+  "T-51_external_cdn": {
+    "refs": [
+      {
+        "tag": "link",
+        "url": "https://fonts.googleapis.com"
+      },
+      {
+        "tag": "link",
+        "url": "https://fonts.gstatic.com"
+      },
+      {
+        "tag": "link",
+        "url": "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Audiowide&display=swap"
+      }
+    ],
+    "gfonts_only": true
+  },
+  "T-35_compare_chip": {
+    "chipPresent": true,
+    "srcBefore": "jarvis-vecteezy-baseline.html?compare=1",
+    "srcAfter": "jarvis-reactor-cinematic-marvel.html?compare=1&t=1776602527305"
+  },
+  "T-29_fps_samples": [
+    55.92729451729419,
+    60.9573298689101,
+    79.9440391723411,
+    61.93806193806194,
+    64.95453182801076,
+    59.87426404541541,
+    61.87624750499002,
+    81.8771842236645,
+    64.92857856348343,
+    66.87961669015704
+  ],
+  "T-29_fps_mean": 65.91571483523285,
+  "T-59_effects_screenshot": "docs/jarvis-uhd-cinematic-v2-parity/marvel/marvel-cinematic-effects.png",
+  "console_errors_total": [],
+  "T-60_placeholder_scan": {
+    "hits": [],
+    "count": 0
+  },
+  "T-grep": {
+    "T-5_EffectComposer": true,
+    "T-5_RenderPass": true,
+    "T-5_EffectPass": true,
+    "T-7_ChromaticAberrationEffect": true,
+    "T-8_flare_vec3": true,
+    "T-12_SpotLight": true,
+    "T-12_volumetric_true": true,
+    "T-14_three_particles_import": true,
+    "T-14_RendererType_INSTANCED": true,
+    "T-21_Meyda_createMeydaAnalyzer_MOOD": true,
+    "T-25_gsap_MotionPathPlugin": true,
+    "T-27_PerspectiveCamera_dolly": true,
+    "T-28_single_rAF": true,
+    "T-28_no_setInterval_animation": true,
+    "T-28_setInterval_call_count": 1
+  }
+}

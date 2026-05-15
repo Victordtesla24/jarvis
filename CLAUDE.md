@@ -71,17 +71,29 @@ JARVIS Telemetry — a cinema-grade macOS HUD that renders a full-screen Iron Ma
 
 ## Build & Run
 
+The primary workflow uses the wrapper scripts at repo root — they assemble the `.app` bundle, launch it, and stop it cleanly.
+
 ```bash
-# Build Go daemon (must be done first — binary is bundled as a Swift resource)
+# Build the complete JarvisWallpaper.app bundle (SPM build + Info.plist + HTML)
+./build-app.sh
+
+# Launch JARVIS (prefers .app bundle, falls back to SPM binary)
+./start-jarvis.sh
+
+# Graceful shutdown (6s HTML shutdown animation then exit)
+./stop-jarvis.sh
+```
+
+For manual dev loops:
+
+```bash
+# Build Go daemon (binary is bundled as a Swift resource)
 cd mactop
 go build -o ../JarvisTelemetry/Sources/JarvisTelemetry/Resources/jarvis-mactop-daemon .
 
 # Build Swift app
 cd JarvisTelemetry
 swift build -c release
-
-# Run (requires sudo for IOKit/SMC sensor access)
-sudo .build/release/JarvisTelemetry
 ```
 
 ## Test & Lint
@@ -95,22 +107,26 @@ make test          # go test -v ./internal/app/...
 make sexy          # gofmt, go vet, gocyclo (max 15), ineffassign
 ```
 
-No Swift tests currently exist.
+Swift tests exist under JarvisTelemetry/Tests/JarvisTelemetryTests/. Run with: cd JarvisTelemetry && swift test.
+
+Python pipeline tests live under scripts/promo-video/tests/. Run with: python3 -m pytest scripts/promo-video/tests/ (or unittest if pytest is unavailable).
 
 ## Architecture
+
+AppDelegate loads jarvis-full-animation.html via WKWebView; telemetry injects via evaluateJavaScript. SwiftUI Canvas JarvisHUDView is secondary.
 
 ```
 Go Daemon (mactop --headless)
   → 1Hz JSON lines via NSPipe
     → TelemetryBridge (async stream reader, JSON decoder)
-      → TelemetryStore (@Published, normalizes to 0.0-1.0)
-        → JarvisHUDView (SwiftUI Canvas @ 60fps)
-          → AppDelegate (NSWindow @ kCGDesktopWindowLevel, one per screen)
+      → AppDelegate.injectFullTelemetry (@MainActor)
+        → WKWebView → updateTelemetry(JSON.parse(...)) in jarvis-full-animation.html
+          → Canvas engine paints at 60fps on the desktop wallpaper layer
 ```
 
 **Go daemon** (`mactop/internal/app/`): Reads CPU/GPU/memory/thermal/power sensors via IOKit, SMC (C), and IOReport (Obj-C) bindings. `headless.go` handles JSON output mode for JARVIS. `app.go` is the coordinator. Three custom metrics: DVHOP (VM overhead %), GUMER (GPU memory eviction MB/s), CCTC (thermal cost above 50°C baseline).
 
-**Swift frontend** (`JarvisTelemetry/Sources/JarvisTelemetry/`): Pure vector rendering — no images or textures. `JarvisHUDView.swift` (1400+ lines) contains the reactor canvas and 15+ view structs. `TelemetryBridge.swift` launches the daemon subprocess and streams JSON. `AppDelegate.swift` manages wallpaper-layer windows. `JarvisPreloader.swift` runs a SceneKit boot sequence.
+**Swift frontend** (`JarvisTelemetry/Sources/JarvisTelemetry/`): WKWebView-backed wallpaper — the HTML/JS engine at `jarvis-full-animation.html` owns the render loop. `AppDelegate.swift` (1200+ lines) orchestrates WKWebView windows, telemetry injection, lock-screen animation, battery events, signal handling. `TelemetryBridge.swift` launches the daemon subprocess and streams JSON. `JarvisHUDView.swift` is a pure-SwiftUI secondary renderer (Canvas + TimelineView) kept for compatibility — no longer the primary render path.
 
 ## Go Conventions (from .cursorrules)
 
@@ -132,7 +148,7 @@ Go Daemon (mactop --headless)
 
 ## Key Constraints
 
-- macOS 14+ / Apple Silicon only (M1/M2/M3/M4)
-- Swift Package Manager (not Xcode project)
-- CGO required (C/Obj-C bindings for IOKit, SMC, IOReport)
-- Daemon binary must be rebuilt and placed in `Resources/` before Swift build picks up changes
+- macOS 15+ (Sequoia) / Apple Silicon only (M1/M2/M3/M4).
+- Swift Package Manager (not Xcode project).
+- CGO required (C/Obj-C bindings for IOKit, SMC, IOReport).
+- Daemon binary must be rebuilt and placed in `Resources/` before Swift build picks up changes.

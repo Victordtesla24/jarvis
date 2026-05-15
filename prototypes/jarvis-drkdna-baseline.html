@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JARVIS — DrKDnA Baseline (J.A.R.V.I.S UI Match)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  :root {
+    /* Palette extracted from DrKDnA J.A.R.V.I.S UI keyframes (00 / 12 / 24) */
+    --bg-base:        #0A0E12;     /* dark slate-black bg (NOT pure black) */
+    --bg-mesh:        #131A22;     /* hex grid faint cell */
+    --cy-blue:        #00BFFF;     /* primary bright cyan-blue */
+    --cy-blue-hot:    #80E0FF;     /* highlight */
+    --cy-blue-dim:    #00709A;     /* dim shadow */
+    --teal-mint:      #3FFFD0;     /* center disc mint-teal */
+    --teal-mint-hot:  #B8FFEC;     /* center disc highlight */
+    --teal-mint-dim:  #1F8270;     /* center disc shadow */
+    --orange-acc:     #FF8C00;     /* small orange progress arc */
+    --orange-hot:     #FFAB33;     /* orange highlight */
+    --red-warn:       #FF3030;     /* perimeter warning markers */
+    --white-marker:   #DCE6F0;     /* perimeter status markers */
+    --frame-line:     #6E7B86;     /* thin outer frame strokes */
+    --text-cyan:      #5FF0FF;     /* J.A.R.V.I.S wordmark */
+  }
+  html, body {
+    width: 100vw; height: 100vh;
+    background: var(--bg-base);
+    overflow: hidden;
+    color: var(--cy-blue);
+    font-family: 'Share Tech Mono', 'Menlo', monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Layered canvas stack — strict z-order back→front */
+  canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+  }
+  #bgCanvas      { z-index: 0; }     /* slate bg + hex/dot mesh */
+  #bloomFar      { z-index: 1; filter: blur(48px); opacity: 0.50; mix-blend-mode: screen; }
+  #bloomMid      { z-index: 1; filter: blur(20px); opacity: 0.65; mix-blend-mode: screen; }
+  #mainCanvas    { z-index: 2; }     /* primary draw surface */
+  #bloomNear     { z-index: 2; filter: blur(8px);  opacity: 0.55; mix-blend-mode: screen; }
+  #grainCanvas   { z-index: 9; mix-blend-mode: overlay; opacity: 0.030; pointer-events: none; }
+  /* Subtle screen-edge vignette — DrKDnA frame has a slight darker edge */
+  #vignette {
+    position: fixed; inset: 0; z-index: 8; pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      transparent 55%,
+      rgba(0,0,0,0.35) 80%,
+      rgba(0,0,0,0.78) 100%);
+  }
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<canvas id="bloomFar"></canvas>
+<canvas id="bloomMid"></canvas>
+<canvas id="mainCanvas"></canvas>
+<canvas id="bloomNear"></canvas>
+<canvas id="grainCanvas"></canvas>
+<div id="vignette"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// JARVIS DrKDnA Baseline — J.A.R.V.I.S UI rebuild from DrKDnA reference GIF
+// (https://www.deviantart.com/drkdna/art/J-A-R-V-I-S-UI-608814550)
+// Frames sampled: prototypes/refs/drkdna-jarvis-ui-frame-{00,12,24}.png
+// ═══════════════════════════════════════════════════════════════════════════
+// Layer composition (back → front, exactly as observed in the reference):
+//   1. Slate-black background + subtle hex/dot mesh
+//   2. Far bloom halo behind reactor
+//   3. Outer frame: thin curved bracket + scattered red/white markers
+//   4. "TURN UP / SYSTEM" label band on the upper inner-arc bracket
+//   5. Multiple thin concentric ring layers, some segmented, some dashed
+//   6. Multiple rotating cyan arc segments at varying CW/CCW speeds
+//   7. Bright dense cyan-blue dotted/segmented inner ring (signature feature)
+//   8. Small orange progress arc on the inner-left
+//   9. Mint-teal radial centre disc with J.A.R.V.I.S wordmark + BETA + MARK II
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TAU = Math.PI * 2;
+const DEG = Math.PI / 180;
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
+
+const CANVAS_IDS = ['bgCanvas','bloomFar','bloomMid','mainCanvas','bloomNear','grainCanvas'];
+const canvases = {}, ctxs = {};
+for (const id of CANVAS_IDS) {
+  canvases[id] = document.getElementById(id);
+  ctxs[id] = canvases[id].getContext('2d');
+}
+const c_bg     = ctxs.bgCanvas;
+const c_bloomF = ctxs.bloomFar;
+const c_bloomM = ctxs.bloomMid;
+const c_main   = ctxs.mainCanvas;
+const c_bloomN = ctxs.bloomNear;
+const c_grain  = ctxs.grainCanvas;
+
+let W, H, CX, CY, R;
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  CX = W / 2;
+  CY = H / 2;
+  R = Math.min(W, H) * 0.42;          // bigger than V3 (0.32) to fill the canvas like DrKDnA
+  for (const id of CANVAS_IDS) {
+    const c = canvases[id];
+    c.width = W * DPR;
+    c.height = H * DPR;
+    c.style.width = W + 'px';
+    c.style.height = H + 'px';
+    ctxs[id].setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  paintHexMesh();
+}
+window.addEventListener('resize', resize);
+
+// ═══ EASING ═══
+function inertia(t, omega, opts) {
+  const o = opts || {};
+  const a = o.amp != null ? o.amp : 0.18;
+  const b = o.freq != null ? o.freq : 0.32;
+  return omega * t + a * Math.sin(b * t + (o.offset || 0));
+}
+
+// ═══ HEX/DOT MESH BACKGROUND — painted ONCE per resize ═══
+// DrKDnA bg shows a faint hexagonal-dot mesh visible inside the dark area.
+function paintHexMesh() {
+  c_bg.fillStyle = '#0A0E12';
+  c_bg.fillRect(0, 0, W, H);
+  // Dot-grid mesh (hex-equivalent at sparse spacing)
+  c_bg.fillStyle = 'rgba(110, 145, 180, 0.10)';
+  const step = 16;
+  for (let y = 0; y <= H + step; y += step) {
+    const offset = ((y / step) % 2 === 0) ? 0 : step / 2;
+    for (let x = 0; x <= W + step; x += step) {
+      c_bg.fillRect(x + offset, y, 1.2, 1.2);
+    }
+  }
+  // Vignette gradient overlay (darker corners)
+  const vg = c_bg.createRadialGradient(CX, CY, R * 0.2, CX, CY, Math.hypot(W, H) * 0.55);
+  vg.addColorStop(0, 'rgba(10, 14, 18, 0)');
+  vg.addColorStop(0.55, 'rgba(8, 10, 14, 0.55)');
+  vg.addColorStop(1, 'rgba(0, 0, 0, 0.96)');
+  c_bg.fillStyle = vg;
+  c_bg.fillRect(0, 0, W, H);
+}
+
+// ═══ FAR BLOOM HALO — broad cyan-blue glow behind the reactor ═══
+function drawFarHalo(t) {
+  const env = 0.78 + 0.22 * Math.sin(t * 0.42);
+  const g = c_bloomF.createRadialGradient(CX, CY, R * 0.05, CX, CY, R * 0.95);
+  g.addColorStop(0,    'rgba(80, 220, 255, ' + (0.45 * env).toFixed(3) + ')');
+  g.addColorStop(0.30, 'rgba(0, 200, 255,  ' + (0.32 * env).toFixed(3) + ')');
+  g.addColorStop(0.65, 'rgba(0, 160, 230,  ' + (0.18 * env).toFixed(3) + ')');
+  g.addColorStop(1,    'rgba(0, 80, 130,   0.00)');
+  c_bloomF.fillStyle = g;
+  c_bloomF.beginPath(); c_bloomF.arc(CX, CY, R * 0.95, 0, TAU); c_bloomF.fill();
+  // Localised mid-bloom around the inner bright dotted ring
+  const g2 = c_bloomM.createRadialGradient(CX, CY, R * 0.05, CX, CY, R * 0.40);
+  g2.addColorStop(0,    'rgba(120, 240, 255, 0.45)');
+  g2.addColorStop(0.50, 'rgba(0, 200, 255, 0.32)');
+  g2.addColorStop(1,    'rgba(0, 120, 200, 0.00)');
+  c_bloomM.fillStyle = g2;
+  c_bloomM.beginPath(); c_bloomM.arc(CX, CY, R * 0.40, 0, TAU); c_bloomM.fill();
+}
+
+// ═══ MID-RING LAYER STACK — thin concentric circles with rotating segments ═══
+// DrKDnA frames show: a few thin static rings + a few rotating arc segments.
+// All in cyan-blue with subtle bloom.
+const MID_RINGS = [
+  // r        kind          omega    width  alpha   color           extra
+  { r: 0.36, kind: 'thin',   omega:  0.000,  w: 0.8, a: 0.42, col: '0,191,255' },
+  { r: 0.40, kind: 'thin',   omega:  0.000,  w: 0.6, a: 0.30, col: '0,191,255' },
+  { r: 0.45, kind: 'dashed', omega: -0.030,  w: 0.9, a: 0.62, col: '0,191,255', dashes: 90, dashFrac: 0.40 },
+  { r: 0.50, kind: 'thin',   omega:  0.000,  w: 0.7, a: 0.32, col: '0,191,255' },
+  { r: 0.56, kind: 'arc',    omega:  0.060,  w: 1.6, a: 0.85, col: '120,224,255', segs: [[0, 80], [200, 280]] },
+  { r: 0.62, kind: 'thin',   omega:  0.000,  w: 0.5, a: 0.22, col: '0,191,255' },
+  { r: 0.66, kind: 'dashed', omega:  0.035,  w: 0.6, a: 0.40, col: '0,191,255', dashes: 144, dashFrac: 0.35 },
+  { r: 0.72, kind: 'arc',    omega: -0.045,  w: 1.4, a: 0.78, col: '128,224,255', segs: [[60, 130], [240, 320]] },
+  { r: 0.78, kind: 'thin',   omega:  0.000,  w: 0.5, a: 0.18, col: '0,191,255' },
+];
+
+function drawMidRings(t) {
+  for (let i = 0; i < MID_RINGS.length; i++) {
+    const ring = MID_RINGS[i];
+    const rr = ring.r * R;
+    const rot = ring.omega !== 0
+      ? inertia(t, ring.omega, { amp: 0.18, freq: 0.32 + i * 0.04, offset: ring.r * 7.0 })
+      : 0;
+
+    if (ring.kind === 'thin') {
+      c_main.strokeStyle = 'rgba(' + ring.col + ',' + ring.a.toFixed(3) + ')';
+      c_main.lineWidth = ring.w;
+      c_main.beginPath(); c_main.arc(CX, CY, rr, 0, TAU); c_main.stroke();
+    } else if (ring.kind === 'dashed') {
+      const step = TAU / ring.dashes;
+      const dashArc = step * ring.dashFrac;
+      c_main.strokeStyle = 'rgba(' + ring.col + ',' + ring.a.toFixed(3) + ')';
+      c_main.lineWidth = ring.w;
+      for (let s = 0; s < ring.dashes; s++) {
+        const a0 = rot + s * step;
+        c_main.beginPath();
+        c_main.arc(CX, CY, rr, a0, a0 + dashArc);
+        c_main.stroke();
+      }
+    } else if (ring.kind === 'arc') {
+      // Bright C-shape rotating segments — DrKDnA's signature mid-rings
+      for (const seg of ring.segs) {
+        const a0 = rot + seg[0] * DEG;
+        const a1 = rot + seg[1] * DEG;
+        const pulse = 0.78 + 0.22 * Math.sin(t * 1.1 + i * 0.7);
+        // Sharp main stroke
+        c_main.strokeStyle = 'rgba(' + ring.col + ',' + (ring.a * pulse).toFixed(3) + ')';
+        c_main.lineWidth = ring.w;
+        c_main.beginPath(); c_main.arc(CX, CY, rr, a0, a1); c_main.stroke();
+        // Bloom near + bloom mid for vibrancy
+        c_bloomN.strokeStyle = 'rgba(' + ring.col + ',' + (ring.a * 0.6 * pulse).toFixed(3) + ')';
+        c_bloomN.lineWidth = ring.w + 2.5;
+        c_bloomN.beginPath(); c_bloomN.arc(CX, CY, rr, a0, a1); c_bloomN.stroke();
+        c_bloomM.strokeStyle = 'rgba(0,200,255,' + (0.45 * pulse).toFixed(3) + ')';
+        c_bloomM.lineWidth = ring.w + 6;
+        c_bloomM.beginPath(); c_bloomM.arc(CX, CY, rr, a0, a1); c_bloomM.stroke();
+      }
+    }
+  }
+}
+
+// ═══ DENSE CYAN DOTTED RING — DrKDnA's signature inner brightness band ═══
+// At ~0.30R, dense small bright cyan dots (~120 dots, all the way around).
+// Slow CCW rotation. Each dot pulses at its own phase.
+function drawDottedRing(t) {
+  const rr = 0.30 * R;
+  const dots = 96;
+  const rot = inertia(t, -0.090, { amp: 0.10, freq: 0.42, offset: 1.3 });
+  const dotR = R * 0.013;
+  for (let i = 0; i < dots; i++) {
+    const a = rot + (TAU / dots) * i;
+    const pulsePhase = t * 1.6 + i * 0.21;
+    const intensity = 0.55 + 0.45 * Math.sin(pulsePhase);
+    const x = CX + Math.cos(a) * rr;
+    const y = CY + Math.sin(a) * rr;
+    // Sharp dot
+    c_main.fillStyle = 'rgba(0, 200, 255, ' + (0.62 + 0.32 * intensity).toFixed(3) + ')';
+    c_main.beginPath(); c_main.arc(x, y, dotR, 0, TAU); c_main.fill();
+    // Bloom for the vibrant pop
+    c_bloomN.fillStyle = 'rgba(0, 200, 255, ' + (0.55 * intensity).toFixed(3) + ')';
+    c_bloomN.beginPath(); c_bloomN.arc(x, y, dotR + 2, 0, TAU); c_bloomN.fill();
+  }
+  // Inner thin guide ring
+  c_main.strokeStyle = 'rgba(0, 200, 255, 0.32)';
+  c_main.lineWidth = 0.7;
+  c_main.beginPath(); c_main.arc(CX, CY, rr - dotR - 2, 0, TAU); c_main.stroke();
+  c_main.beginPath(); c_main.arc(CX, CY, rr + dotR + 2, 0, TAU); c_main.stroke();
+}
+
+// ═══ ORANGE PROGRESS ARC — small accent on the inner-left ═══
+// DrKDnA shows a small orange arc segment at ~9 o'clock position (~180° in
+// canvas-Y-down coords). It's the only non-cyan element in the inner zone.
+function drawOrangeArc(t) {
+  const rr = R * 0.252;
+  const startDeg = 145, endDeg = 215;
+  const pulse = 0.85 + 0.15 * Math.sin(t * 0.9);
+  // Background dim track (subtle)
+  c_main.strokeStyle = 'rgba(255, 140, 0, 0.10)';
+  c_main.lineWidth = R * 0.018;
+  c_main.beginPath();
+  c_main.arc(CX, CY, rr, startDeg * DEG, endDeg * DEG);
+  c_main.stroke();
+  // Bright filled arc — orange dashed segments
+  const segs = 12;
+  const step = (endDeg - startDeg) / segs;
+  for (let i = 0; i < segs; i++) {
+    const a0 = (startDeg + i * step) * DEG;
+    const a1 = (startDeg + (i + 1) * step - 1.2) * DEG;
+    const intensity = 0.55 + 0.45 * Math.sin(t * 1.4 + i * 0.5);
+    c_main.strokeStyle = 'rgba(255, 140, 0, ' + (0.78 + 0.18 * intensity).toFixed(3) + ')';
+    c_main.lineWidth = R * 0.015;
+    c_main.beginPath();
+    c_main.arc(CX, CY, rr, a0, a1);
+    c_main.stroke();
+    // Bloom on the orange — keeps the only non-cyan accent visible
+    c_bloomN.strokeStyle = 'rgba(255, 170, 50, ' + (0.55 * intensity * pulse).toFixed(3) + ')';
+    c_bloomN.lineWidth = R * 0.030;
+    c_bloomN.beginPath();
+    c_bloomN.arc(CX, CY, rr, a0, a1);
+    c_bloomN.stroke();
+  }
+}
+
+// ═══ CENTRE TEAL DISC + WORDMARK ═══
+// The signature element of DrKDnA's design: a mint-teal radial-gradient disc
+// with "J.A.R.V.I.S" / "BETA 0.0" / "MARK II" stacked text.
+function drawCentreDisc(t) {
+  const rOuter = R * 0.20;
+  const breathe = 0.92 + 0.08 * Math.sin(t * 1.4);
+  // Soft outer halo first (gives the teal glow that surrounds the disc)
+  const halo = c_bloomM.createRadialGradient(CX, CY, R * 0.05, CX, CY, R * 0.30);
+  halo.addColorStop(0,    'rgba(63, 255, 208, 0.55)');
+  halo.addColorStop(0.45, 'rgba(40, 220, 180, 0.32)');
+  halo.addColorStop(1,    'rgba(20, 130, 100, 0.00)');
+  c_bloomM.fillStyle = halo;
+  c_bloomM.beginPath(); c_bloomM.arc(CX, CY, R * 0.30, 0, TAU); c_bloomM.fill();
+
+  // Disc body — mint-teal radial gradient, brighter at top-left (specular highlight)
+  const grad = c_main.createRadialGradient(
+    CX - rOuter * 0.22, CY - rOuter * 0.30, rOuter * 0.05,
+    CX, CY, rOuter
+  );
+  grad.addColorStop(0,    'rgba(184, 255, 236, 0.95)');
+  grad.addColorStop(0.30, 'rgba(63, 255, 208, ' + (0.92 * breathe).toFixed(3) + ')');
+  grad.addColorStop(0.70, 'rgba(40, 220, 180, ' + (0.78 * breathe).toFixed(3) + ')');
+  grad.addColorStop(1,    'rgba(20, 130, 100, 0.65)');
+  c_main.fillStyle = grad;
+  c_main.beginPath(); c_main.arc(CX, CY, rOuter * breathe, 0, TAU); c_main.fill();
+  // Disc rim — thin cyan stroke
+  c_main.strokeStyle = 'rgba(140, 255, 230, 0.75)';
+  c_main.lineWidth = 1.1;
+  c_main.beginPath(); c_main.arc(CX, CY, rOuter, 0, TAU); c_main.stroke();
+
+  // Inner darker concentric ring (gives the disc depth)
+  c_main.strokeStyle = 'rgba(20, 80, 70, 0.55)';
+  c_main.lineWidth = 0.8;
+  c_main.beginPath(); c_main.arc(CX, CY, rOuter * 0.85, 0, TAU); c_main.stroke();
+
+  // Wordmark text — J.A.R.V.I.S
+  c_main.save();
+  c_main.shadowColor = 'rgba(180, 255, 230, 0.85)';
+  c_main.shadowBlur = R * 0.022;
+  c_main.fillStyle = 'rgba(20, 90, 80, 0.92)';
+  c_main.font = '600 ' + (R * 0.062).toFixed(0) + 'px Orbitron, "Share Tech Mono", monospace';
+  c_main.textAlign = 'center';
+  c_main.textBaseline = 'middle';
+  c_main.fillText('J.A.R.V.I.S', CX, CY - rOuter * 0.10);
+  // Sub-text: BETA 0.0
+  c_main.shadowBlur = R * 0.012;
+  c_main.font = '500 ' + (R * 0.022).toFixed(0) + 'px "Share Tech Mono", monospace';
+  c_main.fillStyle = 'rgba(15, 75, 65, 0.95)';
+  c_main.fillText('BETA 0.0', CX, CY + rOuter * 0.18);
+  // Sub-text: MARK II
+  c_main.font = '600 ' + (R * 0.030).toFixed(0) + 'px Orbitron, "Share Tech Mono", monospace';
+  c_main.fillStyle = 'rgba(15, 75, 65, 0.95)';
+  c_main.fillText('MARK II', CX, CY + rOuter * 0.42);
+  c_main.restore();
+}
+
+// ═══ OUTER FRAME — thin curved bracket + scattered marker rectangles ═══
+// DrKDnA shows: a thin grey-white outer ring brace (only partial arcs at top &
+// bottom), small RED rectangular markers, small WHITE rectangular markers
+// scattered around the perimeter. Subtle "TURN UP/SYSTEM" label at top.
+function drawOuterFrame(t) {
+  const ringR = R * 0.92;
+  // Outer bracket arcs (subtle frame, only 2 spans visible at top & bottom)
+  c_main.strokeStyle = 'rgba(110, 123, 134, 0.45)';
+  c_main.lineWidth = 0.9;
+  c_main.beginPath(); c_main.arc(CX, CY, ringR, 200 * DEG, 340 * DEG); c_main.stroke();
+  c_main.beginPath(); c_main.arc(CX, CY, ringR,  20 * DEG, 160 * DEG); c_main.stroke();
+
+  // Small WHITE rectangular markers (12 evenly distributed, skip the cardinals)
+  const whiteMarkerAngles = [25, 55, 85, 115, 145, 175, 205, 235, 265, 295, 325, 355];
+  for (const deg of whiteMarkerAngles) {
+    const a = deg * DEG;
+    const mx = CX + Math.cos(a) * ringR;
+    const my = CY + Math.sin(a) * ringR;
+    c_main.save();
+    c_main.translate(mx, my);
+    c_main.rotate(a + Math.PI / 2);
+    c_main.fillStyle = 'rgba(220, 230, 240, 0.78)';
+    c_main.fillRect(-R * 0.013, -R * 0.005, R * 0.026, R * 0.010);
+    c_main.restore();
+  }
+  // Small RED warning markers at specific positions (5 visible in DrKDnA)
+  const redMarkerAngles = [40, 100, 160, 240, 290];
+  for (const deg of redMarkerAngles) {
+    const a = deg * DEG;
+    const mx = CX + Math.cos(a) * ringR;
+    const my = CY + Math.sin(a) * ringR;
+    const blink = 0.65 + 0.35 * Math.sin(t * 2.1 + deg * 0.05);
+    c_main.save();
+    c_main.translate(mx, my);
+    c_main.rotate(a + Math.PI / 2);
+    c_main.fillStyle = 'rgba(255, 48, 48, ' + (0.85 * blink).toFixed(3) + ')';
+    c_main.fillRect(-R * 0.011, -R * 0.005, R * 0.022, R * 0.010);
+    // Bloom on the red blink — gives them visibility
+    c_bloomN.fillStyle = 'rgba(255, 80, 80, ' + (0.55 * blink).toFixed(3) + ')';
+    c_bloomN.fillRect(-R * 0.014, -R * 0.008, R * 0.028, R * 0.016);
+    c_main.restore();
+  }
+  // "TURN UP / SYSTEM" tiny label at top inner-frame (12 o'clock zone)
+  c_main.save();
+  c_main.fillStyle = 'rgba(120, 200, 240, 0.55)';
+  c_main.font = '500 ' + (R * 0.018).toFixed(0) + 'px "Share Tech Mono", monospace';
+  c_main.textAlign = 'center';
+  c_main.textBaseline = 'middle';
+  c_main.fillText('TURN UP / SYSTEM', CX, CY - R * 0.36);
+  c_main.restore();
+
+  // Inner brace arc — slightly tighter than the outer bracket, also partial
+  const innerR = R * 0.35;
+  c_main.strokeStyle = 'rgba(110, 130, 150, 0.55)';
+  c_main.lineWidth = 1.2;
+  c_main.beginPath(); c_main.arc(CX, CY, innerR, 350 * DEG, 10 * DEG); c_main.stroke();
+  c_main.beginPath(); c_main.arc(CX, CY, innerR, 170 * DEG, 190 * DEG); c_main.stroke();
+}
+
+// ═══ FILM GRAIN — soft texture overlay ═══
+function drawGrain() {
+  const w = canvases.grainCanvas.width;
+  const h = canvases.grainCanvas.height;
+  const img = c_grain.createImageData(w, h);
+  const data = img.data;
+  for (let i = 0; i < data.length; i += 16) {
+    const v = Math.random() * 255;
+    data[i] = v; data[i+1] = v; data[i+2] = v; data[i+3] = 32;
+  }
+  c_grain.putImageData(img, 0, 0);
+}
+
+// ═══ MAIN LOOP ═══
+const T0 = performance.now() / 1000;
+let grainCooldown = 0;
+
+function frame() {
+  const t = performance.now() / 1000 - T0;
+
+  // Clear motion canvases each frame (bg is static)
+  c_main.clearRect(0, 0, W, H);
+  c_bloomF.clearRect(0, 0, W, H);
+  c_bloomM.clearRect(0, 0, W, H);
+  c_bloomN.clearRect(0, 0, W, H);
+
+  // Draw back-to-front
+  drawFarHalo(t);
+  drawOuterFrame(t);
+  drawMidRings(t);
+  drawDottedRing(t);
+  drawOrangeArc(t);
+  drawCentreDisc(t);
+
+  grainCooldown--;
+  if (grainCooldown <= 0) { drawGrain(); grainCooldown = 3; }
+
+  requestAnimationFrame(frame);
+}
+
+// ═══ BOOT ═══
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

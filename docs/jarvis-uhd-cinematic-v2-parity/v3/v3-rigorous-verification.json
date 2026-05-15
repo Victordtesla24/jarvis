@@ -1,0 +1,2538 @@
+{
+  "url": "http://localhost:8899/jarvis-uhd-cinematic-v2.html",
+  "capturedAt": "2026-04-19T09:09:38.296Z",
+  "viewports": [
+    {
+      "name": "1280",
+      "w": 1280,
+      "h": 720,
+      "zonal": {
+        "canvasW": 1280,
+        "canvasH": 720,
+        "dprCap": 1,
+        "wheelZone": {
+          "rIn": 36.864000000000004,
+          "rOut": 82.944,
+          "white": 3901,
+          "other": 1042
+        },
+        "spikeZone": {
+          "rIn": 115.2,
+          "rOut": 142.848,
+          "cyan": 1820,
+          "other": 0
+        },
+        "ratio": {
+          "whiteOverCyan": 2.1434065934065933
+        },
+        "wheelStrokeRGB": {
+          "minR": 200,
+          "minG": 244,
+          "minB": 255,
+          "maxR": 255,
+          "maxG": 255,
+          "maxB": 255
+        }
+      },
+      "rotation": {
+        "samples": 60,
+        "dirs": [
+          {
+            "label": "L1",
+            "omega": 0.4000000000000001,
+            "dir": "CW",
+            "periodS": 15.707963267948962
+          },
+          {
+            "label": "L2",
+            "omega": -0.31,
+            "dir": "CCW",
+            "periodS": 20.26833970057931
+          },
+          {
+            "label": "L3",
+            "omega": 0.24000000000000002,
+            "dir": "CW",
+            "periodS": 26.17993877991494
+          }
+        ]
+      },
+      "fps": {
+        "frames": 44,
+        "elapsedS": 5.22310000000149,
+        "fps": 8.42411594646617
+      },
+      "animations": {
+        "count": 46,
+        "list": [
+          {
+            "name": "<anon>",
+            "target": "BODY",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "<anon>",
+            "target": "DIV.line.visible",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-0",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-1",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-2",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-3",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-4",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-5",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-6",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-7",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-8",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-9",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-10",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-11",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-12",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-13",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-14",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-15",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-16",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-17",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-18",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-19",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-20",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-21",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          }
+        ]
+      },
+      "inventory": {
+        "viewport": {
+          "W": 1280,
+          "H": 720,
+          "CX": 640,
+          "CY": 360,
+          "R": 230.4,
+          "rezR": 126.72000000000001
+        },
+        "rez": {
+          "violations": [],
+          "leafTextCount": 84
+        },
+        "neural": {
+          "paths": 22,
+          "dots": 22,
+          "pulses": 22,
+          "motion": 22,
+          "dataNeural": 22,
+          "oneToOne": true,
+          "strokes": [
+            "rgba(220, 248, 255, 0.7)",
+            "rgba(148, 226, 255, 0.45)"
+          ],
+          "fills": [
+            "rgba(220, 248, 255, 0.7)"
+          ]
+        },
+        "zOrder": {
+          "overlayZ": 5,
+          "endpointZ": 6,
+          "bgZ": 1,
+          "ok": true
+        },
+        "plates": [
+          {
+            "id": "centerClock",
+            "alpha": 0.5,
+            "bg": "rgba(0, 15, 30, 0.5)"
+          },
+          {
+            "id": "centerDate",
+            "alpha": 0.5,
+            "bg": "rgba(0, 15, 30, 0.5)"
+          },
+          {
+            "id": "catSys",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catCpu",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catGpu",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catMem",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catDsk",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catNet",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catPwr",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catThm",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catSec",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catLog",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snCpuCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snGpuCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snMemCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snTempCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snPowerCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snNetCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "amberReasonCpu",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonMem",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonThermal",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonPower",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          }
+        ]
+      },
+      "v3Intro": {
+        "outerLayers": {
+          "A": {
+            "omega": 0.108,
+            "dir": "CW"
+          },
+          "B": {
+            "omega": -0.072,
+            "dir": "CCW"
+          },
+          "C": {
+            "omega": 0.054,
+            "dir": "CW"
+          }
+        },
+        "outerCuts": [
+          [
+            30,
+            40
+          ],
+          [
+            180,
+            190
+          ],
+          [
+            210,
+            220
+          ]
+        ],
+        "outerDoubleSpans": [
+          [
+            40,
+            170
+          ],
+          [
+            230,
+            350
+          ]
+        ],
+        "mechRings": [
+          {
+            "label": "L1",
+            "r": 0.228,
+            "w": 3.5,
+            "teeth": 40,
+            "lugs": 16,
+            "dir": 1,
+            "omega": 0.4,
+            "wobble": 0.18,
+            "periodS": 15.707963267948966
+          },
+          {
+            "label": "L2",
+            "r": 0.27,
+            "w": 3.2,
+            "teeth": 44,
+            "lugs": 20,
+            "dir": -1,
+            "omega": 0.31,
+            "wobble": 0.18,
+            "periodS": 20.26833970057931
+          },
+          {
+            "label": "L3",
+            "r": 0.315,
+            "w": 2.8,
+            "teeth": 48,
+            "lugs": 24,
+            "dir": 1,
+            "omega": 0.24,
+            "wobble": 0.18,
+            "periodS": 26.179938779914945
+          }
+        ],
+        "reactorExclusionDiskFrac": 0.55,
+        "neuralAnchorFrac": 0.555,
+        "neuralPulseTraversalS": 2.4,
+        "jarvisGifProportions": {
+          "innerRings": [
+            0.24,
+            0.27,
+            0.3
+          ],
+          "outerPerimeter": 0.78
+        }
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": []
+    },
+    {
+      "name": "1920",
+      "w": 1920,
+      "h": 1080,
+      "zonal": {
+        "canvasW": 1920,
+        "canvasH": 1080,
+        "dprCap": 1,
+        "wheelZone": {
+          "rIn": 55.29600000000001,
+          "rOut": 124.416,
+          "white": 6152,
+          "other": 1677
+        },
+        "spikeZone": {
+          "rIn": 172.8,
+          "rOut": 214.27200000000002,
+          "cyan": 3758,
+          "other": 0
+        },
+        "ratio": {
+          "whiteOverCyan": 1.6370409792442788
+        },
+        "wheelStrokeRGB": {
+          "minR": 203,
+          "minG": 246,
+          "minB": 255,
+          "maxR": 255,
+          "maxG": 255,
+          "maxB": 255
+        }
+      },
+      "rotation": {
+        "samples": 60,
+        "dirs": [
+          {
+            "label": "L1",
+            "omega": 0.4,
+            "dir": "CW",
+            "periodS": 15.707963267948966
+          },
+          {
+            "label": "L2",
+            "omega": -0.31,
+            "dir": "CCW",
+            "periodS": 20.26833970057931
+          },
+          {
+            "label": "L3",
+            "omega": 0.23999999999999996,
+            "dir": "CW",
+            "periodS": 26.179938779914945
+          }
+        ]
+      },
+      "fps": {
+        "frames": 23,
+        "elapsedS": 5.2025,
+        "fps": 4.420951465641519
+      },
+      "animations": {
+        "count": 46,
+        "list": [
+          {
+            "name": "<anon>",
+            "target": "BODY",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "<anon>",
+            "target": "DIV.line.visible",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-0",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-1",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-2",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-3",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-4",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-5",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-6",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-7",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-8",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-9",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-10",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-11",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-12",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-13",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-14",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-15",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-16",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-17",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-18",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-19",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-20",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-21",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          }
+        ]
+      },
+      "inventory": {
+        "viewport": {
+          "W": 1920,
+          "H": 1080,
+          "CX": 960,
+          "CY": 540,
+          "R": 345.6,
+          "rezR": 190.08000000000004
+        },
+        "rez": {
+          "violations": [],
+          "leafTextCount": 93
+        },
+        "neural": {
+          "paths": 22,
+          "dots": 22,
+          "pulses": 22,
+          "motion": 22,
+          "dataNeural": 22,
+          "oneToOne": true,
+          "strokes": [
+            "rgba(220, 248, 255, 0.7)",
+            "rgba(148, 226, 255, 0.45)"
+          ],
+          "fills": [
+            "rgba(220, 248, 255, 0.7)"
+          ]
+        },
+        "zOrder": {
+          "overlayZ": 5,
+          "endpointZ": 6,
+          "bgZ": 1,
+          "ok": true
+        },
+        "plates": [
+          {
+            "id": "centerClock",
+            "alpha": 0.5,
+            "bg": "rgba(0, 15, 30, 0.5)"
+          },
+          {
+            "id": "centerDate",
+            "alpha": 0.5,
+            "bg": "rgba(0, 15, 30, 0.5)"
+          },
+          {
+            "id": "catSys",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catCpu",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catGpu",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catMem",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catDsk",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catNet",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catPwr",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catThm",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catSec",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catLog",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snCpuCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snGpuCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snMemCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snTempCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snPowerCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snNetCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "amberReasonCpu",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonMem",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonThermal",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonPower",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          }
+        ]
+      },
+      "v3Intro": {
+        "outerLayers": {
+          "A": {
+            "omega": 0.108,
+            "dir": "CW"
+          },
+          "B": {
+            "omega": -0.072,
+            "dir": "CCW"
+          },
+          "C": {
+            "omega": 0.054,
+            "dir": "CW"
+          }
+        },
+        "outerCuts": [
+          [
+            30,
+            40
+          ],
+          [
+            180,
+            190
+          ],
+          [
+            210,
+            220
+          ]
+        ],
+        "outerDoubleSpans": [
+          [
+            40,
+            170
+          ],
+          [
+            230,
+            350
+          ]
+        ],
+        "mechRings": [
+          {
+            "label": "L1",
+            "r": 0.228,
+            "w": 3.5,
+            "teeth": 40,
+            "lugs": 16,
+            "dir": 1,
+            "omega": 0.4,
+            "wobble": 0.18,
+            "periodS": 15.707963267948966
+          },
+          {
+            "label": "L2",
+            "r": 0.27,
+            "w": 3.2,
+            "teeth": 44,
+            "lugs": 20,
+            "dir": -1,
+            "omega": 0.31,
+            "wobble": 0.18,
+            "periodS": 20.26833970057931
+          },
+          {
+            "label": "L3",
+            "r": 0.315,
+            "w": 2.8,
+            "teeth": 48,
+            "lugs": 24,
+            "dir": 1,
+            "omega": 0.24,
+            "wobble": 0.18,
+            "periodS": 26.179938779914945
+          }
+        ],
+        "reactorExclusionDiskFrac": 0.55,
+        "neuralAnchorFrac": 0.555,
+        "neuralPulseTraversalS": 2.4,
+        "jarvisGifProportions": {
+          "innerRings": [
+            0.24,
+            0.27,
+            0.3
+          ],
+          "outerPerimeter": 0.78
+        }
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": []
+    },
+    {
+      "name": "2560",
+      "w": 2560,
+      "h": 1440,
+      "zonal": {
+        "canvasW": 2560,
+        "canvasH": 1440,
+        "dprCap": 1,
+        "wheelZone": {
+          "rIn": 73.72800000000001,
+          "rOut": 165.888,
+          "white": 8530,
+          "other": 2413
+        },
+        "spikeZone": {
+          "rIn": 230.4,
+          "rOut": 285.696,
+          "cyan": 5905,
+          "other": 0
+        },
+        "ratio": {
+          "whiteOverCyan": 1.4445385266723116
+        },
+        "wheelStrokeRGB": {
+          "minR": 210,
+          "minG": 246,
+          "minB": 255,
+          "maxR": 255,
+          "maxG": 255,
+          "maxB": 255
+        }
+      },
+      "rotation": {
+        "samples": 60,
+        "dirs": [
+          {
+            "label": "L1",
+            "omega": 0.4,
+            "dir": "CW",
+            "periodS": 15.707963267948966
+          },
+          {
+            "label": "L2",
+            "omega": -0.31,
+            "dir": "CCW",
+            "periodS": 20.26833970057931
+          },
+          {
+            "label": "L3",
+            "omega": 0.24000000000000002,
+            "dir": "CW",
+            "periodS": 26.17993877991494
+          }
+        ]
+      },
+      "fps": {
+        "frames": 14,
+        "elapsedS": 5.201699999999255,
+        "fps": 2.691427802449585
+      },
+      "animations": {
+        "count": 48,
+        "list": [
+          {
+            "name": "<anon>",
+            "target": "BODY",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "<anon>",
+            "target": "DIV.line.visible.gone",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "<anon>",
+            "target": "DIV.line.visible",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-0",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-1",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-2",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-3",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-4",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-5",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-6",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-7",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-8",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-9",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-10",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-11",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-12",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-13",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-14",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-15",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-16",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-17",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-18",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-19",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-20",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-21",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "holoFlicker",
+            "target": "#hud",
+            "kfProps": [
+              "opacity",
+              "transform"
+            ]
+          }
+        ]
+      },
+      "inventory": {
+        "viewport": {
+          "W": 2560,
+          "H": 1440,
+          "CX": 1280,
+          "CY": 720,
+          "R": 460.8,
+          "rezR": 253.44000000000003
+        },
+        "rez": {
+          "violations": [],
+          "leafTextCount": 92
+        },
+        "neural": {
+          "paths": 22,
+          "dots": 22,
+          "pulses": 22,
+          "motion": 22,
+          "dataNeural": 22,
+          "oneToOne": true,
+          "strokes": [
+            "rgba(220, 248, 255, 0.7)",
+            "rgba(148, 226, 255, 0.45)"
+          ],
+          "fills": [
+            "rgba(220, 248, 255, 0.7)"
+          ]
+        },
+        "zOrder": {
+          "overlayZ": 5,
+          "endpointZ": 6,
+          "bgZ": 1,
+          "ok": true
+        },
+        "plates": [
+          {
+            "id": "centerClock",
+            "alpha": 0.5,
+            "bg": "rgba(0, 15, 30, 0.5)"
+          },
+          {
+            "id": "centerDate",
+            "alpha": 0.5,
+            "bg": "rgba(0, 15, 30, 0.5)"
+          },
+          {
+            "id": "catSys",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catCpu",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catGpu",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catMem",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catDsk",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catNet",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catPwr",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catThm",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catSec",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catLog",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snCpuCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snGpuCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snMemCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snTempCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snPowerCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snNetCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "amberReasonCpu",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonMem",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonThermal",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonPower",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          }
+        ]
+      },
+      "v3Intro": {
+        "outerLayers": {
+          "A": {
+            "omega": 0.108,
+            "dir": "CW"
+          },
+          "B": {
+            "omega": -0.072,
+            "dir": "CCW"
+          },
+          "C": {
+            "omega": 0.054,
+            "dir": "CW"
+          }
+        },
+        "outerCuts": [
+          [
+            30,
+            40
+          ],
+          [
+            180,
+            190
+          ],
+          [
+            210,
+            220
+          ]
+        ],
+        "outerDoubleSpans": [
+          [
+            40,
+            170
+          ],
+          [
+            230,
+            350
+          ]
+        ],
+        "mechRings": [
+          {
+            "label": "L1",
+            "r": 0.228,
+            "w": 3.5,
+            "teeth": 40,
+            "lugs": 16,
+            "dir": 1,
+            "omega": 0.4,
+            "wobble": 0.18,
+            "periodS": 15.707963267948966
+          },
+          {
+            "label": "L2",
+            "r": 0.27,
+            "w": 3.2,
+            "teeth": 44,
+            "lugs": 20,
+            "dir": -1,
+            "omega": 0.31,
+            "wobble": 0.18,
+            "periodS": 20.26833970057931
+          },
+          {
+            "label": "L3",
+            "r": 0.315,
+            "w": 2.8,
+            "teeth": 48,
+            "lugs": 24,
+            "dir": 1,
+            "omega": 0.24,
+            "wobble": 0.18,
+            "periodS": 26.179938779914945
+          }
+        ],
+        "reactorExclusionDiskFrac": 0.55,
+        "neuralAnchorFrac": 0.555,
+        "neuralPulseTraversalS": 2.4,
+        "jarvisGifProportions": {
+          "innerRings": [
+            0.24,
+            0.27,
+            0.3
+          ],
+          "outerPerimeter": 0.78
+        }
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": []
+    },
+    {
+      "name": "3840",
+      "w": 3840,
+      "h": 2160,
+      "zonal": {
+        "canvasW": 3840,
+        "canvasH": 2160,
+        "dprCap": 1,
+        "wheelZone": {
+          "rIn": 110.59200000000001,
+          "rOut": 248.832,
+          "white": 13272,
+          "other": 3698
+        },
+        "spikeZone": {
+          "rIn": 345.6,
+          "rOut": 428.54400000000004,
+          "cyan": 5576,
+          "other": 0
+        },
+        "ratio": {
+          "whiteOverCyan": 2.380200860832138
+        },
+        "wheelStrokeRGB": {
+          "minR": 201,
+          "minG": 243,
+          "minB": 255,
+          "maxR": 255,
+          "maxG": 255,
+          "maxB": 255
+        }
+      },
+      "rotation": {
+        "samples": 60,
+        "dirs": [
+          {
+            "label": "L1",
+            "omega": 0.4,
+            "dir": "CW",
+            "periodS": 15.707963267948966
+          },
+          {
+            "label": "L2",
+            "omega": -0.31,
+            "dir": "CCW",
+            "periodS": 20.26833970057931
+          },
+          {
+            "label": "L3",
+            "omega": 0.24,
+            "dir": "CW",
+            "periodS": 26.179938779914945
+          }
+        ]
+      },
+      "fps": {
+        "frames": 6,
+        "elapsedS": 5.20029999999702,
+        "fps": 1.1537795896397205
+      },
+      "animations": {
+        "count": 49,
+        "list": [
+          {
+            "name": "<anon>",
+            "target": "BODY",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "<anon>",
+            "target": "DIV.line.visible",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "<anon>",
+            "target": "DIV.line.visible",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "<anon>",
+            "target": "DIV.float-panel.show",
+            "kfProps": [
+              "opacity"
+            ]
+          },
+          {
+            "name": "<anon>",
+            "target": "DIV.float-panel.show",
+            "kfProps": [
+              "transform"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-0",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-1",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-2",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-3",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-4",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-5",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-6",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-7",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-8",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-9",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-10",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-11",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-12",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-13",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-14",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-15",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-16",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-17",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-18",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-19",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-20",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "#neural-path-21",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          },
+          {
+            "name": "neuralFlow",
+            "target": "circle.[object.SVGAnimatedString]",
+            "kfProps": [
+              "strokeDashoffset"
+            ]
+          }
+        ]
+      },
+      "inventory": {
+        "viewport": {
+          "W": 3840,
+          "H": 2160,
+          "CX": 1920,
+          "CY": 1080,
+          "R": 691.2,
+          "rezR": 380.1600000000001
+        },
+        "rez": {
+          "violations": [],
+          "leafTextCount": 97
+        },
+        "neural": {
+          "paths": 22,
+          "dots": 22,
+          "pulses": 22,
+          "motion": 22,
+          "dataNeural": 22,
+          "oneToOne": true,
+          "strokes": [
+            "rgba(220, 248, 255, 0.7)",
+            "rgba(148, 226, 255, 0.45)"
+          ],
+          "fills": [
+            "rgba(220, 248, 255, 0.7)"
+          ]
+        },
+        "zOrder": {
+          "overlayZ": 5,
+          "endpointZ": 6,
+          "bgZ": 1,
+          "ok": true
+        },
+        "plates": [
+          {
+            "id": "centerClock",
+            "alpha": 0.5,
+            "bg": "rgba(0, 15, 30, 0.5)"
+          },
+          {
+            "id": "centerDate",
+            "alpha": 0.5,
+            "bg": "rgba(0, 15, 30, 0.5)"
+          },
+          {
+            "id": "catSys",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catCpu",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catGpu",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catMem",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catDsk",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catNet",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catPwr",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catThm",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catSec",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "catLog",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snCpuCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snGpuCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snMemCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snTempCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snPowerCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "snNetCell",
+            "alpha": 0.5,
+            "bg": "rgba(2, 12, 22, 0.5)"
+          },
+          {
+            "id": "amberReasonCpu",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonMem",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonThermal",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          },
+          {
+            "id": "amberReasonPower",
+            "alpha": 0.54,
+            "bg": "rgba(28, 16, 4, 0.54)"
+          }
+        ]
+      },
+      "v3Intro": {
+        "outerLayers": {
+          "A": {
+            "omega": 0.108,
+            "dir": "CW"
+          },
+          "B": {
+            "omega": -0.072,
+            "dir": "CCW"
+          },
+          "C": {
+            "omega": 0.054,
+            "dir": "CW"
+          }
+        },
+        "outerCuts": [
+          [
+            30,
+            40
+          ],
+          [
+            180,
+            190
+          ],
+          [
+            210,
+            220
+          ]
+        ],
+        "outerDoubleSpans": [
+          [
+            40,
+            170
+          ],
+          [
+            230,
+            350
+          ]
+        ],
+        "mechRings": [
+          {
+            "label": "L1",
+            "r": 0.228,
+            "w": 3.5,
+            "teeth": 40,
+            "lugs": 16,
+            "dir": 1,
+            "omega": 0.4,
+            "wobble": 0.18,
+            "periodS": 15.707963267948966
+          },
+          {
+            "label": "L2",
+            "r": 0.27,
+            "w": 3.2,
+            "teeth": 44,
+            "lugs": 20,
+            "dir": -1,
+            "omega": 0.31,
+            "wobble": 0.18,
+            "periodS": 20.26833970057931
+          },
+          {
+            "label": "L3",
+            "r": 0.315,
+            "w": 2.8,
+            "teeth": 48,
+            "lugs": 24,
+            "dir": 1,
+            "omega": 0.24,
+            "wobble": 0.18,
+            "periodS": 26.179938779914945
+          }
+        ],
+        "reactorExclusionDiskFrac": 0.55,
+        "neuralAnchorFrac": 0.555,
+        "neuralPulseTraversalS": 2.4,
+        "jarvisGifProportions": {
+          "innerRings": [
+            0.24,
+            0.27,
+            0.3
+          ],
+          "outerPerimeter": 0.78
+        }
+      },
+      "consoleErrors": [],
+      "pageErrors": [],
+      "requestFailures": []
+    }
+  ]
+}

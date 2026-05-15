@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JARVIS Reactor Core — Target Aesthetic (Copper + Blue Holo)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  :root {
+    --copper-warm:  #C97A3A;     /* warm copper highlight */
+    --copper-mid:   #8E4D22;     /* mid copper */
+    --copper-dark:  #4A2C18;     /* deep copper shadow */
+    --copper-glow:  #F2A567;     /* hot copper rim glow */
+    --holo-cyan:    #00C8FF;     /* primary holo blue */
+    --holo-cyan-hot:#7AE5FF;     /* bright holo highlight */
+    --holo-cyan-dim:#005C7A;     /* dim holo shadow */
+    --bg:           #000000;     /* pure deep black per brief */
+    --thermal:      #FF7F38;     /* heat-wave tint */
+  }
+  html, body {
+    width: 100vw; height: 100vh;
+    background: var(--bg);
+    overflow: hidden;
+    color: var(--holo-cyan);
+    font-family: 'Share Tech Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Layered canvas stack — strict z-order back→front */
+  canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+  }
+  #bgLayer       { z-index: 0; background: var(--bg); }
+  /* Heat distortion shimmer behind the copper core */
+  #thermalCanvas { z-index: 1; opacity: 0.55; mix-blend-mode: screen; filter: blur(10px); }
+  /* Copper mechanical core — the photoreal center */
+  #copperCanvas  { z-index: 2; }
+  /* Cinematic depth-of-field blur on the copper itself */
+  #copperBloom   { z-index: 2; filter: blur(12px); opacity: 0.58; mix-blend-mode: screen; }
+  /* Holographic blue UI rings */
+  #holoCanvas    { z-index: 3; }
+  /* Holo bloom passes — vibrant pop */
+  #holoBloom1    { z-index: 3; filter: blur(18px); opacity: 0.72; mix-blend-mode: screen; }
+  #holoBloom2    { z-index: 3; filter: blur(46px); opacity: 0.45; mix-blend-mode: screen; }
+  /* Subtle film grain — texture without dominating */
+  #grainCanvas   { z-index: 9; mix-blend-mode: overlay; opacity: 0.025; pointer-events: none; }
+  /* Cinematic vignette */
+  #vignette {
+    position: fixed; inset: 0; z-index: 8; pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      transparent 50%,
+      rgba(0,0,0,0.35) 78%,
+      rgba(0,0,0,0.85) 100%);
+  }
+</style>
+</head>
+<body>
+<canvas id="bgLayer"></canvas>
+<canvas id="thermalCanvas"></canvas>
+<canvas id="copperCanvas"></canvas>
+<canvas id="copperBloom"></canvas>
+<canvas id="holoCanvas"></canvas>
+<canvas id="holoBloom1"></canvas>
+<canvas id="holoBloom2"></canvas>
+<canvas id="grainCanvas"></canvas>
+<div id="vignette"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// JARVIS Reactor Core Target — Cinematic Copper Center + Blue Holographic Rings
+// ═══════════════════════════════════════════════════════════════════════════
+// Design brief (verbatim user direction):
+//   Cinematic UHD 4K 60fps continuous looping reactor core HUD on pure black.
+//   Center: brushed-copper mechanical rings with thermal heat-wave distortion.
+//   Outer: multiple layers of glowing neon-blue holographic concentric circles
+//          with intricate tick marks, segmented arcs, angular crosshairs, and
+//          pulsing radial equalizer bars rotating CW + CCW at varying speeds.
+//   No text, no numbers, no jagged edges, no camera movement, no zoom, no white.
+//   Center perfectly stationary; smooth, stabilized, seamless loop.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TAU = Math.PI * 2;
+const DEG = Math.PI / 180;
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
+
+const CANVAS_IDS = ['bgLayer','thermalCanvas','copperCanvas','copperBloom','holoCanvas','holoBloom1','holoBloom2','grainCanvas'];
+const canvases = {}, ctxs = {};
+for (const id of CANVAS_IDS) {
+  canvases[id] = document.getElementById(id);
+  ctxs[id] = canvases[id].getContext('2d');
+}
+const c_bg     = ctxs.bgLayer;
+const c_therm  = ctxs.thermalCanvas;
+const c_copper = ctxs.copperCanvas;
+const c_cBloom = ctxs.copperBloom;
+const c_holo   = ctxs.holoCanvas;
+const c_hBloom1= ctxs.holoBloom1;
+const c_hBloom2= ctxs.holoBloom2;
+const c_grain  = ctxs.grainCanvas;
+
+let W, H, CX, CY, R;
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  CX = W / 2;
+  CY = H / 2;
+  R = Math.min(W, H) * 0.36;     // a bit larger than V3 to sell the "centre" focus
+  for (const id of CANVAS_IDS) {
+    const c = canvases[id];
+    c.width = W * DPR;
+    c.height = H * DPR;
+    c.style.width = W + 'px';
+    c.style.height = H + 'px';
+    ctxs[id].setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ═══ EASING ═══
+// Mechanical-inertia phase: additive sin so per-revolution velocity is non-linear.
+// phase(t) = ω·t + a·sin(b·t + offset) — clean, bounded variance.
+function inertia(t, omega, opts) {
+  const o = opts || {};
+  const a = o.amp != null ? o.amp : 0.18;
+  const b = o.freq != null ? o.freq : 0.32;
+  return omega * t + a * Math.sin(b * t + (o.offset || 0));
+}
+
+// Smooth easeInOutSine — used for breathing pulses (no harsh strobing).
+function eIOSine(x) { return -(Math.cos(Math.PI * x) - 1) / 2; }
+
+// ═══ COPPER CORE — concentric brushed-metal rings with thermal heat-wave ═══
+// Per-ring: radial gradient from --copper-dark → --copper-mid → --copper-warm,
+// with per-frame procedural anisotropic streak texture (the "brushed metal" look).
+// Centre is perfectly stationary (per brief — "Keep the center perfectly stationary").
+// Concentric rings rotate VERY SLOWLY at differential speeds (one CW, one CCW).
+const COPPER_RINGS = [
+  // Innermost = centre disc + 4 concentric rings expanding outward.
+  { rIn: 0.00,  rOut: 0.045, omega:  0.0,   highlightAngle: -Math.PI/2.5 }, // central pip
+  { rIn: 0.052, rOut: 0.075, omega:  0.012, highlightAngle: -Math.PI/3   },
+  { rIn: 0.080, rOut: 0.108, omega: -0.018, highlightAngle:  Math.PI/4   },
+  { rIn: 0.115, rOut: 0.150, omega:  0.014, highlightAngle: -Math.PI/2.5 },
+  { rIn: 0.158, rOut: 0.196, omega: -0.010, highlightAngle:  Math.PI/3.5 },
+];
+
+function drawCopperCore(t) {
+  // Soft warm spillage behind the copper — gives the heat-wave halo.
+  const warmGlow = c_cBloom.createRadialGradient(CX, CY, R * 0.02, CX, CY, R * 0.32);
+  warmGlow.addColorStop(0,    'rgba(242, 165, 103, 0.65)');
+  warmGlow.addColorStop(0.40, 'rgba(201, 122, 58,  0.32)');
+  warmGlow.addColorStop(1,    'rgba(74,  44,  24,  0.00)');
+  c_cBloom.fillStyle = warmGlow;
+  c_cBloom.beginPath(); c_cBloom.arc(CX, CY, R * 0.32, 0, TAU); c_cBloom.fill();
+
+  for (let i = 0; i < COPPER_RINGS.length; i++) {
+    const ring = COPPER_RINGS[i];
+    const rOut = ring.rOut * R;
+    const rIn  = ring.rIn  * R;
+    // Slow per-ring rotation (mechanical inertia for organic feel).
+    const rot = inertia(t, ring.omega, { amp: 0.08, freq: 0.18 + i * 0.05, offset: i * 1.7 });
+    // Radial gradient — copper sheen with a moving highlight that simulates
+    // a directional light source on a metallic surface.
+    const lit = ring.highlightAngle + rot;
+    const hx = CX + Math.cos(lit) * rOut * 0.45;
+    const hy = CY + Math.sin(lit) * rOut * 0.45;
+    const grad = c_copper.createRadialGradient(hx, hy, rOut * 0.10, CX, CY, rOut);
+    grad.addColorStop(0,    '#F2A567');                           // hot highlight
+    grad.addColorStop(0.20, '#C97A3A');                           // warm copper
+    grad.addColorStop(0.60, '#8E4D22');                           // mid copper
+    grad.addColorStop(0.95, '#4A2C18');                           // deep shadow
+    grad.addColorStop(1,    '#2A1810');
+    c_copper.fillStyle = grad;
+    c_copper.beginPath();
+    c_copper.arc(CX, CY, rOut, 0, TAU);
+    if (rIn > 0.001) {
+      // Inner cut-out for the ring (annulus). Uses 'evenodd' fill rule via reverse arc.
+      c_copper.arc(CX, CY, rIn, 0, TAU, true);
+    }
+    c_copper.fill();
+
+    // Brushed-metal "scratch" texture — short tangential strokes at a few angles.
+    // Generated stably per-frame (no random seed) so motion is smooth/seamless.
+    const ringMid = (rIn + rOut) * 0.5;
+    const strokeCount = 64;
+    c_copper.save();
+    c_copper.lineWidth = 0.4;
+    for (let s = 0; s < strokeCount; s++) {
+      const a = rot + (TAU / strokeCount) * s;
+      const aJit = a + 0.005 * Math.sin(t * 0.8 + s * 0.27);
+      const r0 = ringMid - (rOut - rIn) * 0.42;
+      const r1 = ringMid + (rOut - rIn) * 0.42;
+      // Brightness modulates with angle relative to highlight — selling the metal sheen.
+      const dAng = Math.atan2(Math.sin(a - lit), Math.cos(a - lit));
+      const brightness = 0.10 + 0.30 * Math.max(0, Math.cos(dAng));
+      c_copper.strokeStyle = 'rgba(255, 220, 175, ' + brightness.toFixed(3) + ')';
+      c_copper.beginPath();
+      c_copper.moveTo(CX + Math.cos(aJit) * r0, CY + Math.sin(aJit) * r0);
+      c_copper.lineTo(CX + Math.cos(aJit) * r1, CY + Math.sin(aJit) * r1);
+      c_copper.stroke();
+    }
+    c_copper.restore();
+
+    // Thin dark inner rim (separates rings) — gives mechanical depth read.
+    if (rIn > 0.001) {
+      c_copper.strokeStyle = 'rgba(20, 10, 4, 0.92)';
+      c_copper.lineWidth = 1.2;
+      c_copper.beginPath(); c_copper.arc(CX, CY, rIn, 0, TAU); c_copper.stroke();
+    }
+    // Bright outer-rim highlight — signals the ring's outer edge under specular light.
+    c_copper.strokeStyle = 'rgba(255, 200, 140, 0.55)';
+    c_copper.lineWidth = 0.8;
+    c_copper.beginPath(); c_copper.arc(CX, CY, rOut, 0, TAU); c_copper.stroke();
+  }
+}
+
+// ═══ THERMAL HEAT WAVE — wispy radial shimmer behind the copper ═══
+// Many short translucent arcs at slowly varying radii give the shimmering "heat-wave"
+// distortion. The CSS filter blur(10px) on #thermalCanvas softens it into a haze.
+function drawThermalShimmer(t) {
+  const wisps = 80;
+  for (let i = 0; i < wisps; i++) {
+    const baseA = (TAU / wisps) * i;
+    // Slow upward drift — heat rises (in canvas-Y-down, "up" is negative Y).
+    const driftY = -((t * 12 + i * 2.7) % (R * 0.6)) - R * 0.05;
+    const swirl = 0.06 * Math.sin(t * 0.9 + i * 0.41);
+    const rr = R * (0.20 + 0.15 * Math.sin(t * 0.4 + i * 0.31));
+    const ax = CX + Math.cos(baseA + swirl) * rr;
+    const ay = CY + Math.sin(baseA + swirl) * rr + driftY * 0.18;
+    const rad = R * (0.012 + 0.006 * Math.sin(t * 1.3 + i * 0.7));
+    // Hot copper-orange wisps (palette: --thermal #FF7F38 + --copper-warm #C97A3A).
+    const hot = 0.38 + 0.35 * Math.sin(t * 1.6 + i * 0.83);
+    c_therm.fillStyle = 'rgba(255, 145, 70, ' + (0.18 * hot).toFixed(3) + ')';
+    c_therm.beginPath();
+    c_therm.arc(ax, ay, rad, 0, TAU);
+    c_therm.fill();
+  }
+}
+
+// ═══ HOLOGRAPHIC BLUE LAYERS — multiple concentric rings with rich UI elements ═══
+// Each layer config carries: radius, rotation omega (CW + or CCW -), wobble freq,
+// and the kind of decoration (ticks, segmented arcs, equalizer bars, crosshairs, etc.).
+// Adjacent layers alternate rotation direction so the eye reads "many independent dials".
+const HOLO_LAYERS = [
+  // Innermost ring — closest to the copper. Tight tick scale, slow CCW.
+  { kind: 'tickScale',     r: 0.30, omega: -0.045, ticks: 120, longEvery: 12,  color: 'cyan' },
+  // Pulsing radial equalizer bars — central feature of the design.
+  { kind: 'equalizerBars', r: 0.36, omega:  0.020, count:  72, baseLen: 0.04, maxLen: 0.10 },
+  // Segmented arc — bright bold C-shape that rotates CW.
+  { kind: 'segArc',        r: 0.43, omega:  0.060, segCount: 4, segArc: 0.55, gapArc: 0.30 },
+  // Dashed mid-ring — slowly rotating CCW.
+  { kind: 'dashed',        r: 0.49, omega: -0.038, segs: 90, dashFrac: 0.35 },
+  // Equalizer bars (wider band).
+  { kind: 'equalizerBars', r: 0.55, omega: -0.014, count: 96, baseLen: 0.05, maxLen: 0.13 },
+  // Segmented arc — counter-direction to the inner one (CCW).
+  { kind: 'segArc',        r: 0.62, omega: -0.055, segCount: 3, segArc: 0.68, gapArc: 0.35 },
+  // Outer dense tick scale — slow CW.
+  { kind: 'tickScale',     r: 0.70, omega:  0.024, ticks: 200, longEvery: 20, color: 'cyan' },
+  // Outermost halo ring — minimal, near-invisible just to bound the design.
+  { kind: 'thinRing',      r: 0.78, omega:  0.012 },
+];
+
+function drawHoloRing_TickScale(layer, t) {
+  const rr = layer.r * R;
+  const rot = inertia(t, layer.omega, { amp: 0.18, freq: 0.31, offset: layer.r * 6.3 });
+  const step = TAU / layer.ticks;
+  // Background ring stroke (faint, holds the tick scale together).
+  c_holo.strokeStyle = 'rgba(0, 200, 255, 0.18)';
+  c_holo.lineWidth = 0.7;
+  c_holo.beginPath(); c_holo.arc(CX, CY, rr, 0, TAU); c_holo.stroke();
+  for (let i = 0; i < layer.ticks; i++) {
+    const a = rot + i * step;
+    const isLong = (i % layer.longEvery) === 0;
+    const r0 = rr - R * (isLong ? 0.014 : 0.006);
+    const r1 = rr + R * (isLong ? 0.014 : 0.006);
+    const localPulse = 0.62 + 0.32 * Math.sin(t * 1.4 + i * 0.27);
+    const alpha = (isLong ? 0.78 : 0.42) * localPulse;
+    c_holo.strokeStyle = 'rgba(122, 229, 255, ' + alpha.toFixed(3) + ')';
+    c_holo.lineWidth = isLong ? 1.05 : 0.55;
+    c_holo.beginPath();
+    c_holo.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+    c_holo.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+    c_holo.stroke();
+  }
+}
+
+function drawHoloRing_EqualizerBars(layer, t) {
+  const rIn = layer.r * R;
+  const step = TAU / layer.count;
+  const rot = inertia(t, layer.omega, { amp: 0.10, freq: 0.42, offset: layer.r * 4.1 });
+  for (let i = 0; i < layer.count; i++) {
+    const a = rot + i * step;
+    // Each bar's length pulses at its own phase — the "equalizer" reactive feel.
+    const phase = t * 1.6 + i * 0.31;
+    const norm = 0.5 + 0.5 * Math.sin(phase) * Math.cos(phase * 0.7 + i * 0.13);
+    const len = layer.baseLen * R + (layer.maxLen - layer.baseLen) * R * Math.abs(norm);
+    const r0 = rIn;
+    const r1 = rIn + len;
+    const intensity = 0.55 + 0.45 * Math.abs(norm);
+    c_holo.strokeStyle = 'rgba(0, 200, 255, ' + (0.38 + 0.45 * intensity).toFixed(3) + ')';
+    c_holo.lineWidth = R * 0.0035;
+    c_holo.beginPath();
+    c_holo.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+    c_holo.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+    c_holo.stroke();
+    // Bright tip on the brightest bars — sells the "reactive" feel.
+    if (intensity > 0.85) {
+      c_holo.fillStyle = 'rgba(180, 240, 255, 0.92)';
+      c_holo.beginPath();
+      c_holo.arc(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1, R * 0.0035, 0, TAU);
+      c_holo.fill();
+    }
+  }
+}
+
+function drawHoloRing_SegArc(layer, t) {
+  const rr = layer.r * R;
+  const rot = inertia(t, layer.omega, { amp: 0.20, freq: 0.36, offset: layer.r * 5.5 });
+  const step = TAU / layer.segCount;
+  // Each arc is a bold bright segment.
+  for (let s = 0; s < layer.segCount; s++) {
+    const a0 = rot + s * step + (step - layer.segArc) * 0.5;
+    const a1 = a0 + layer.segArc;
+    const pulse = 0.78 + 0.22 * Math.sin(t * 1.1 + s * 0.6);
+    c_holo.strokeStyle = 'rgba(122, 229, 255, ' + (0.78 * pulse).toFixed(3) + ')';
+    c_holo.lineWidth = R * 0.014;
+    c_holo.beginPath();
+    c_holo.arc(CX, CY, rr, a0, a1);
+    c_holo.stroke();
+    // Bloom echo for the bright "neon glow" feel.
+    c_hBloom1.strokeStyle = 'rgba(0, 200, 255, ' + (0.55 * pulse).toFixed(3) + ')';
+    c_hBloom1.lineWidth = R * 0.022;
+    c_hBloom1.beginPath();
+    c_hBloom1.arc(CX, CY, rr, a0, a1);
+    c_hBloom1.stroke();
+    // Wider soft halo
+    c_hBloom2.strokeStyle = 'rgba(0, 200, 255, ' + (0.35 * pulse).toFixed(3) + ')';
+    c_hBloom2.lineWidth = R * 0.040;
+    c_hBloom2.beginPath();
+    c_hBloom2.arc(CX, CY, rr, a0, a1);
+    c_hBloom2.stroke();
+  }
+}
+
+function drawHoloRing_Dashed(layer, t) {
+  const rr = layer.r * R;
+  const rot = inertia(t, layer.omega, { amp: 0.16, freq: 0.28, offset: layer.r * 7.7 });
+  const step = TAU / layer.segs;
+  const dashArc = step * layer.dashFrac;
+  for (let i = 0; i < layer.segs; i++) {
+    const a0 = rot + i * step;
+    const a1 = a0 + dashArc;
+    c_holo.strokeStyle = 'rgba(0, 200, 255, 0.46)';
+    c_holo.lineWidth = R * 0.005;
+    c_holo.beginPath();
+    c_holo.arc(CX, CY, rr, a0, a1);
+    c_holo.stroke();
+  }
+}
+
+function drawHoloRing_ThinRing(layer, t) {
+  const rr = layer.r * R;
+  c_holo.strokeStyle = 'rgba(0, 180, 230, 0.22)';
+  c_holo.lineWidth = R * 0.003;
+  c_holo.beginPath(); c_holo.arc(CX, CY, rr, 0, TAU); c_holo.stroke();
+}
+
+function drawHoloLayer(layer, t) {
+  switch (layer.kind) {
+    case 'tickScale':     return drawHoloRing_TickScale(layer, t);
+    case 'equalizerBars': return drawHoloRing_EqualizerBars(layer, t);
+    case 'segArc':        return drawHoloRing_SegArc(layer, t);
+    case 'dashed':        return drawHoloRing_Dashed(layer, t);
+    case 'thinRing':      return drawHoloRing_ThinRing(layer, t);
+  }
+}
+
+// ═══ CARDINAL ANGULAR CROSSHAIRS — small "+" markers at 0°/90°/180°/270° ═══
+// Sit between the inner equalizer band and the outer tick scale.
+function drawCardinalCrosshairs(t) {
+  const crossR = 0.46 * R;
+  const sz = R * 0.018;
+  const pulse = 0.75 + 0.25 * Math.sin(t * 0.9);
+  for (const deg of [0, 90, 180, 270]) {
+    const a = deg * DEG;
+    const x = CX + Math.cos(a) * crossR;
+    const y = CY + Math.sin(a) * crossR;
+    c_holo.strokeStyle = 'rgba(122, 229, 255, ' + (0.72 * pulse).toFixed(3) + ')';
+    c_holo.lineWidth = R * 0.0035;
+    // Horizontal stroke
+    c_holo.beginPath();
+    c_holo.moveTo(x - sz, y);
+    c_holo.lineTo(x + sz, y);
+    c_holo.stroke();
+    // Vertical stroke
+    c_holo.beginPath();
+    c_holo.moveTo(x, y - sz);
+    c_holo.lineTo(x, y + sz);
+    c_holo.stroke();
+    // Soft glow on the crosshair
+    c_hBloom1.strokeStyle = 'rgba(0, 200, 255, ' + (0.5 * pulse).toFixed(3) + ')';
+    c_hBloom1.lineWidth = R * 0.006;
+    c_hBloom1.beginPath();
+    c_hBloom1.moveTo(x - sz, y); c_hBloom1.lineTo(x + sz, y);
+    c_hBloom1.moveTo(x, y - sz); c_hBloom1.lineTo(x, y + sz);
+    c_hBloom1.stroke();
+  }
+}
+
+// ═══ FILM GRAIN — temporal noise overlay ═══
+function drawGrain() {
+  const w = canvases.grainCanvas.width;
+  const h = canvases.grainCanvas.height;
+  const img = c_grain.createImageData(w, h);
+  const data = img.data;
+  for (let i = 0; i < data.length; i += 16) {
+    const v = Math.random() * 255;
+    data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = 28;
+  }
+  c_grain.putImageData(img, 0, 0);
+}
+
+// ═══ MAIN LOOP ═══
+const T0 = performance.now() / 1000;
+let grainCooldown = 0;
+
+function frame() {
+  const t = performance.now() / 1000 - T0;
+
+  // Clear all canvases (keep bg untouched — pure black is the constant).
+  c_therm .clearRect(0, 0, W, H);
+  c_copper.clearRect(0, 0, W, H);
+  c_cBloom.clearRect(0, 0, W, H);
+  c_holo  .clearRect(0, 0, W, H);
+  c_hBloom1.clearRect(0, 0, W, H);
+  c_hBloom2.clearRect(0, 0, W, H);
+
+  // Draw back-to-front
+  drawThermalShimmer(t);
+  drawCopperCore(t);
+  for (const layer of HOLO_LAYERS) drawHoloLayer(layer, t);
+  drawCardinalCrosshairs(t);
+
+  // Film grain (every ~3 frames — texture without dominating cost)
+  grainCooldown--;
+  if (grainCooldown <= 0) { drawGrain(); grainCooldown = 3; }
+
+  requestAnimationFrame(frame);
+}
+
+// Pure black background paint (one-shot — never cleared).
+c_bg.fillStyle = '#000000';
+c_bg.fillRect(0, 0, W, H);
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

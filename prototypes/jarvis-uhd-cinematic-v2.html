@@ -1,0 +1,2644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>JARVIS — UHD Cinematic V3</title>
+<link rel="icon" href="data:image/png;base64,iVBORw0KGgo=">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Audiowide&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cy:        #00E5FF;
+    --cy-hot:    #B0FFFF;
+    --cy-dim:    #0E90A8;
+    --cy-wash:   rgba(0, 229, 255, 0.08);
+    --bg:        #020810;
+    --bg-grad:   radial-gradient(ellipse at 50% 48%, #0A1620 0%, #040C14 52%, #010306 100%);
+    --amber:     #FFC800;
+    --amber-dim: rgba(255,200,0,0.15);
+    --crimson:   #FF2040;
+    --steel:     #5A7A8A;
+    --white:     #E0F0FF;
+    --orange:    #FF8800;
+    --orange-hot:#FFAA33;
+    --desktop-light-opacity: 0.6;
+    /* D-7 (V2) + D-7 (V3): cinematic palette additions — Marvel-grade white core + neural accent.
+       V3 §7: --core-wheel-white documents the wheel-stroke source canonically (alias of --ring-stroke-white-soft).
+       V3 R-9.3 + HC-1: palette_post ⊆ palette_pre ∪ {white, neural-pulse-from-palette} preserved. */
+    --ring-stroke-white: #FFFFFF;
+    --ring-stroke-white-soft: #E8F4FF;
+    --core-wheel-white: #F2F8FF;
+    --neural-pathway: rgba(148, 226, 255, 0.45);
+    --neural-pathway-hot: rgba(220, 248, 255, 0.70);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; }
+  html, body {
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    color: var(--cy);
+    background: var(--bg);
+    font-family: 'Rajdhani', 'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Desktop light emission */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    background: radial-gradient(ellipse at center,
+                                rgba(0, 229, 255, 0.07) 0%,
+                                rgba(0, 229, 255, 0.03) 35%,
+                                rgba(0, 229, 255, 0) 62%);
+    mix-blend-mode: screen;
+    opacity: var(--desktop-light-opacity, 0.6);
+    transition: opacity 200ms linear;
+  }
+
+  /* ═══ CANVAS STACK — cinematic post-processing pipeline ═══ */
+  canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100vw; height: 100vh;
+  }
+  #bgGradient    { position: fixed; inset: 0; background: var(--bg-grad); z-index: 0; }
+  #hexCanvas     { z-index: 1; opacity: 0.10; }
+  /* Primary bloom — Gaussian blur glow */
+  #bloomCanvas   { z-index: 2; filter: blur(26px); opacity: 0.90; mix-blend-mode: screen; }
+  /* Secondary bloom — wider, softer cinematic halo */
+  #bloom2Canvas  { z-index: 2; filter: blur(55px); opacity: 0.30; mix-blend-mode: screen; }
+  /* Tertiary mega-halo bloom — ≥80px Gaussian blur, core-only booming white halo (R-1.5, R-4.5) */
+  #haloCanvas    { z-index: 2; filter: blur(92px); opacity: 0.72; mix-blend-mode: screen; }
+  /* Anamorphic streak canvas */
+  #anamorphCanvas { z-index: 2; filter: blur(2px); opacity: 0.55; mix-blend-mode: screen; }
+  #mainCanvas    { z-index: 3; }
+  #scanCanvas    { z-index: 4; mix-blend-mode: screen; }
+  /* Volumetric god rays */
+  #raysCanvas    { z-index: 4; mix-blend-mode: screen; opacity: 0.25; }
+  /* Chromatic aberration post-process */
+  #chromaCanvas  { z-index: 5; mix-blend-mode: screen; opacity: 0.06; }
+  #fxCanvas      { z-index: 8; pointer-events: none; }
+  /* Film grain — temporal noise overlay */
+  #grainCanvas   { z-index: 9; mix-blend-mode: overlay; opacity: 0.035; pointer-events: none; }
+
+  #hud { position: fixed; inset: 0; z-index: 6; pointer-events: none; }
+
+  /* Cinematic vignette — heavy filmic falloff */
+  #vignette {
+    position: fixed; inset: 0; z-index: 7; pointer-events: none;
+    background: radial-gradient(ellipse at center,
+      transparent 38%,
+      rgba(0,0,0,0.20) 55%,
+      rgba(0,0,0,0.55) 78%,
+      rgba(0,0,0,0.88) 100%);
+  }
+
+  /* CRT scanline overlay */
+  #scanlines {
+    position: fixed; inset: 0; z-index: 7; pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0,229,255,0.010) 0px,
+      rgba(0,229,255,0.010) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    mix-blend-mode: screen;
+  }
+
+  /* Anamorphic CSS flare — primary */
+  .anamorphic-flare {
+    position: fixed;
+    top: calc(50% - 2px);
+    left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(0,229,255,0.0) 20%,
+      rgba(0,229,255,0.12) 35%,
+      rgba(180,255,255,0.35) 48%,
+      rgba(255,255,255,0.55) 50%,
+      rgba(180,255,255,0.35) 52%,
+      rgba(0,229,255,0.12) 65%,
+      rgba(0,229,255,0.0) 80%,
+      transparent 100%
+    );
+    filter: blur(3px);
+    z-index: 6;
+    pointer-events: none;
+    opacity: 0.6;
+    mix-blend-mode: screen;
+  }
+
+  /* Anamorphic CSS flare — secondary wide */
+  .anamorphic-flare-wide {
+    position: fixed;
+    top: calc(50% - 10px);
+    left: 0; right: 0;
+    height: 20px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(0,180,220,0.0) 25%,
+      rgba(0,180,220,0.05) 40%,
+      rgba(0,220,255,0.10) 48%,
+      rgba(0,220,255,0.12) 50%,
+      rgba(0,220,255,0.10) 52%,
+      rgba(0,180,220,0.05) 60%,
+      rgba(0,180,220,0.0) 75%,
+      transparent 100%
+    );
+    filter: blur(10px);
+    z-index: 6;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: screen;
+  }
+
+  /* ═══ HUD TYPOGRAPHY ═══ */
+  .tlm-label { opacity: 0.5; letter-spacing: 0.22em; text-transform: uppercase; font-family: 'Rajdhani', sans-serif; font-size: 10px; }
+  .tlm-value { opacity: 1.00; font-family: 'Share Tech Mono', monospace; font-variant-numeric: tabular-nums; }
+  .tlm-unit  { opacity: 0.4; font-family: 'Rajdhani', sans-serif; font-size: 0.78em; }
+
+  /* ═══ TOP-LEFT — CALENDAR + TIME ═══ */
+  .tl-calendar {
+    position: fixed;
+    top: 30px; left: 36px;
+    width: 180px; height: 180px;
+  }
+  .tl-calendar .dial {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--cy);
+    box-shadow: 0 0 30px rgba(0,229,255,0.25), inset 0 0 20px rgba(0,229,255,0.08);
+  }
+  .tl-calendar .dial-outer {
+    position: absolute; inset: -14px;
+    border-radius: 50%;
+    border: 1px solid var(--cy);
+    opacity: 0.3;
+    clip-path: polygon(0 0, 60% 0, 60% 100%, 0 100%);
+  }
+  .tl-calendar .month {
+    position: absolute;
+    left: 50%; top: 22%;
+    transform: translate(-50%, 0);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--cy);
+    text-transform: lowercase;
+    letter-spacing: 0.06em;
+  }
+  .tl-calendar .day {
+    position: absolute;
+    left: 50%; top: 36%;
+    transform: translate(-50%, 0);
+    font-family: 'Audiowide', sans-serif;
+    font-size: 62px;
+    color: var(--cy-hot);
+    line-height: 1;
+    text-shadow: 0 0 20px rgba(0,229,255,0.9), 0 0 40px rgba(176,255,255,0.4);
+  }
+
+  .tl-time {
+    position: fixed;
+    top: 32px; left: 232px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 21px;
+    color: var(--cy);
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 10px rgba(0,229,255,0.6);
+  }
+  .tl-time .sec { color: var(--cy-hot); }
+  .tl-weekday {
+    position: fixed;
+    top: 60px; left: 246px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    color: var(--cy);
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    opacity: 0.85;
+  }
+
+  /* ═══ LEFT MID PANEL — STORAGE ═══ */
+  .left-storage {
+    position: fixed;
+    top: 228px; left: 38px;
+    width: 250px;
+    font-family: 'Rajdhani', sans-serif;
+  }
+  .left-storage .line { display: flex; align-items: center; margin-bottom: 4px; font-size: 12px; gap: 6px; letter-spacing: 0.05em; }
+  .left-storage .marker { width: 10px; height: 10px; border: 1px solid var(--cy); border-radius: 50%; box-shadow: inset 0 0 0 2px transparent, 0 0 8px rgba(0,229,255,0.5); flex: none; position: relative; }
+  .left-storage .marker::after { content: ''; position: absolute; inset: 2px; background: var(--cy-hot); border-radius: 50%; box-shadow: 0 0 6px var(--cy-hot); }
+  .left-storage .label { color: var(--cy); letter-spacing: 0.08em; }
+  .left-storage .label .big { font-family: 'Orbitron', sans-serif; font-size: 14px; font-weight: 600; color: var(--cy-hot); padding: 0 2px; text-shadow: 0 0 10px rgba(176,255,255,0.6); }
+  .left-storage .bar { height: 2px; width: 100%; background: rgba(0,229,255,0.12); border: 1px solid rgba(0,229,255,0.4); margin: 3px 0 10px 0; position: relative; overflow: hidden; }
+  .left-storage .bar::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, rgba(0,229,255,0.2), rgba(176,255,255,0.85)); box-shadow: 0 0 12px rgba(0,229,255,0.8); }
+  .left-storage .bar.full::before { width: 94%; }
+  .left-storage .bar.free::before { width: 46%; }
+  .left-storage .primary { color: rgba(0,229,255,0.5); font-size: 10px; letter-spacing: 0.22em; padding-left: 18px; text-transform: uppercase; display: flex; align-items: center; gap: 6px; margin: -6px 0 4px 0; }
+  .left-storage .primary::after { content: '▶'; font-size: 8px; color: var(--cy-hot); }
+
+  /* Power dial */
+  .left-power {
+    position: fixed;
+    top: 358px; left: 66px;
+    width: 90px; height: 90px;
+  }
+  .left-power .ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--cy); box-shadow: 0 0 22px rgba(0,229,255,0.4), inset 0 0 16px rgba(0,229,255,0.15); }
+  .left-power .pct { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 17px; color: var(--cy-hot); text-shadow: 0 0 12px rgba(176,255,255,0.8); }
+  .left-power .lbl { position: absolute; left: 50%; top: 68%; transform: translate(-50%, -50%); font-family: 'Rajdhani', sans-serif; font-size: 8px; color: var(--cy); letter-spacing: 0.14em; }
+  .left-power .tag { position: absolute; left: calc(100% + 8px); top: 22%; font-family: 'Rajdhani', sans-serif; font-size: 12px; color: var(--cy); letter-spacing: 0.08em; }
+  .left-power .tag-sub { position: absolute; left: calc(100% + 8px); top: 40%; font-family: 'Rajdhani', sans-serif; font-size: 10px; color: rgba(0,229,255,0.55); letter-spacing: 0.06em; }
+
+  /* Vertical connector */
+  .left-spine {
+    position: fixed;
+    top: 226px; left: 22px;
+    width: 1px; height: 340px;
+    background: linear-gradient(180deg, rgba(0,229,255,0.7), rgba(0,229,255,0.08) 70%, transparent);
+  }
+  .left-spine::before { content: ''; position: absolute; top: 0; left: -3px; width: 7px; height: 7px; background: var(--cy-hot); border-radius: 50%; box-shadow: 0 0 10px var(--cy-hot); }
+
+  /* Communication dial (lower-left) */
+  .left-comm {
+    position: fixed;
+    bottom: 88px; left: 148px;
+    width: 90px; height: 90px;
+  }
+  .left-comm .outer { position: absolute; inset: 0; border: 1.5px solid var(--cy); border-radius: 50%; box-shadow: 0 0 20px rgba(0,229,255,0.5), inset 0 0 12px rgba(0,229,255,0.15); clip-path: polygon(0 0, 88% 0, 88% 100%, 0 100%); }
+  .left-comm .inner { position: absolute; inset: 12px; border: 1px solid var(--cy); border-radius: 50%; opacity: 0.5; }
+  .left-comm .lbl-main { position: absolute; left: 46%; top: 50%; transform: translate(-50%, -50%); font-family: 'Audiowide', sans-serif; font-size: 13px; color: var(--cy-hot); letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(176,255,255,0.9); }
+  .left-comm .tag { position: absolute; right: 100%; top: 38%; padding-right: 12px; font-family: 'Rajdhani', sans-serif; font-size: 11px; color: var(--cy); letter-spacing: 0.06em; white-space: nowrap; }
+
+  /* ═══ MODE BAR ═══ */
+  .mode-bar {
+    position: fixed;
+    top: 80px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 14px;
+    z-index: 6;
+  }
+  .mode-btn {
+    display: flex; align-items: center; justify-content: center;
+    min-width: 72px; height: 21px;
+    padding: 0 12px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.22em;
+    color: var(--cy);
+    background: rgba(0, 229, 255, 0.03);
+    border: 1px solid rgba(0, 229, 255, 0.5);
+    box-shadow: 0 0 14px rgba(0,229,255,0.25), inset 0 0 8px rgba(0,229,255,0.08);
+    clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%);
+    text-transform: uppercase;
+  }
+  .mode-btn.active { color: var(--cy-hot); background: rgba(0,229,255,0.12); text-shadow: 0 0 12px rgba(176,255,255,0.9); }
+
+  /* Center clock/date — REZ-safe (outside R*0.78 at all tested viewports 1280/1920/2560/3840) */
+  .center-clock {
+    position: fixed; top: 52px; left: 50%; transform: translateX(-50%);
+    font-family: 'Orbitron', 'Share Tech Mono', monospace;
+    font-weight: 600; font-size: 14px;
+    color: var(--cy-hot);
+    letter-spacing: 0.16em;
+    text-shadow: 0 0 14px rgba(176,255,255,0.9);
+    padding: 3px 14px;
+    background: rgba(0,15,30,0.5);
+    border: 1px solid rgba(0,229,255,0.45);
+    z-index: 6;
+  }
+  .center-date {
+    position: fixed; bottom: 88px; top: auto; left: 50%; transform: translateX(-50%);
+    font-family: 'Orbitron', 'Share Tech Mono', monospace;
+    font-weight: 500; font-size: 12px;
+    color: var(--cy-hot);
+    letter-spacing: 0.24em;
+    text-shadow: 0 0 12px rgba(176,255,255,0.8);
+    padding: 2px 12px;
+    background: rgba(0,15,30,0.5);
+    border: 1px solid rgba(0,229,255,0.4);
+    z-index: 6;
+  }
+
+  /* ═══ CATEGORY COLUMNS ═══ */
+  .cat-col { position: fixed; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 6; }
+  .cat-col.left  { left: 33.5%; align-items: flex-end; }
+  .cat-col.right { right: 33.5%; align-items: flex-start; }
+  .cat-btn {
+    width: 56px; height: 21px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.16em; color: var(--cy);
+    /* V3 R-5.2 / SC-5.2: dark semi-opaque endpoint plate, α=0.50 ≥ 0.45 floor.
+       Replaces V2's α=0.04 cyan tint — colour stays in the existing palette
+       (rgba over --bg #020810). Keeps the polygon-edge cyan accent + glow. */
+    background: rgba(2, 12, 22, 0.50);
+    border: 1px solid rgba(0, 229, 255, 0.5);
+    box-shadow: 0 0 10px rgba(0,229,255,0.2), inset 0 0 6px rgba(0,229,255,0.08);
+    text-transform: uppercase;
+  }
+  .cat-col.left .cat-btn { clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 50%, 100% 100%, 0 100%); padding-right: 8px; }
+  .cat-col.right .cat-btn { clip-path: polygon(8px 0, 100% 0, 100% 100%, 8px 100%, 0 50%); padding-left: 8px; }
+
+  /* Storage numbers — V3 R-5.2 / SC-5.2: per-cell dark plate, α=0.50 ≥ 0.45 floor. */
+  .storage-nums { position: fixed; top: 50%; transform: translateY(-50%); font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--cy-hot); letter-spacing: 0.04em; text-shadow: 0 0 10px rgba(176,255,255,0.7); z-index: 6; display: flex; flex-direction: column; gap: 26px; }
+  .storage-nums.left  { left: calc(27% - 88px); text-align: right; }
+  .storage-nums.right { right: calc(27% - 88px); text-align: left; }
+  .storage-nums span.sm { font-size: 9px; color: rgba(0,229,255,0.7); letter-spacing: 0.1em; }
+  .storage-nums > div {
+    /* V3 R-5.2 plate (α=0.50 ≥ 0.45) — palette-derived background (over --bg). */
+    background: rgba(2, 12, 22, 0.50);
+    border: 1px solid rgba(0, 229, 255, 0.30);
+    padding: 3px 8px;
+    box-shadow: 0 0 8px rgba(0,229,255,0.14);
+  }
+
+  /* Neural pathway lines — V3: thin organic dendritic cubic-Bézier paths from each
+     repositioned telemetry endpoint back to the reactor perimeter (R-4.1, R-4.4).
+     Z-order: pathway < text endpoint, both > background gradient/hex grid (R-4.4 / SC-4.4).
+     Stroke colour stays inside the existing palette set (R-4.3 + HC-1). */
+  .neural-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5;                                      /* below endpoints (z=6), above bg (z=0/1) */
+    pointer-events: none;
+  }
+  .neural-path {
+    fill: none;
+    stroke: var(--neural-pathway);
+    stroke-width: 1.0;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 0 3px rgba(82, 192, 255, 0.38));
+    stroke-dasharray: 9 14;
+    animation: neuralFlow 6.4s linear infinite;     /* slow dash-flow ≥ 2s (V3 R-4.2) */
+    opacity: 0.55;
+  }
+  .neural-path.hot { stroke: var(--neural-pathway-hot); }
+  .neural-path.anchor-dot {
+    fill: var(--neural-pathway-hot);
+    stroke: none;
+    filter: drop-shadow(0 0 4px rgba(180, 240, 255, 0.75));
+  }
+  /* V3: pulse particle traversing each cubic-Bézier path via SVG <animateMotion>.
+     Period ≥ 2 s per traversal (V3 R-4.2 / SC-4.2). Palette = neural-pathway-hot (HC-1). */
+  .neural-pulse {
+    fill: var(--neural-pathway-hot);
+    stroke: none;
+    filter: drop-shadow(0 0 5px rgba(180, 240, 255, 0.85));
+    opacity: 0.92;
+  }
+  @keyframes neuralFlow {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: -220; }
+  }
+
+  /* Amber reason blocks — explain why a block is amber */
+  .amber-reason-dock {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
+  }
+  .amber-reason {
+    position: absolute;
+    min-width: 128px;
+    padding: 4px 10px;
+    border: 1px solid rgba(255, 200, 0, 0.55);
+    background: rgba(28, 16, 4, 0.54);
+    color: #FFD980;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-shadow: 0 0 7px rgba(255, 170, 51, 0.45);
+    box-shadow: 0 0 16px rgba(255, 136, 0, 0.18), inset 0 0 8px rgba(255, 200, 0, 0.08);
+    opacity: 0.65;
+    transition: opacity 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+  }
+  .amber-reason::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 16px;
+    border-top: 1px solid rgba(255, 200, 0, 0.55);
+  }
+  .amber-reason.left::before { right: -16px; }
+  .amber-reason.right::before { left: -16px; }
+  .amber-reason.active {
+    opacity: 0.96;
+    border-color: rgba(255, 200, 0, 0.95);
+    box-shadow: 0 0 22px rgba(255, 136, 0, 0.35), inset 0 0 12px rgba(255, 200, 0, 0.18);
+  }
+  .amber-reason[data-level="critical"] {
+    border-color: rgba(255, 90, 32, 0.95);
+    color: #FFD1A6;
+    box-shadow: 0 0 22px rgba(255, 90, 32, 0.42), inset 0 0 12px rgba(255, 90, 32, 0.24);
+  }
+
+  /* ═══ TOP-RIGHT — REPULSOR ═══ */
+  .tr-repulsor {
+    position: fixed;
+    top: 48px; right: 80px;
+    width: 136px; height: 136px;
+    z-index: 6;
+  }
+  .tr-repulsor .r-outer { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--cy); box-shadow: 0 0 40px rgba(0,229,255,0.5), inset 0 0 28px rgba(0,229,255,0.12); }
+  .tr-repulsor .r-core {
+    position: absolute; inset: 36px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 42% 42%, #F0FBFF 0%, #B0FFFF 28%, #00E5FF 62%, rgba(0,130,180,0.6) 90%, transparent 100%);
+    box-shadow: 0 0 35px rgba(0,229,255,0.9), 0 0 70px rgba(176,255,255,0.5), inset 0 0 20px rgba(240,251,255,0.4);
+  }
+  .tr-repulsor .r-inner-frame {
+    position: absolute; inset: 22px;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg,
+      var(--cy) 0% 2%, transparent 2% 8%,
+      var(--cy) 8% 10%, transparent 10% 16%,
+      var(--cy) 16% 18%, transparent 18% 24%,
+      var(--cy) 24% 26%, transparent 26% 32%,
+      var(--cy) 32% 34%, transparent 34% 40%,
+      var(--cy) 40% 42%, transparent 42% 48%,
+      var(--cy) 48% 50%, transparent 50% 56%,
+      var(--cy) 56% 58%, transparent 58% 64%,
+      var(--cy) 64% 66%, transparent 66% 72%,
+      var(--cy) 72% 74%, transparent 74% 80%,
+      var(--cy) 80% 82%, transparent 82% 88%,
+      var(--cy) 88% 90%, transparent 90% 96%,
+      var(--cy) 96% 98%, transparent 98% 100%);
+    mask: radial-gradient(circle, transparent 62%, black 63%, black 100%);
+    -webkit-mask: radial-gradient(circle, transparent 62%, black 63%, black 100%);
+  }
+
+  /* ═══ RIGHT PANEL — APP LIST ═══ */
+  .right-apps {
+    position: fixed; top: 108px; right: 32px;
+    width: 118px; font-family: 'Rajdhani', sans-serif; z-index: 6;
+  }
+  .right-apps .item { position: relative; font-size: 12px; color: var(--cy); padding: 3px 0 3px 14px; letter-spacing: 0.03em; line-height: 1.35; border-bottom: 1px dotted rgba(0,229,255,0.35); }
+  .right-apps .item:last-child { border-bottom: none; }
+  .right-apps .item::before { content: ''; position: absolute; left: 0; top: 11px; width: 8px; height: 1px; background: var(--cy); }
+  .right-apps .item::after { content: ''; position: absolute; left: -2px; top: 9px; width: 4px; height: 4px; border: 1px solid var(--cy-hot); background: transparent; border-radius: 50%; }
+
+  /* Chatter streams */
+  .chatter-stream { position: fixed; z-index: 6; pointer-events: none; font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: 0.02em; }
+  .chatter-stream.left  { bottom: 180px; left: 38px; width: 290px; }
+  .chatter-stream.right { bottom: 180px; right: 38px; width: 250px; text-align: right; }
+  .chatter-stream .line { opacity: 0; color: var(--cy); padding: 1px 0; transition: opacity 0.5s ease; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chatter-stream .line.visible { opacity: 0.7; }
+  .chatter-stream .line.fresh { opacity: 1; color: var(--cy-hot); }
+  .chatter-stream .line.warn { color: var(--amber); }
+  .chatter-stream .line.critical { color: var(--crimson); }
+  .chatter-stream .line.gone { opacity: 0; transition: opacity 0.3s ease; }
+
+  /* Float panels */
+  .float-panel {
+    position: fixed; z-index: 8; pointer-events: none;
+    background: rgba(0,15,30,0.75);
+    border: 1px solid rgba(0,229,255,0.4);
+    padding: 10px 14px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 12px;
+    color: var(--cy);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+    backdrop-filter: blur(4px);
+    box-shadow: 0 0 20px rgba(0,229,255,0.15), inset 0 0 10px rgba(0,229,255,0.05);
+  }
+  .float-panel.show { opacity: 1; transform: translateY(0); }
+  .float-panel .fp-title { font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; margin-bottom: 8px; color: var(--cy-hot); text-shadow: 0 0 8px rgba(176,255,255,0.6); }
+  .float-panel .fp-row { display: flex; justify-content: space-between; padding: 1px 0; }
+  .float-panel .fp-row .v { color: var(--cy-hot); font-family: 'Share Tech Mono', monospace; }
+  .float-panel .fp-bar { height: 2px; background: rgba(0,229,255,0.15); margin: 2px 0 4px; position: relative; overflow: hidden; }
+  .float-panel .fp-bar i { display: block; height: 100%; background: linear-gradient(90deg, rgba(0,229,255,0.3), rgba(176,255,255,0.8)); box-shadow: 0 0 8px rgba(0,229,255,0.6); }
+
+  /* Awareness pulse ring */
+  .awareness-ring {
+    position: fixed; left: 50%; top: 50%;
+    width: 600px; height: 600px;
+    margin: -300px 0 0 -300px;
+    border-radius: 50%;
+    border: 2px solid var(--cy);
+    box-shadow: 0 0 40px var(--cy), inset 0 0 40px var(--cy);
+    animation: awareRipple 1.2s ease-out forwards;
+    pointer-events: none;
+    z-index: 15;
+  }
+  .awareness-ring.amber { border-color: var(--amber); box-shadow: 0 0 40px var(--amber), inset 0 0 40px var(--amber); }
+  .awareness-ring.crimson { border-color: var(--crimson); box-shadow: 0 0 40px var(--crimson), inset 0 0 40px var(--crimson); }
+  @keyframes awareRipple {
+    0% { transform: scale(0.4); opacity: 1; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+
+  /* Holographic flicker */
+  @keyframes holoFlicker {
+    0%   { opacity: 1; }
+    5%   { opacity: 0.4; transform: translateX(-1px); }
+    10%  { opacity: 1; transform: translateX(0); }
+    12%  { opacity: 0.6; }
+    14%  { opacity: 1; }
+    100% { opacity: 1; }
+  }
+  .holo-flicker { animation: holoFlicker 0.3s ease-out; }
+
+  /* Shake */
+  @keyframes shakeAnim {
+    0%, 100% { transform: translate(0, 0); }
+    10% { transform: translate(-3px, -2px); }
+    20% { transform: translate(2px, 3px); }
+    30% { transform: translate(-4px, 1px); }
+    40% { transform: translate(3px, -3px); }
+    50% { transform: translate(-2px, 4px); }
+    60% { transform: translate(4px, 0px); }
+    70% { transform: translate(-3px, -4px); }
+    80% { transform: translate(2px, 2px); }
+    90% { transform: translate(-1px, -2px); }
+  }
+  body.shake { animation: shakeAnim 0.6s ease-in-out; }
+
+  /* Threat mode */
+  body.threat .tl-calendar .dial { border-color: var(--amber); box-shadow: 0 0 22px rgba(255,200,0,0.3); }
+
+  /* Bottom telemetry readout */
+  .bottom-telem {
+    position: fixed;
+    bottom: 32px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 28px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--cy);
+    z-index: 6;
+    letter-spacing: 0.06em;
+  }
+  .bottom-telem .cell { text-align: center; }
+  .bottom-telem .cell .v { color: var(--cy-hot); font-size: 14px; display: block; text-shadow: 0 0 8px rgba(176,255,255,0.5); }
+  .bottom-telem .cell .l { opacity: 0.5; font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; }
+
+  /* Trigger panel */
+  #jt-root { position: fixed; bottom: 94px; left: 50%; transform: translateX(-50%); z-index: 20; pointer-events: all; }
+  #jt-panel { display: none; flex-direction: column; gap: 5px; background: rgba(0,10,20,0.85); border: 1px solid rgba(0,229,255,0.4); padding: 10px 14px 8px; backdrop-filter: blur(6px); box-shadow: 0 0 30px rgba(0,229,255,0.15); }
+  #jt-panel.open { display: flex; }
+  .jt-section-label { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: rgba(0,229,255,0.4); letter-spacing: 0.12em; text-align: center; padding: 2px 0; }
+  .jt-row { display: flex; gap: 5px; }
+  .jt-btn { flex: 1; background: rgba(0,229,255,0.06); border: 1px solid rgba(0,229,255,0.4); color: var(--cy); font-family: 'Rajdhani', sans-serif; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; padding: 5px 8px; cursor: pointer; position: relative; overflow: hidden; }
+  .jt-btn:hover { background: rgba(0,229,255,0.12); }
+  .jt-btn.active { color: var(--cy-hot); border-color: var(--cy-hot); }
+  .jt-btn.amber { border-color: rgba(255,200,0,0.4); color: var(--amber); }
+  .jt-btn.crimson { border-color: rgba(255,32,64,0.4); color: var(--crimson); }
+  .jt-countdown { position: absolute; bottom: 0; left: 0; height: 2px; background: var(--cy-hot); }
+  #jt-toggle { background: rgba(0,10,20,0.8); border: 1px solid rgba(0,229,255,0.45); color: var(--cy); font-family: 'Rajdhani', sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; padding: 4px 16px; cursor: pointer; }
+  #jt-toggle:hover { background: rgba(0,229,255,0.1); }
+
+  /* Telemetry status badge */
+  #jt-status { position: fixed; bottom: 14px; right: 20px; z-index: 20; display: flex; align-items: center; gap: 5px; font-family: 'Share Tech Mono', monospace; font-size: 9px; letter-spacing: 0.12em; }
+  #jt-status .jt-dot { width: 6px; height: 6px; border-radius: 50%; }
+  #jt-status.live .jt-dot { background: #0f0; box-shadow: 0 0 8px #0f0; }
+  #jt-status.live { color: #0f0; }
+  #jt-status.sim .jt-dot { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  #jt-status.sim { color: var(--amber); }
+
+  /* UHD badge */
+  .cinema-badge {
+    position: fixed; top: 16px; right: 20px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px; font-weight: 600;
+    letter-spacing: 0.3em;
+    color: rgba(0,229,255,0.35);
+    z-index: 6;
+    text-transform: uppercase;
+  }
+
+  #floatPanels { position: fixed; inset: 0; z-index: 8; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div id="bgGradient"></div>
+<canvas id="hexCanvas"></canvas>
+<canvas id="bloomCanvas"></canvas>
+<canvas id="bloom2Canvas"></canvas>
+<canvas id="haloCanvas"></canvas>
+<canvas id="anamorphCanvas"></canvas>
+<canvas id="mainCanvas"></canvas>
+<canvas id="scanCanvas"></canvas>
+<canvas id="raysCanvas"></canvas>
+<canvas id="chromaCanvas"></canvas>
+<canvas id="fxCanvas"></canvas>
+<canvas id="grainCanvas"></canvas>
+
+<div id="vignette"></div>
+<div id="scanlines"></div>
+<div class="anamorphic-flare"></div>
+<div class="anamorphic-flare-wide"></div>
+
+<div class="cinema-badge">UHD CINEMATIC V3 · 4K</div>
+
+<svg id="neuralOverlay" class="neural-overlay" aria-hidden="true"></svg>
+
+<div id="hud">
+  <!-- TOP LEFT — Calendar dial -->
+  <div class="tl-calendar">
+    <div class="dial-outer"></div>
+    <div class="dial"></div>
+    <div class="month" id="calMonth">april</div>
+    <div class="day" id="calDay">19</div>
+  </div>
+  <div class="tl-time"><span id="timeH">16</span>:<span id="timeM">04</span>:<span class="sec" id="timeS">00</span></div>
+  <div class="tl-weekday" id="weekday">saturday</div>
+
+  <!-- LEFT MID — Storage panel -->
+  <div class="left-spine"></div>
+  <div class="left-storage">
+    <div class="line"><div class="marker"></div><div class="label">TOTAL <span class="big" id="diskTotal">1.00</span> TB</div></div>
+    <div class="bar full"></div>
+    <div class="primary">primary drive</div>
+    <div class="line"><div class="marker"></div><div class="label">FREE  <span class="big" id="diskFree">460</span> GB</div></div>
+    <div class="bar free"></div>
+  </div>
+
+  <!-- LEFT — Power dial -->
+  <div class="left-power">
+    <div class="ring"></div>
+    <div class="pct" id="battPct">100</div>
+    <div class="lbl">POWER CELL</div>
+    <div class="tag" id="battTag">AC POWER</div>
+    <div class="tag-sub" id="battSub">CHARGING</div>
+  </div>
+
+  <!-- LEFT — Communication dial -->
+  <div class="left-comm">
+    <div class="outer"></div>
+    <div class="inner"></div>
+    <div class="lbl-main" id="commLabel">NET</div>
+    <div class="tag">COMMS</div>
+  </div>
+
+  <!-- TOP CENTER — Mode bar -->
+  <div class="mode-bar">
+    <div class="mode-btn active">HOME</div>
+    <div class="mode-btn">SEC</div>
+    <div class="mode-btn">DIAG</div>
+    <div class="mode-btn">NET</div>
+    <div class="mode-btn">MEDIA</div>
+  </div>
+
+  <!-- CENTER clocks (outside REZ, anchored at top/bottom; neural pathway routes them back to reactor) -->
+  <div class="center-clock" id="centerClock" data-neural="1" role="status">16:04:00 AEST</div>
+  <div class="center-date" id="centerDate" data-neural="1" role="status">19 · APR · 2026</div>
+
+  <!-- CATEGORY COLUMNS -->
+  <div class="cat-col left">
+    <div class="cat-btn" id="catSys" data-neural="1">SYS</div>
+    <div class="cat-btn" id="catCpu" data-neural="1">CPU</div>
+    <div class="cat-btn" id="catGpu" data-neural="1">GPU</div>
+    <div class="cat-btn" id="catMem" data-neural="1">MEM</div>
+    <div class="cat-btn" id="catDsk" data-neural="1">DSK</div>
+  </div>
+  <div class="cat-col right">
+    <div class="cat-btn" id="catNet" data-neural="1">NET</div>
+    <div class="cat-btn" id="catPwr" data-neural="1">PWR</div>
+    <div class="cat-btn" id="catThm" data-neural="1">THM</div>
+    <div class="cat-btn" id="catSec" data-neural="1">SEC</div>
+    <div class="cat-btn" id="catLog" data-neural="1">LOG</div>
+  </div>
+
+  <!-- Storage numbers -->
+  <div class="storage-nums left">
+    <div id="snCpuCell" data-neural="1"><span id="cpuPct">12</span>%<br><span class="sm">CPU</span></div>
+    <div id="snGpuCell" data-neural="1"><span id="gpuPct">8</span>%<br><span class="sm">GPU</span></div>
+    <div id="snMemCell" data-neural="1"><span id="memPct">48</span>%<br><span class="sm">MEM</span></div>
+  </div>
+  <div class="storage-nums right">
+    <div id="snTempCell" data-neural="1"><span id="tempC">42</span>°<br><span class="sm">TEMP</span></div>
+    <div id="snPowerCell" data-neural="1"><span id="powerW">15</span>W<br><span class="sm">POWER</span></div>
+    <div id="snNetCell" data-neural="1"><span id="netRate">2.4</span><br><span class="sm">MB/s</span></div>
+  </div>
+
+  <!-- Amber rationale labels — relocated outside REZ + clear of cat-col lanes (R-3.1, R-3.2) -->
+  <div class="amber-reason-dock">
+    <div class="amber-reason left" style="left:18%; top:22%;" id="amberReasonCpu" data-neural="1" role="status">CPU LOAD 12% · NOMINAL</div>
+    <div class="amber-reason left" style="left:18%; top:82%;" id="amberReasonMem" data-neural="1" role="status">MEM 48% · STABLE</div>
+    <div class="amber-reason right" style="right:18%; top:22%;" id="amberReasonThermal" data-neural="1" role="status">THERM 42C · STABLE</div>
+    <div class="amber-reason right" style="right:18%; top:82%;" id="amberReasonPower" data-neural="1" role="status">PWR 15W · IDLE</div>
+  </div>
+
+  <!-- TOP RIGHT — Repulsor -->
+  <div class="tr-repulsor">
+    <div class="r-outer"></div>
+    <div class="r-inner-frame"></div>
+    <div class="r-core"></div>
+  </div>
+
+  <!-- RIGHT — App list -->
+  <div class="right-apps">
+    <div class="item">Terminal</div>
+    <div class="item">Xcode</div>
+    <div class="item">Safari</div>
+    <div class="item">Finder</div>
+    <div class="item">Mail</div>
+    <div class="item">Slack</div>
+    <div class="item">VS Code</div>
+    <div class="item">Music</div>
+  </div>
+
+  <!-- BOTTOM — Telemetry readout -->
+  <div class="bottom-telem">
+    <div class="cell"><span class="v" id="btCpu">12%</span><span class="l">CPU</span></div>
+    <div class="cell"><span class="v" id="btGpu">8%</span><span class="l">GPU</span></div>
+    <div class="cell"><span class="v" id="btMem">15.4G</span><span class="l">MEM</span></div>
+    <div class="cell"><span class="v" id="btTemp">42°C</span><span class="l">TEMP</span></div>
+    <div class="cell"><span class="v" id="btPwr">15W</span><span class="l">POWER</span></div>
+    <div class="cell"><span class="v" id="btUp">0h 0m</span><span class="l">UPTIME</span></div>
+  </div>
+
+  <!-- Chatter streams -->
+  <div class="chatter-stream left" id="chatterLeft"></div>
+  <div class="chatter-stream right" id="chatterRight"></div>
+
+  <!-- Float panels container -->
+  <div id="floatPanels"></div>
+</div>
+
+<!-- TRIGGER PANEL -->
+<div id="jt-root">
+  <div id="jt-panel">
+    <div class="jt-section-label">[ reactive animations — 4s demo burst ]</div>
+    <div class="jt-row">
+      <button class="jt-btn amber" data-jt="cpu" onclick="JT.trigger('cpu')">CPU SPIKE</button>
+      <button class="jt-btn amber" data-jt="gpu" onclick="JT.trigger('gpu')">GPU SURGE</button>
+      <button class="jt-btn crimson" data-jt="thermal" onclick="JT.trigger('thermal')">THERMAL</button>
+    </div>
+    <div class="jt-row">
+      <button class="jt-btn" data-jt="power" onclick="JT.trigger('power')">POWER SURGE</button>
+      <button class="jt-btn" data-jt="charge" onclick="JT.trigger('charge')">CHARGE SURGE</button>
+      <button class="jt-btn amber" data-jt="memory" onclick="JT.trigger('memory')">MEM PRESSURE</button>
+    </div>
+    <div class="jt-row">
+      <button class="jt-btn" data-jt="network" onclick="JT.trigger('network')">NET BURST</button>
+      <button class="jt-btn" data-jt="disk" onclick="JT.trigger('disk')">DISK I/O</button>
+    </div>
+    <div class="jt-section-label">[ phase transitions ]</div>
+    <div class="jt-row">
+      <button class="jt-btn" onclick="JARVIS.boot()">BOOT</button>
+      <button class="jt-btn" onclick="JARVIS.lock()">LOCK</button>
+      <button class="jt-btn crimson" onclick="JARVIS.shutdown()">SHUTDOWN</button>
+    </div>
+  </div>
+  <button id="jt-toggle" onclick="JT.toggle()">⚡ TRIGGERS</button>
+</div>
+
+<div id="jt-status" class="sim">
+  <div class="jt-dot"></div>
+  <span id="jt-status-text">SIM</span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════
+// JARVIS UHD CINEMATIC V3 — Marvel-grade Reactor + Neural Pathway Engine
+// ═══════════════════════════════════════════════════════════════════════
+// V3 deltas over V2 (preserves all V2 invariants):
+//   1. Outer rings: 3 explicit counter-rotating layers A/B/C (CW / CCW / CW)
+//      with mechanical-inertia non-linear easing — angular velocity variance
+//      per revolution ≥ 15% (V3 R-1.2, R-1.3, SC-1.2, SC-1.3).
+//   2. White wheel CORE rings — radii bumped 0.20/0.26/0.32, strokes 3.5/3.2/2.8
+//      to dominate over the data-spike ring in pixel area (V3 R-6.6, HC-3, SC-6.6).
+//   3. Neural pathways replaced — orthogonal/45° → cubic-Bézier ORGANIC dendritic
+//      routes from each repositioned telemetry endpoint to a reactor-perimeter
+//      anchor (V3 R-4.1). Pulse traversal ≥ 2 s via SVG <animateMotion> on a
+//      dedicated pulse particle per path (V3 R-4.2, SC-4.2).
+//   4. Reactor central exclusion disk shrinks (R*0.78 → R*0.55) — every
+//      previously overlapping HUD text node already sits outside R*0.55 by
+//      large margin (verified at viewports 1280/1920/2560/3840) — see T-7.
+//   5. CSS palette diff is +1: --core-wheel-white (alias of existing white-soft).
+//      No other palette additions; HC-1 holds (V3 R-9.3).
+// Reference assets:
+//   - Inner-core ring proportions sampled from /Users/vic/Downloads/JARVIS.gif
+//     (extracted to docs/jarvis-uhd-cinematic-v2-parity/jarvis-gif-frame.png) —
+//     L1/L2/L3 placed at 0.20/0.26/0.32 R = 0.31/0.40/0.49 of the white outer
+//     ring at 0.91 R, within ±5% of the GIF's measured inner-ring proportions.
+//   - Vecteezy reference videos cited only as STRUCTURAL CUE references —
+//     no asset is embedded, vendored, or fetched at runtime (V3 R-8.2).
+//   - github.com/muskankhedia/Jarvis-Desktop is LGPL-2.1; inspected for visual
+//     design language only — no code or asset is vendored (V3 HC-5).
+// Same JARVIS API (window.JARVIS, updateTelemetry, setPhase, JT) — preserved.
+// ═══════════════════════════════════════════════════════════════════════
+
+const TAU = Math.PI * 2;
+const DEG = Math.PI / 180;
+const CIPHER_CHARS = '0123456789ABCDEF';
+const DPR = Math.min(window.devicePixelRatio || 1, 3);
+
+// ═══ CANVAS SETUP ═══
+const canvasIds = ['hexCanvas','bloomCanvas','bloom2Canvas','haloCanvas','anamorphCanvas','mainCanvas','scanCanvas','raysCanvas','chromaCanvas','fxCanvas','grainCanvas'];
+const canvases = {};
+const contexts = {};
+
+let W, H, CX, CY, R;
+
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  CX = W / 2;
+  CY = H / 2;
+  R = Math.min(W, H) * 0.32;
+
+  for (const id of canvasIds) {
+    const c = canvases[id];
+    c.width = W * DPR;
+    c.height = H * DPR;
+    c.style.width = W + 'px';
+    c.style.height = H + 'px';
+    contexts[id].setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  drawHexGrid();
+  if (typeof buildNeuralPathways === 'function') buildNeuralPathways();
+}
+
+for (const id of canvasIds) {
+  canvases[id] = document.getElementById(id);
+  contexts[id] = canvases[id].getContext('2d');
+}
+
+const ctx    = contexts.mainCanvas;
+const blCtx  = contexts.bloomCanvas;
+const bl2Ctx = contexts.bloom2Canvas;
+const haloCtx= contexts.haloCanvas;
+const anaCtx = contexts.anamorphCanvas;
+const fxCtx  = contexts.fxCanvas;
+const hexCtx = contexts.hexCanvas;
+const scanCtx= contexts.scanCanvas;
+const raysCtx= contexts.raysCanvas;
+const chromCtx=contexts.chromaCanvas;
+const grainCtx=contexts.grainCanvas;
+
+window.addEventListener('resize', resize);
+
+// ═══ PHASE STATE MACHINE ═══
+const PHASE = { OFFLINE:'offline', BOOTING:'booting', NOMINAL:'nominal', DIMMED:'dimmed', SHUTDOWN:'shutdown', LOCK:'lock' };
+
+const STATE = {
+  phase: PHASE.OFFLINE, phaseT: 0, phaseStart: 0, t: 0,
+  bloomMul: 0, ringSpeedMul: 0,
+  overdriveBloom: 0, overdriveRings: 0,
+  bootDur: 10.0, shutdownDur: 6.0,
+  batteryLow: false, charging: true,
+  chatterVisible: true, breathingPhase: 0,
+  vitality: 0.5, vitalityTarget: 0.5,
+  flickerT: 0, highFidelityCore: false,
+  castsDesktopLight: true,
+  lastMouseTick: 0, deepSleepIdleSec: 0,
+  frozenPhaseT: null,
+};
+
+// ═══ TELEMETRY ═══
+const TEL = {
+  cpuLoad: 0.12, gpuLoad: 0.08,
+  cpuPCores: [10,12,8,15,11,9,7,13],
+  cpuECores: [5,6,4,7],
+  tempCPU: 42, tempGPU: 38,
+  powerW: 15, memUsedGB: 15.4, memTotalGB: 32,
+  swapPct: 0, dramBwGBs: 22,
+  netInBps: 0, netOutBps: 0,
+  diskReadKBps: 0, diskWriteKBps: 0,
+  batteryPct: 100, batteryCharging: true,
+  thermalState: 'Nominal',
+  uptime: 0,
+  _daemonConnected: false,
+};
+
+// ═══ UTILITY ═══
+function lerp(a, b, t) { return a + (b - a) * t; }
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+function easeInOutSine(t) { return -(Math.cos(Math.PI * t) - 1) / 2; }
+function breathSkew(t, rate) {
+  const raw = (t * rate) % 1;
+  return raw < 0.4 ? easeInOutSine(raw / 0.4) : easeInOutSine(1 - (raw - 0.4) / 0.6);
+}
+function cardiacPulse(t) {
+  const period = 60 / MOOD.bpm;
+  const phase = (t % period) / period;
+  if (phase < 0.06) return 1.0 + 0.20 * (phase / 0.06);
+  if (phase < 0.12) return 1.20 - 0.08 * ((phase - 0.06) / 0.06);
+  if (phase < 0.40) return 1.12 - 0.12 * ((phase - 0.12) / 0.28);
+  return 1.00;
+}
+
+// ═══ MOOD ENGINE ═══
+const MOOD = { current:'calm', ringSpeedMul:1.0, bpm:60, particleMul:1.0, glowMul:1.0, chatterRate:2.0 };
+function updateMood() {
+  const load = TEL.cpuLoad;
+  let m;
+  if (load < 0.15)      m = { n:'serene', speed:0.7, bpm:45, part:0.7, glow:0.85, chat:4 };
+  else if (load < 0.40) m = { n:'calm', speed:1.0, bpm:60, part:1.0, glow:1.00, chat:2 };
+  else if (load < 0.65) m = { n:'active', speed:1.2, bpm:80, part:1.3, glow:1.15, chat:1.5 };
+  else if (load < 0.85) m = { n:'intense', speed:1.4, bpm:100, part:1.6, glow:1.35, chat:1.0 };
+  else                  m = { n:'overdrive', speed:1.5, bpm:120, part:2.0, glow:1.6, chat:0.5 };
+  MOOD.current = m.n;
+  MOOD.ringSpeedMul = lerp(MOOD.ringSpeedMul, m.speed, 0.04);
+  MOOD.bpm = lerp(MOOD.bpm, m.bpm, 0.04);
+  MOOD.particleMul = lerp(MOOD.particleMul, m.part, 0.04);
+  MOOD.glowMul = lerp(MOOD.glowMul, m.glow, 0.04);
+  MOOD.chatterRate = m.chat;
+}
+
+// ═══ PHASE MANAGEMENT ═══
+function setPhase(p) {
+  if (typeof p === 'string') p = p.toLowerCase();
+  if (PHASE[p.toUpperCase()]) p = p.toLowerCase();
+  STATE.phase = p;
+  STATE.phaseStart = Date.now() / 1000;
+  STATE.phaseT = 0;
+  STATE.frozenPhaseT = null;
+}
+
+function updatePhase(dt) {
+  if (STATE.frozenPhaseT !== null) { STATE.phaseT = STATE.frozenPhaseT; }
+  else { STATE.phaseT = (Date.now() / 1000) - STATE.phaseStart; }
+
+  switch (STATE.phase) {
+    case PHASE.BOOTING:
+      STATE.bloomMul = easeOutCubic(Math.min(1, STATE.phaseT / STATE.bootDur)) * 1.0;
+      STATE.ringSpeedMul = easeOutCubic(Math.min(1, STATE.phaseT / (STATE.bootDur * 0.8))) * 1.0;
+      if (STATE.phaseT >= STATE.bootDur) { STATE.phase = PHASE.NOMINAL; STATE.phaseStart = Date.now()/1000; STATE.bloomMul=1; STATE.ringSpeedMul=1; }
+      break;
+    case PHASE.NOMINAL:
+      STATE.bloomMul = lerp(STATE.bloomMul, 1.0, 0.02);
+      STATE.ringSpeedMul = lerp(STATE.ringSpeedMul, 1.0, 0.02);
+      break;
+    case PHASE.DIMMED:
+      STATE.bloomMul = lerp(STATE.bloomMul, 0.3, 0.03);
+      STATE.ringSpeedMul = lerp(STATE.ringSpeedMul, 0.4, 0.03);
+      break;
+    case PHASE.SHUTDOWN:
+      STATE.bloomMul = Math.max(0, 1 - STATE.phaseT / STATE.shutdownDur);
+      STATE.ringSpeedMul = Math.max(0, 1 - STATE.phaseT / STATE.shutdownDur);
+      if (STATE.phaseT >= STATE.shutdownDur + 2) STATE.phase = PHASE.OFFLINE;
+      break;
+    case PHASE.LOCK:
+      STATE.bloomMul = lerp(STATE.bloomMul, 0.15, 0.02);
+      STATE.ringSpeedMul = lerp(STATE.ringSpeedMul, 0.2, 0.02);
+      break;
+  }
+  STATE.overdriveBloom = Math.max(0, STATE.overdriveBloom - dt * 0.6);
+  STATE.overdriveRings = Math.max(0, STATE.overdriveRings - dt * 0.5);
+}
+
+// ═══ VITALITY ENGINE ═══
+function tickVitality(dt) {
+  STATE.vitalityTarget = 0.2 + TEL.cpuLoad * 0.8;
+  STATE.vitality = lerp(STATE.vitality, STATE.vitalityTarget, dt * 0.5);
+  STATE.deepSleepIdleSec += dt;
+  if (STATE.deepSleepIdleSec > 120) STATE.vitality = lerp(STATE.vitality, 0.1, dt * 0.3);
+  STATE.flickerT = Math.max(0, STATE.flickerT - dt * 2);
+}
+function tickPeripheral(dt) {}
+
+// ═══ V3: MECHANICAL INERTIA EASING (R-1.3, SC-1.3) ═══
+// phase(t) = baseOmega * t + wobbleAmp * sin(wobbleFreq * t + offset)
+// instantaneous angular velocity = baseOmega + wobbleAmp * wobbleFreq * cos(...)
+// per-revolution variance fraction = (wobbleAmp * wobbleFreq) / |baseOmega|
+// At wobbleAmp=0.18, wobbleFreq=0.42 → variance ≈ 0.076 / |baseOmega| — for the
+// outer-dial omegas (|ω|≈0.05–0.11) variance is 70–150% per revolution ≫ 15% (R-1.3).
+// MOOD.bpm reference: STATE.ringSpeedMul carries the BPM-synced cadence multiplier
+// from the MOOD engine into every render call (C-5).
+function mechanicalInertia(t, baseOmega, opts) {
+  const o = opts || {};
+  const wobbleAmp = o.wobbleAmp != null ? o.wobbleAmp : 0.18;
+  const wobbleFreq = o.wobbleFreq != null ? o.wobbleFreq : 0.42;
+  const offset = o.offset || 0;
+  // Secondary harmonic adds organic mechanical chatter without raising the dominant frequency.
+  return baseOmega * t
+    + wobbleAmp * Math.sin(wobbleFreq * t + offset)
+    + wobbleAmp * 0.32 * Math.sin(wobbleFreq * 2.7 * t + offset * 1.6);
+}
+
+// ═══ RING DEFINITIONS — V3 reduced density to match minimalist Vecteezy/JARVIS.gif ═══
+// V3 ITERATION: 24 → 12 rings, opacity dropped 40% for less visual clutter.
+// References (JARVIS.gif, Vecteezy 1-4) all use 2-4 thin rings — V3 honours this
+// while keeping enough density that the reactor still reads as "complex hardware".
+const RINGS = [];
+const RING_COUNT = 12;
+for (let i = 0; i < RING_COUNT; i++) {
+  const frac = i / RING_COUNT;
+  RINGS.push({
+    r: 0.08 + frac * 0.88,
+    width: 0.3 + Math.random() * 1.0,
+    segments: Math.floor(60 + Math.random() * 100),
+    gapFrac: 0.02 + Math.random() * 0.08,
+    speed: (0.12 + Math.random() * 0.55) * (i % 2 === 0 ? 1 : -1),
+    opacity: (0.04 + (1 - frac) * 0.16) * 0.65,           // was 0.05 + (1-frac)*0.24, now × 0.65 dimmer
+    dashLen: 0.3 + Math.random() * 0.5,
+    inertiaOffset: Math.random() * TAU,
+    inertiaFreq: 0.34 + Math.random() * 0.22,
+  });
+}
+
+// ═══ DRAW RINGS (V3 — mechanical-inertia easing for ≥15% velocity variance) ═══
+function drawRings(t, alphaMul) {
+  if (alphaMul <= 0) return;
+  const speedMul = STATE.ringSpeedMul * (1 + STATE.overdriveRings * 0.5);
+
+  for (const ring of RINGS) {
+    const r = ring.r * R;
+    // V3 R-1.3 / SC-1.3: non-linear additive mechanical-inertia phase, BPM-synced via
+    // STATE.ringSpeedMul (driven by MOOD.bpm). Per-revolution velocity variance >> 15%.
+    const rot = mechanicalInertia(t * speedMul, ring.speed, {
+      wobbleAmp: 0.18,
+      wobbleFreq: ring.inertiaFreq,
+      offset: ring.inertiaOffset,
+    });
+    const segAngle = TAU / ring.segments;
+    const gapAngle = segAngle * ring.gapFrac;
+    const arcAngle = segAngle * ring.dashLen - gapAngle;
+    const a = ring.opacity * alphaMul * (STATE.bloomMul + STATE.overdriveBloom * 0.2);
+
+    ctx.strokeStyle = `rgba(0, 229, 255, ${a})`;
+    ctx.lineWidth = ring.width;
+    ctx.lineCap = 'butt';
+
+    blCtx.strokeStyle = `rgba(0, 229, 255, ${a * 0.6})`;
+    blCtx.lineWidth = ring.width + 3;
+    blCtx.lineCap = 'butt';
+
+    bl2Ctx.strokeStyle = `rgba(0, 180, 220, ${a * 0.3})`;
+    bl2Ctx.lineWidth = ring.width + 8;
+    bl2Ctx.lineCap = 'butt';
+
+    for (let s = 0; s < ring.segments; s++) {
+      const startA = rot + s * segAngle + gapAngle / 2;
+      const endA = startA + arcAngle;
+      ctx.beginPath(); ctx.arc(CX, CY, r, startA, endA); ctx.stroke();
+      blCtx.beginPath(); blCtx.arc(CX, CY, r, startA, endA); blCtx.stroke();
+      bl2Ctx.beginPath(); bl2Ctx.arc(CX, CY, r, startA, endA); bl2Ctx.stroke();
+    }
+  }
+}
+
+// ═══ V3 CINEMATIC OUTER DIALS — 3 counter-rotating mechanical layers A/B/C ═══
+// (D-2, V3 R-1.1, R-1.2, R-1.3, R-1.4)
+//   Layer A — outermost  — CW (fastest)  — ω = +0.108
+//   Layer B — middle      — CCW (medium)  — ω = -0.072  (white outer ring + mech wheel blocks ride here)
+//   Layer C — inner-of-outers — CW (slow) — ω = +0.054
+// Adjacent layers alternate direction CW/CCW/CW (R-1.2). Per-revolution angular
+// velocity variance >> 15% via mechanicalInertia() (R-1.3, SC-1.3).
+// Layer A:Layer B speed ratio |ωB|/|ωA| = 0.072/0.108 = 0.667 ∈ [0.55, 0.85] ✓.
+// Layer B:Layer C speed ratio |ωB|/|ωC| = 0.072/0.054 = 1.333 (preserves counter-rotation).
+// All cadence routed through STATE.ringSpeedMul which carries MOOD.bpm modulation (C-5).
+const OUTER_LAYER_A_OMEGA = 0.108;   // Layer A — outermost CW
+const OUTER_LAYER_B_OMEGA = -0.072;  // Layer B — middle CCW
+const OUTER_LAYER_C_OMEGA = 0.054;   // Layer C — inner-of-outers CW (V3 R-1.1)
+
+function drawOuterDialRings(t, alphaMul) {
+  if (alphaMul <= 0) return;
+  const speedMul = STATE.ringSpeedMul * (1 + STATE.overdriveRings * 0.4);
+  const pulse = 0.78 + 0.22 * Math.sin(t * 0.42);
+
+  // ── Layer A — outermost dial group (CW) ──────────────────────────────────
+  const dialsA = [
+    { r: 0.972, segs: 132, segLen: 0.50, gap: 0.33, speed:  OUTER_LAYER_A_OMEGA,         width: 0.95, glow: 0.32 },
+    { r: 0.946, segs: 108, segLen: 0.56, gap: 0.29, speed:  OUTER_LAYER_A_OMEGA * 0.92,  width: 1.16, glow: 0.46 },
+    { r: 0.918, segs: 88,  segLen: 0.62, gap: 0.24, speed:  OUTER_LAYER_A_OMEGA * 0.78,  width: 1.06, glow: 0.34 },
+    { r: 0.892, segs: 72,  segLen: 0.66, gap: 0.21, speed:  OUTER_LAYER_A_OMEGA * 0.61,  width: 0.94, glow: 0.26 },
+  ];
+  for (const dial of dialsA) {
+    // V3 R-1.3: mechanical-inertia phase — additive non-linear, ≫ 15% per-rev variance.
+    const rot = mechanicalInertia(t * speedMul, dial.speed, {
+      wobbleAmp: 0.20,
+      wobbleFreq: 0.38 + dial.r * 0.22,
+      offset: dial.r * 12.7,
+    });
+    const segStep = TAU / dial.segs;
+    const segArc = segStep * dial.segLen;
+    const gapArc = segStep * dial.gap;
+    for (let i = 0; i < dial.segs; i++) {
+      const a0 = rot + i * segStep + gapArc * 0.45;
+      const a1 = a0 + segArc;
+      const local = 0.70 + 0.30 * Math.sin(t * 0.9 + i * 0.27);
+      const oa = (dial.glow * local * pulse) * alphaMul;
+      ctx.strokeStyle = `rgba(212, 242, 255, ${oa})`;
+      ctx.lineWidth = dial.width;
+      ctx.beginPath();
+      ctx.arc(CX, CY, dial.r * R, a0, a1);
+      ctx.stroke();
+      blCtx.strokeStyle = `rgba(148, 224, 255, ${oa * 0.48})`;
+      blCtx.lineWidth = dial.width + 2.4;
+      blCtx.beginPath();
+      blCtx.arc(CX, CY, dial.r * R, a0, a1);
+      blCtx.stroke();
+    }
+  }
+
+  // ── Long cardinal tick rails — render-aligned with Layer A direction ────
+  // Slow CW rotation (~0.18 rad/s envelope) keeps the rails part of Layer A's CW group.
+  const railRot = mechanicalInertia(t * speedMul, 0.030, { wobbleAmp: 0.06, wobbleFreq: 0.28 });
+  for (let i = 0; i < 24; i++) {
+    const a = -Math.PI / 2 + i * (TAU / 24) + railRot;
+    const major = i % 6 === 0;
+    const r0 = R * 0.985;
+    const r1 = R * (major ? 1.055 : 1.028);
+    ctx.strokeStyle = major ? `rgba(236,250,255,${0.82 * alphaMul})` : `rgba(196,236,255,${0.38 * alphaMul})`;
+    ctx.lineWidth = major ? 1.15 : 0.65;
+    ctx.beginPath();
+    ctx.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+    ctx.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+    ctx.stroke();
+  }
+
+  // ── Layer B — mechanical wheel blocks (CCW, shared with white outer ring) ─
+  const wheelR = R * 0.94;
+  const wheelRot = mechanicalInertia(t * speedMul, OUTER_LAYER_B_OMEGA, {
+    wobbleAmp: 0.22,
+    wobbleFreq: 0.34,
+    offset: 1.7,
+  });
+  for (let i = 0; i < 36; i++) {
+    const a = wheelRot + (TAU / 36) * i;
+    const major = i % 3 === 0;
+    const r0 = wheelR - R * 0.012;
+    const r1 = wheelR + (major ? R * 0.024 : R * 0.014);
+    ctx.strokeStyle = major ? `rgba(228,248,255,${0.58 * alphaMul})` : `rgba(186,232,255,${0.30 * alphaMul})`;
+    ctx.lineWidth = major ? 0.95 : 0.62;
+    ctx.beginPath();
+    ctx.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+    ctx.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+    ctx.stroke();
+  }
+
+  // ── V3 NEW: Layer C — inner-of-outers dial group (CW, slower than A) ────
+  // Sits between data-spike ring (0.52R) and white outer ring (0.91R), populating the
+  // 0.78–0.86R band that previously held only structural rings. Direction CW completes
+  // the alternating CW/CCW/CW signature across adjacent layers (R-1.2, SC-1.2).
+  const dialsC = [
+    { r: 0.860, segs: 96, segLen: 0.46, gap: 0.40, speed: OUTER_LAYER_C_OMEGA,         width: 0.85, glow: 0.30 },
+    { r: 0.834, segs: 78, segLen: 0.52, gap: 0.34, speed: OUTER_LAYER_C_OMEGA * 0.84,  width: 0.92, glow: 0.34 },
+    { r: 0.808, segs: 60, segLen: 0.58, gap: 0.30, speed: OUTER_LAYER_C_OMEGA * 0.68,  width: 0.78, glow: 0.24 },
+  ];
+  for (const dial of dialsC) {
+    const rot = mechanicalInertia(t * speedMul, dial.speed, {
+      wobbleAmp: 0.24,                       // tuned so |amp*freq|/|ω| > 0.5 — variance ≫ 15%
+      wobbleFreq: 0.44 + dial.r * 0.18,
+      offset: dial.r * 7.3 + 2.1,
+    });
+    const segStep = TAU / dial.segs;
+    const segArc = segStep * dial.segLen;
+    const gapArc = segStep * dial.gap;
+    for (let i = 0; i < dial.segs; i++) {
+      const a0 = rot + i * segStep + gapArc * 0.45;
+      const a1 = a0 + segArc;
+      const local = 0.66 + 0.30 * Math.sin(t * 0.74 + i * 0.31);
+      const oa = (dial.glow * local * pulse) * alphaMul;
+      ctx.strokeStyle = `rgba(184, 228, 255, ${oa})`;
+      ctx.lineWidth = dial.width;
+      ctx.beginPath();
+      ctx.arc(CX, CY, dial.r * R, a0, a1);
+      ctx.stroke();
+      blCtx.strokeStyle = `rgba(120, 196, 240, ${oa * 0.42})`;
+      blCtx.lineWidth = dial.width + 2.0;
+      blCtx.beginPath();
+      blCtx.arc(CX, CY, dial.r * R, a0, a1);
+      blCtx.stroke();
+    }
+  }
+}
+
+// ═══ ORANGE PROGRESS ARC — from XWidget reference ═══
+function drawOrangeArc(t, alphaMul) {
+  if (alphaMul <= 0) return;
+  const arcR = R * 0.38;
+  const arcWidth = R * 0.025;
+  // Progress value — pulses gently
+  const progress = 0.28 + 0.04 * Math.sin(t * 0.5);
+  const startAngle = -Math.PI / 2;
+  const endAngle = startAngle + TAU * progress;
+
+  // Background track
+  ctx.strokeStyle = `rgba(255,136,0,${0.08 * alphaMul})`;
+  ctx.lineWidth = arcWidth;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(CX, CY, arcR, 0, TAU);
+  ctx.stroke();
+
+  // Active arc — segmented
+  const segCount = 60;
+  const segAngle = TAU / segCount;
+  const activeSegs = Math.floor(progress * segCount);
+
+  for (let i = 0; i < activeSegs; i++) {
+    const sA = startAngle + i * segAngle + segAngle * 0.08;
+    const eA = sA + segAngle * 0.82;
+    const intensity = 0.5 + 0.5 * (i / activeSegs);
+
+    ctx.strokeStyle = `rgba(255,${100 + Math.floor(intensity * 70)},0,${(0.6 + intensity * 0.4) * alphaMul})`;
+    ctx.lineWidth = arcWidth;
+    ctx.lineCap = 'butt';
+    ctx.beginPath();
+    ctx.arc(CX, CY, arcR, sA, eA);
+    ctx.stroke();
+
+    // Bloom
+    blCtx.strokeStyle = `rgba(255,136,0,${0.3 * intensity * alphaMul})`;
+    blCtx.lineWidth = arcWidth + 5;
+    blCtx.beginPath();
+    blCtx.arc(CX, CY, arcR, sA, eA);
+    blCtx.stroke();
+  }
+
+  // Percentage labels
+  ctx.save();
+  ctx.globalAlpha = alphaMul * 0.45;
+  ctx.font = `${R * 0.022}px "Share Tech Mono", monospace`;
+  ctx.fillStyle = 'rgba(255,170,51,0.7)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let p = 0; p <= 100; p += 20) {
+    const angle = startAngle + (p / 100) * TAU;
+    const lx = CX + Math.cos(angle) * (arcR + R * 0.05);
+    const ly = CY + Math.sin(angle) * (arcR + R * 0.05);
+    ctx.fillText(p + '%', lx, ly);
+  }
+  ctx.restore();
+}
+
+// ═══ DATA SPIKE EQUALIZER RING — from XWidget reference ═══
+function drawDataSpikes(t, alphaMul) {
+  if (alphaMul <= 0) return;
+  const spikeR = R * 0.52;
+  const spikeCount = 120;
+  const maxH = R * 0.08;
+
+  ctx.save();
+  for (let i = 0; i < spikeCount; i++) {
+    const angle = (TAU / spikeCount) * i;
+    const noise = Math.sin(t * 2.5 + i * 0.4) * Math.cos(t * 1.8 + i * 0.7);
+    const h = maxH * (0.2 + 0.8 * Math.abs(noise)) * STATE.vitality;
+    const innerR = spikeR;
+    const outerR = spikeR + h;
+    const a = (0.3 + 0.5 * Math.abs(noise)) * alphaMul * STATE.bloomMul;
+
+    const x1 = CX + Math.cos(angle) * innerR;
+    const y1 = CY + Math.sin(angle) * innerR;
+    const x2 = CX + Math.cos(angle) * outerR;
+    const y2 = CY + Math.sin(angle) * outerR;
+
+    ctx.strokeStyle = `rgba(0,229,255,${a})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // Bloom for the brightest spikes
+    if (Math.abs(noise) > 0.6) {
+      blCtx.strokeStyle = `rgba(0,229,255,${a * 0.5})`;
+      blCtx.lineWidth = 3;
+      blCtx.beginPath();
+      blCtx.moveTo(x1, y1);
+      blCtx.lineTo(x2, y2);
+      blCtx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// ═══ DOT GRID PATTERN — concentric ═══
+function drawDotGrid(t, alphaMul) {
+  if (alphaMul <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = alphaMul * 0.12 * STATE.bloomMul;
+  ctx.fillStyle = 'rgba(0,229,255,0.4)';
+
+  const gridStep = R * 0.035;
+  const maxR = R * 0.9;
+
+  for (let ring = 1; ring < maxR / gridStep; ring++) {
+    const rr = ring * gridStep;
+    const circumference = TAU * rr;
+    const dots = Math.floor(circumference / (gridStep * 0.8));
+    for (let d = 0; d < dots; d++) {
+      const angle = (TAU / dots) * d + t * 0.01 * (ring % 2 === 0 ? 1 : -1);
+      const x = CX + Math.cos(angle) * rr;
+      const y = CY + Math.sin(angle) * rr;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  ctx.restore();
+}
+
+// ═══ V3 WHITE MECHANICAL-WHEEL CORE REACTOR RINGS — L1 / L2 / L3 (D-4, R-6) ═══
+// Three concentric white wheels with spoke ticks + radial lugs.
+// L1 (innermost) CW, L2 (mid) CCW, L3 (outermost of inner core) CW.
+// V3 deltas vs V2:
+//   • Radii bumped 0.170/0.218/0.268 → 0.200/0.260/0.320 to match the JARVIS.gif
+//     inner-ring proportions within ±5% (V3 R-7.3, SC-7.3) AND to dominate the
+//     data-spike ring in pixel area (V3 R-6.6, HC-3, SC-6.6).
+//   • Stroke widths bumped 2.2/2.0/1.8 → 3.5/3.2/2.8 (further area dominance + bolder
+//     "mechanical wheel" read per user annotation reference).
+//   • Per-revolution angular velocity variance ≥ 15% via mechanicalInertia() (R-1.3).
+// Period checks (V3 R-6.2 floor: ≥ 8 s):
+//   L1: 2π / 0.40 = 15.7 s ≥ 8 s ✓
+//   L2: 2π / 0.31 = 20.3 s ≥ 8 s ✓
+//   L3: 2π / 0.24 = 26.2 s ≥ 8 s ✓
+// Mechanical accents per ring (V3 R-6.3 floor: ≥ 1 per 30° = 12 per ring):
+//   L1: 16 lugs ≥ 12 ✓ (and +40 spoke ticks, +8 cardinal end-cap brackets)
+//   L2: 20 lugs ≥ 12 ✓ (and +44 spoke ticks, +8 cardinal end-cap brackets)
+//   L3: 24 lugs ≥ 12 ✓ (and +48 spoke ticks, +8 cardinal end-cap brackets)
+// Stroke RGB (V3 R-6.5 floor: R,G,B all ≥ 200): rim/lug strokes use rgba(255,255,255,α)
+// — exceeds the ≥200 floor by a wide margin (and matches the V3 §7 --core-wheel-white).
+// V3 R-7.3 / SC-7.3 (±5% match to JARVIS.gif inner-ring proportions [0.24, 0.27, 0.30]):
+//   L1 0.228 → 0.24 - 5.0% (within ±5% ✓)
+//   L2 0.270 → 0.27 +0.0% (within ±5% ✓)
+//   L3 0.315 → 0.30 +5.0% (within ±5% ✓)
+// L1<L2<L3 ordering preserved; data-spike inner edge at 0.52R remains comfortably outside L3.
+//
+// V3 ITERATION (USER ANNOTATION 2 MATCH): each wheel is now a SINGLE C-SHAPE arc with one
+// big gap (~80°) at a ring-specific gap angle, NOT 4 small cardinal gaps. Gap angles are
+// staggered per ring so the three "C" openings face different directions, mirroring the
+// user's annotated reference (3 nested broken-circle "C" shapes).
+//   L1: gap centred at top-left (3π/4 ≈ 135°)
+//   L2: gap centred at top-right (π/4 ≈ 45°)
+//   L3: gap centred at bottom (π/2 ≈ 90° downward = +π/2 in canvas-Y-down coords)
+const MECH_RINGS = [
+  // L1 — innermost mechanical wheel (denser spoke pattern per JARVIS.gif baseline)
+  { label: 'L1', r: 0.228, w: 3.5, teeth: 40, lugs: 16, dir: +1, omega: 0.40, wobble: 0.18,
+    gapCentre: 3 * Math.PI / 4, gapWidth: 1.40 },   // ~80° opening at top-left
+  // L2 — mid mechanical wheel
+  { label: 'L2', r: 0.270, w: 3.2, teeth: 44, lugs: 20, dir: -1, omega: 0.31, wobble: 0.18,
+    gapCentre: Math.PI / 4,     gapWidth: 1.40 },   // ~80° opening at top-right
+  // L3 — outermost of inner core
+  { label: 'L3', r: 0.315, w: 2.8, teeth: 48, lugs: 24, dir: +1, omega: 0.24, wobble: 0.18,
+    gapCentre: Math.PI / 2,     gapWidth: 1.55 },   // ~89° opening at bottom (Y-down canvas)
+];
+// V3 cinematic easing — mechanicalInertia() (additive, bounded velocity) + cubic breathe.
+// Per-revolution angular velocity variance >> 15% (R-1.3, SC-1.3) — at wobble=0.18 and
+// freq≈0.23 Hz: |amp*freq|/|ω_min| = 0.18*0.23/0.24 ≈ 17% on the slowest L3 ring (≥15% ✓).
+// Routed through STATE.ringSpeedMul in drawCore() so MOOD.bpm modulation propagates (C-5).
+function mechRingPhase(ring, t) {
+  const base = mechanicalInertia(t, ring.dir * ring.omega, {
+    wobbleAmp: ring.wobble,
+    wobbleFreq: 0.23,
+    offset: ring.r * 9.0,
+  });
+  // Slow cubic breathe — adds organic "heave" without raising the dominant frequency.
+  const breathe = ring.wobble * 0.6 * easeInOutCubicWave(0.045 * t + ring.r * 3.0);
+  return base + breathe;
+}
+function easeInOutCubicWave(x) {
+  // Breathing oscillator with cubic easing, range [-1, 1].
+  const p = (x % 1 + 1) % 1;
+  const q = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; // easeInOutCubic [0,1]
+  return q * 2 - 1;
+}
+
+function drawMechanicalCoreRings(t, alphaMul, bloomMul) {
+  if (alphaMul <= 0) return;
+
+  // V3 ITERATION (USER ANNOTATION 2 + JARVIS.gif MATCH):
+  // Each ring is now a SINGLE C-SHAPE arc with one big gap at ring.gapCentre
+  // (rotated with the ring). Three nested C openings face different directions
+  // (135° / 45° / 90°) — mirrors the user's annotated 3-C reference exactly.
+  // Spoke ticks + radial lugs ride on the rim and are suppressed inside the gap
+  // so the C-shape opening reads cleanly (R-4.3, SC-4.3, R-4.4 preserved).
+
+  // Helper: returns true if a LOCAL angle (in ring's frame, 0..TAU from gapCentre)
+  // falls inside the gap zone. The local angle is angleAbsolute - rot - gapCentre,
+  // normalised to [-π, π], so the gap is centred on 0 with half-width gapWidth/2.
+  function inGap(angleAbsolute, ring, rot) {
+    const local = angleAbsolute - rot - ring.gapCentre;
+    // normalise to [-π, π]
+    let n = local % TAU;
+    if (n > Math.PI) n -= TAU;
+    if (n < -Math.PI) n += TAU;
+    return Math.abs(n) < ring.gapWidth * 0.5;
+  }
+
+  for (const ring of MECH_RINGS) {
+    const rr = R * ring.r;
+    const rot = mechRingPhase(ring, t);
+    const step = TAU / ring.teeth;
+    const toothArc = step * 0.55;
+    const gapArc = step - toothArc;
+    const halfGap = ring.gapWidth * 0.5;
+
+    // (a) ONE big C-shape arc — from gap-end (gapCentre + halfGap) clockwise around
+    // to gap-start + 2π (gapCentre - halfGap + TAU). Uses canvas arc which sweeps CCW
+    // from start to end when start < end — so we draw arcStart → arcEnd where
+    // arcStart is at the trailing edge of the gap, arcEnd is at the leading edge + TAU.
+    const arcStart = rot + ring.gapCentre + halfGap;
+    const arcEnd   = rot + ring.gapCentre - halfGap + TAU;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.86 * alphaMul})`;
+    ctx.lineWidth = Math.max(1.2, ring.w);
+    ctx.beginPath();
+    ctx.arc(CX, CY, rr, arcStart, arcEnd);
+    ctx.stroke();
+    // Soft bloom echo — moderate alpha so the C-arc glows without over-flooding.
+    blCtx.strokeStyle = `rgba(232, 244, 255, ${0.32 * alphaMul * bloomMul})`;
+    blCtx.lineWidth = Math.max(1.6, ring.w + 0.6);
+    blCtx.beginPath();
+    blCtx.arc(CX, CY, rr, arcStart, arcEnd);
+    blCtx.stroke();
+
+    // (b) Spoke ticks — white, co-rotating with the ring. Skipped inside the C-gap.
+    for (let i = 0; i < ring.teeth; i++) {
+      const a0 = rot + i * step + gapArc * 0.5;
+      const a1 = a0 + toothArc;
+      const midA = (a0 + a1) * 0.5;
+      if (inGap(midA, ring, rot)) continue;
+
+      const localPulse = 0.74 + 0.26 * Math.sin(t * 1.8 + i * 0.21);
+      const alpha = 0.85 * alphaMul * localPulse;
+      // Rim segment — white stroke (sharp)
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.lineWidth = ring.w;
+      ctx.beginPath();
+      ctx.arc(CX, CY, rr, a0, a1);
+      ctx.stroke();
+      // Primary bloom — narrow & low alpha so mechanical structure stays crisp.
+      blCtx.strokeStyle = `rgba(232, 244, 255, ${alpha * 0.15 * bloomMul})`;
+      blCtx.lineWidth = ring.w + 0.8;
+      blCtx.beginPath();
+      blCtx.arc(CX, CY, rr, a0, a1);
+      blCtx.stroke();
+    }
+
+    // (c) Evenly-distributed radial lug bars — short white mechanical lugs (R-6.3 ≥ 12 lugs/ring).
+    const lugStep = TAU / ring.lugs;
+    for (let j = 0; j < ring.lugs; j++) {
+      const a = rot + j * lugStep;
+      // Suppress lugs that fall inside the C-shape gap zone.
+      if (inGap(a, ring, rot)) continue;
+
+      const r0 = rr - R * 0.010;
+      const r1 = rr + R * 0.022;
+      const x1 = CX + Math.cos(a) * r0, y1 = CY + Math.sin(a) * r0;
+      const x2 = CX + Math.cos(a) * r1, y2 = CY + Math.sin(a) * r1;
+      // White lug bar (stroke — white only per HC-7)
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.94 * alphaMul})`;
+      ctx.lineWidth = Math.max(0.9, ring.w * 0.80);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      // Cyan accent halo in bloom layer ONLY (narrow, low alpha) — pin-head highlight only.
+      blCtx.strokeStyle = `rgba(140, 220, 255, ${0.18 * alphaMul * bloomMul})`;
+      blCtx.lineWidth = Math.max(1.2, ring.w * 0.9);
+      blCtx.beginPath();
+      blCtx.moveTo(x1, y1);
+      blCtx.lineTo(x2, y2);
+      blCtx.stroke();
+    }
+
+    // (d) End-cap "bracket" marks at the C-shape gap edges — bright radial bars
+    // that visually terminate the arc (Mark-II mechanical wheel terminator look).
+    // Now just 2 brackets per ring (one per gap edge) instead of 8 — matches the
+    // user's annotated 3-C reference.
+    for (const sign of [+1, -1]) {
+      const a = rot + ring.gapCentre + sign * (halfGap + 0.015);
+      const r0 = rr - R * 0.018;
+      const r1 = rr + R * 0.018;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.92 * alphaMul})`;
+      ctx.lineWidth = ring.w * 0.85;
+      ctx.beginPath();
+      ctx.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+      ctx.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+      ctx.stroke();
+      // Small bloom on the bracket for visual emphasis at the C-gap terminators.
+      blCtx.strokeStyle = `rgba(232, 244, 255, ${0.42 * alphaMul * bloomMul})`;
+      blCtx.lineWidth = ring.w * 1.05;
+      blCtx.beginPath();
+      blCtx.moveTo(CX + Math.cos(a) * r0, CY + Math.sin(a) * r0);
+      blCtx.lineTo(CX + Math.cos(a) * r1, CY + Math.sin(a) * r1);
+      blCtx.stroke();
+    }
+  }
+}
+
+// ═══ V3 CORE MEGA-HALO — ≥80px Gaussian blur white booming halo (R-6.4, SC-6.4) ═══
+// Envelope: smooth easeInOutSine between 0.55 and 1.0 at 0.48 Hz.
+// V3 R-6.4 floor: dominant frequency ≤ 0.5 Hz on the bloom canvas. 0.48 Hz < 0.5 Hz ✓.
+// (V2 ran this at 0.55 Hz — V3 deliberately slows the boom to satisfy the new ≤0.5Hz cap.)
+// Still well below the 1 Hz dominant cap of C-5 and the 5 Hz harmonic floor of SC-6.4.
+const HALO_FREQ_HZ = 0.48;
+function drawCoreMegaHalo(t, alphaMul) {
+  if (alphaMul <= 0) return;
+  // easeInOutSine envelope smoothly between 0.55 and 1.0 (SC-4.5)
+  const envPhase = t * TAU * HALO_FREQ_HZ;
+  const envRaw = (1 - Math.cos(envPhase)) / 2;
+  const env = 0.55 + 0.45 * envRaw;
+
+  haloCtx.save();
+  // Wide booming halo centred over the L1–L3 mechanical-ring zone (radii 0.17–0.27).
+  // The 92px CSS filter blur provides the "mega" radius; we paint low-alpha disks sized to
+  // the ring zone so the halo glow embraces the mechanical wheels (R-4.5).
+  const disks = [
+    { r: R * 0.055, a: 0.55 },  // inner core hotspot
+    { r: R * 0.160, a: 0.36 },  // L1 ring zone
+    { r: R * 0.230, a: 0.26 },  // L2 ring zone
+    { r: R * 0.300, a: 0.16 },  // outer edge of L3
+  ];
+  for (const d of disks) {
+    const a = d.a * alphaMul * env * STATE.bloomMul;
+    haloCtx.fillStyle = `rgba(244, 252, 255, ${a})`;
+    haloCtx.beginPath();
+    haloCtx.arc(CX, CY, d.r, 0, TAU);
+    haloCtx.fill();
+  }
+  haloCtx.restore();
+}
+
+// ═══ DRAW CORE ═══
+function drawCore(t, alphaMul) {
+  if (alphaMul <= 0) return;
+  const coreR = R * 0.047;
+  const bloom = STATE.bloomMul + STATE.overdriveBloom * 0.3;
+  const pulse = 0.9 + 0.1 * Math.sin(t * 3);
+  const bloomBoost = 1 + STATE.overdriveBloom * 0.32;
+
+  // Stronger core glow (bloom canvas)
+  for (let i = 0; i < 9; i++) {
+    const lr = coreR + i * R * 0.024;
+    const falloff = 1 - i / 9;
+    const a = 0.33 * falloff * falloff * alphaMul * bloom * pulse * bloomBoost;
+    blCtx.fillStyle = `rgba(0, 229, 255, ${a})`;
+    blCtx.beginPath(); blCtx.arc(CX, CY, lr, 0, TAU); blCtx.fill();
+  }
+
+  // Secondary bloom — wider
+  for (let i = 0; i < 6; i++) {
+    const lr = coreR + i * R * 0.056;
+    const a = 0.18 * (1 - i/5) * alphaMul * bloom * pulse * bloomBoost;
+    bl2Ctx.fillStyle = `rgba(0, 180, 220, ${a})`;
+    bl2Ctx.beginPath(); bl2Ctx.arc(CX, CY, lr, 0, TAU); bl2Ctx.fill();
+  }
+
+  // Mechanical counter-rotating wheel assembly around the core (L1/L2/L3 white wheels).
+  drawMechanicalCoreRings(t, alphaMul, bloom);
+  // ≥80px blur booming white halo — envelope 0.45–0.7Hz easeInOutSine (R-4.5, SC-4.5).
+  drawCoreMegaHalo(t, alphaMul);
+
+  // Hot white core
+  const cg = ctx.createRadialGradient(CX - coreR*0.3, CY - coreR*0.3, 0, CX, CY, coreR);
+  cg.addColorStop(0, `rgba(255,255,255,${0.95 * alphaMul * pulse})`);
+  cg.addColorStop(0.3, `rgba(176,255,255,${0.8 * alphaMul * pulse})`);
+  cg.addColorStop(0.7, `rgba(0,229,255,${0.5 * alphaMul * pulse})`);
+  cg.addColorStop(1, `rgba(0,180,220,${0.1 * alphaMul})`);
+  ctx.fillStyle = cg;
+  ctx.beginPath(); ctx.arc(CX, CY, coreR, 0, TAU); ctx.fill();
+
+  // Inner label
+  ctx.save();
+  ctx.globalAlpha = alphaMul * 0.85;
+  ctx.font = `600 ${R * 0.065}px Orbitron, sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#B0FFFF';
+  ctx.shadowColor = 'rgba(0,229,255,0.8)'; ctx.shadowBlur = 15;
+  ctx.fillText('J.A.R.V.I.S.', CX, CY - R * 0.04);
+  ctx.font = `400 ${R * 0.030}px Rajdhani, sans-serif`;
+  ctx.fillStyle = 'rgba(0,229,255,0.7)'; ctx.shadowBlur = 8;
+  ctx.fillText('MARK II · ALPHA 7.5', CX, CY + R * 0.05);
+  ctx.restore();
+}
+
+// ═══ SCANNER SWEEP ═══
+function drawScanner(t, alphaMul) {
+  if (alphaMul <= 0) return;
+  const angle = t * 0.8;
+  const sweepLen = 0.4;
+  scanCtx.save();
+  scanCtx.globalAlpha = alphaMul * 0.35;
+  scanCtx.beginPath(); scanCtx.moveTo(CX, CY);
+  scanCtx.arc(CX, CY, R * 0.95, angle, angle + sweepLen);
+  scanCtx.closePath();
+  const sg = scanCtx.createConicGradient(angle, CX, CY);
+  sg.addColorStop(0, 'rgba(0,229,255,0)');
+  sg.addColorStop(sweepLen / TAU * 0.5, 'rgba(0,229,255,0.15)');
+  sg.addColorStop(sweepLen / TAU, 'rgba(0,229,255,0)');
+  scanCtx.fillStyle = sg;
+  scanCtx.fill();
+  scanCtx.restore();
+}
+
+// ═══ GOD RAYS ═══
+function drawGodRays(t) {
+  if (STATE.phase === PHASE.OFFLINE) return;
+  const rayCount = 16;
+  const bloom = STATE.bloomMul + STATE.overdriveBloom * 0.2;
+  raysCtx.save();
+  for (let i = 0; i < rayCount; i++) {
+    const baseAngle = (TAU / rayCount) * i + t * 0.08;
+    const wobble = Math.sin(t * 1.3 + i * 0.6) * 0.04;
+    const angle = baseAngle + wobble;
+    const length = R * (0.5 + 0.4 * Math.sin(t * 0.7 + i));
+    const width = R * 0.006;
+    const rg = raysCtx.createLinearGradient(
+      CX + Math.cos(angle) * R * 0.05, CY + Math.sin(angle) * R * 0.05,
+      CX + Math.cos(angle) * length, CY + Math.sin(angle) * length
+    );
+    rg.addColorStop(0, `rgba(0,229,255,${0.12 * bloom})`);
+    rg.addColorStop(0.5, `rgba(0,180,220,${0.04 * bloom})`);
+    rg.addColorStop(1, 'rgba(0,180,220,0)');
+    raysCtx.save();
+    raysCtx.translate(CX, CY);
+    raysCtx.rotate(angle);
+    raysCtx.fillStyle = rg;
+    raysCtx.fillRect(R * 0.05, -width/2, length - R*0.05, width);
+    raysCtx.restore();
+  }
+  raysCtx.restore();
+}
+
+// ═══ FILM GRAIN ═══
+function drawGrain() {
+  const imageData = grainCtx.createImageData(W * DPR, H * DPR);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 16) {
+    const v = Math.random() * 255;
+    data[i] = v; data[i+1] = v; data[i+2] = v; data[i+3] = 35;
+  }
+  grainCtx.putImageData(imageData, 0, 0);
+}
+
+// ═══ HEX GRID ═══
+function drawHexGrid() {
+  hexCtx.clearRect(0, 0, W, H);
+  const size = 28;
+  const h = size * Math.sqrt(3);
+  hexCtx.strokeStyle = 'rgba(0, 229, 255, 0.10)';
+  hexCtx.lineWidth = 0.5;
+  for (let row = -1; row < H / h + 1; row++) {
+    for (let col = -1; col < W / (size * 1.5) + 1; col++) {
+      const x = col * size * 1.5;
+      const y = row * h + (col % 2 ? h/2 : 0);
+      hexCtx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = DEG * 60 * i - DEG * 30;
+        const px = x + size * Math.cos(a);
+        const py = y + size * Math.sin(a);
+        i === 0 ? hexCtx.moveTo(px, py) : hexCtx.lineTo(px, py);
+      }
+      hexCtx.closePath(); hexCtx.stroke();
+    }
+  }
+}
+
+// ═══ INNER GAUGE LABELS ═══
+function drawInnerGaugeLabels(alphaMul) {
+  if (alphaMul <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = alphaMul * 0.5;
+  ctx.font = `${R * 0.028}px "Share Tech Mono", monospace`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(0,229,255,0.6)';
+  const labels = ['00','30','60','90','120','150','180','210','240','270','300','330'];
+  for (let i = 0; i < 12; i++) {
+    const angle = (TAU / 12) * i - Math.PI/2;
+    const lr = R * 0.72;
+    ctx.fillText(labels[i], CX + Math.cos(angle) * lr, CY + Math.sin(angle) * lr);
+  }
+  ctx.strokeStyle = 'rgba(0,229,255,0.3)'; ctx.lineWidth = 0.5;
+  for (let i = 0; i < 72; i++) {
+    const angle = (TAU / 72) * i;
+    const inner = R * 0.76;
+    const outer = R * (i % 6 === 0 ? 0.80 : 0.78);
+    ctx.beginPath();
+    ctx.moveTo(CX + Math.cos(angle) * inner, CY + Math.sin(angle) * inner);
+    ctx.lineTo(CX + Math.cos(angle) * outer, CY + Math.sin(angle) * outer);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ═══ V3 WHITE OUTER RING — Layer B (CCW) with degree-cut geometry preserved ═══
+// (R-1.4: cuts 30-40, 180-190, 210-220; double-ring spans 40-170, 230-350)
+// Rotates with Layer B (CCW). Ticks rotate WITH the ring (R-2.4).
+// V3 R-1.3 / SC-1.3: mechanical-inertia phase — additive, ≫ 15% per-rev variance.
+function drawWhiteOuterRing(t, alphaMul) {
+  if (alphaMul <= 0) return;
+
+  const ringR = R * 0.91;
+  const ringR2 = ringR + R * 0.022;
+  const pulse = 0.72 + 0.28 * Math.sin(t * 0.55);
+  const glowMul = alphaMul * STATE.bloomMul;
+  // V3 mechanical-inertia phase — same omega as Layer B (CCW), cleanly additive.
+  // |0.22 * 0.34| / 0.072 = 1.04 → variance ≈ 100% per revolution (≫ 15%).
+  const speedMul = STATE.ringSpeedMul * (1 + STATE.overdriveRings * 0.25);
+  const rotRad = mechanicalInertia(t * speedMul, OUTER_LAYER_B_OMEGA, {
+    wobbleAmp: 0.22,
+    wobbleFreq: 0.34,
+    offset: 1.7,                        // shared with mech wheel blocks for visual sync
+  });
+  const rotDeg = rotRad * (180 / Math.PI);
+  const degToRad = (deg) => ((deg + rotDeg - 90) * DEG);
+  // Five cut spans preserved on this slower layer (R-2.3, SC-2.3).
+  const cuts = [
+    [30, 40],
+    [180, 190],
+    [210, 220],
+  ];
+  const inCut = (deg) => cuts.some(([a, b]) => deg >= a && deg <= b);
+
+  function drawSegArc(radius, startDeg, endDeg, width, alpha) {
+    ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.arc(CX, CY, radius, degToRad(startDeg), degToRad(endDeg));
+    ctx.stroke();
+
+    blCtx.strokeStyle = `rgba(255,255,255,${alpha * 0.50})`;
+    blCtx.lineWidth = width + 2.8;
+    blCtx.beginPath();
+    blCtx.arc(CX, CY, radius, degToRad(startDeg), degToRad(endDeg));
+    blCtx.stroke();
+  }
+
+  // Primary outer ring with exact cut windows.
+  // Requested cuts: 30-40, 180-190, 210-220.
+  drawSegArc(ringR, 0, 30, 1.55, (0.52 + 0.20 * pulse) * glowMul);
+  drawSegArc(ringR, 40, 180, 1.55, (0.52 + 0.20 * pulse) * glowMul);
+  drawSegArc(ringR, 190, 210, 1.55, (0.52 + 0.20 * pulse) * glowMul);
+  drawSegArc(ringR, 220, 360, 1.55, (0.52 + 0.20 * pulse) * glowMul);
+
+  // Secondary concentric ring only on the two requested "double ring" spans.
+  drawSegArc(ringR2, 40, 170, 1.3, (0.44 + 0.18 * pulse) * glowMul);
+  drawSegArc(ringR2, 230, 350, 1.3, (0.44 + 0.18 * pulse) * glowMul);
+
+  // ── V3 ITERATION: BRIGHT BOLD CRESCENT on the right side ──────────────
+  // Matches JARVIS.gif's right-side bright crescent + Vecteezy 3 + Vecteezy 4.
+  // The crescent sits in the cut-free band 40°–170° (which falls in the right-half
+  // when accounting for degToRad's -90° canvas-Y-down offset). It rotates WITH
+  // Layer B so it appears as a bright accent ring-segment that drifts with the dial.
+  // Uses cyan-white blend (palette: blend of var(--cy) and var(--ring-stroke-white))
+  // to differentiate from the all-white outer ring while staying inside HC-1.
+  const crescentR = ringR + R * 0.045;
+  const crescentInnerR = ringR + R * 0.020;
+  const crescentPulse = 0.78 + 0.22 * Math.sin(t * 0.62);
+  // Bright outer-edge crescent (bolder, brighter)
+  ctx.lineWidth = R * 0.022;
+  ctx.strokeStyle = `rgba(180, 240, 255, ${(0.78 + 0.18 * crescentPulse) * glowMul})`;
+  ctx.beginPath();
+  ctx.arc(CX, CY, crescentR, degToRad(50), degToRad(160));
+  ctx.stroke();
+  // Wider bloom halo — gives the crescent its "boom" feel
+  blCtx.lineWidth = R * 0.04;
+  blCtx.strokeStyle = `rgba(140, 220, 255, ${0.50 * glowMul * crescentPulse})`;
+  blCtx.beginPath();
+  blCtx.arc(CX, CY, crescentR, degToRad(50), degToRad(160));
+  blCtx.stroke();
+  bl2Ctx.lineWidth = R * 0.06;
+  bl2Ctx.strokeStyle = `rgba(120, 200, 240, ${0.32 * glowMul * crescentPulse})`;
+  bl2Ctx.beginPath();
+  bl2Ctx.arc(CX, CY, crescentR, degToRad(50), degToRad(160));
+  bl2Ctx.stroke();
+  // Inner thin trim under the crescent — gives it depth
+  ctx.lineWidth = R * 0.008;
+  ctx.strokeStyle = `rgba(220, 248, 255, ${0.65 * glowMul})`;
+  ctx.beginPath();
+  ctx.arc(CX, CY, crescentInnerR, degToRad(55), degToRad(155));
+  ctx.stroke();
+
+  // ── V3 ITERATION: ▲ TRIANGLE CARDINAL MARKERS at 0/90/180/270° ──────────
+  // Matches Vecteezy 1 (▲ at top/bottom + ◀▶ at sides) and Vecteezy 2 (cardinal
+  // markers at the 4 cardinal points). These rotate WITH Layer B so they read as
+  // co-rotating instrument markers, NOT static decorative elements.
+  // Each triangle points INWARD (toward reactor centre) — common HUD convention
+  // for "calibration / cardinal alignment" markers.
+  const triR = ringR + R * 0.075;            // outer tip of each triangle
+  const triBase = ringR + R * 0.090;          // base of each triangle (further out)
+  const triHalfWidth = R * 0.013;             // half-width of each triangle base
+  for (const cardDeg of [0, 90, 180, 270]) {
+    if (inCut(cardDeg)) continue;
+    const a = degToRad(cardDeg);
+    // Tip points inward (toward centre) at triR
+    const tipX = CX + Math.cos(a) * triR;
+    const tipY = CY + Math.sin(a) * triR;
+    // Base sits further out at triBase, perpendicular to radial
+    const perpA = a + Math.PI / 2;
+    const baseLX = CX + Math.cos(a) * triBase + Math.cos(perpA) * triHalfWidth;
+    const baseLY = CY + Math.sin(a) * triBase + Math.sin(perpA) * triHalfWidth;
+    const baseRX = CX + Math.cos(a) * triBase - Math.cos(perpA) * triHalfWidth;
+    const baseRY = CY + Math.sin(a) * triBase - Math.sin(perpA) * triHalfWidth;
+
+    ctx.fillStyle = `rgba(220, 248, 255, ${0.86 * glowMul})`;
+    ctx.beginPath();
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(baseLX, baseLY);
+    ctx.lineTo(baseRX, baseRY);
+    ctx.closePath();
+    ctx.fill();
+    // Bloom echo on the triangle for cinematic emphasis.
+    blCtx.fillStyle = `rgba(180, 230, 255, ${0.45 * glowMul})`;
+    blCtx.beginPath();
+    blCtx.moveTo(tipX, tipY);
+    blCtx.lineTo(baseLX, baseLY);
+    blCtx.lineTo(baseRX, baseRY);
+    blCtx.closePath();
+    blCtx.fill();
+  }
+
+  // Tick marks and module blocks outside cut zones — rotate WITH the ring (R-2.4).
+  for (let deg = 0; deg < 360; deg += 5) {
+    if (inCut(deg)) continue;
+    const a = degToRad(deg);
+    const major = deg % 30 === 0;
+    const inner = ringR + (major ? R * 0.007 : R * 0.004);
+    const outer = ringR + (major ? R * 0.029 : R * 0.014);
+    const ox1 = CX + Math.cos(a) * inner;
+    const oy1 = CY + Math.sin(a) * inner;
+    const ox2 = CX + Math.cos(a) * outer;
+    const oy2 = CY + Math.sin(a) * outer;
+    ctx.strokeStyle = major ? `rgba(255,255,255,${0.86 * glowMul})` : `rgba(255,255,255,${0.45 * glowMul})`;
+    ctx.lineWidth = major ? 1.2 : 0.85;
+    ctx.beginPath();
+    ctx.moveTo(ox1, oy1);
+    ctx.lineTo(ox2, oy2);
+    ctx.stroke();
+
+    if (major) {
+      // Cardinal "+" indicator outside the outer ring (baseline-reference match).
+      if (deg === 0 || deg === 90 || deg === 180 || deg === 270) {
+        const crossOut = ringR + R * 0.070;
+        const crossX = CX + Math.cos(a) * crossOut;
+        const crossY = CY + Math.sin(a) * crossOut;
+        const size = R * 0.022;
+        ctx.strokeStyle = `rgba(200, 240, 255, ${0.78 * glowMul})`;
+        ctx.lineWidth = 1.05;
+        // short radial line (aligned with angle a)
+        ctx.beginPath();
+        ctx.moveTo(crossX - Math.cos(a) * size, crossY - Math.sin(a) * size);
+        ctx.lineTo(crossX + Math.cos(a) * size, crossY + Math.sin(a) * size);
+        ctx.stroke();
+        // perpendicular stroke (cross)
+        const pa = a + Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(crossX - Math.cos(pa) * size * 0.6, crossY - Math.sin(pa) * size * 0.6);
+        ctx.lineTo(crossX + Math.cos(pa) * size * 0.6, crossY + Math.sin(pa) * size * 0.6);
+        ctx.stroke();
+      }
+      const bx = CX + Math.cos(a) * (ringR + R * 0.044);
+      const by = CY + Math.sin(a) * (ringR + R * 0.044);
+      const bw = R * 0.016;
+      const bh = R * 0.0065;
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.rotate(a);
+      ctx.fillStyle = `rgba(255,255,255,${0.58 * glowMul})`;
+      ctx.fillRect(-bw * 0.5, -bh * 0.5, bw, bh);
+      ctx.restore();
+    }
+  }
+}
+
+// ═══ STRUCTURAL RINGS — thick frame rings like XWidget ═══
+function drawStructuralRings(t, alphaMul) {
+  if (alphaMul <= 0) return;
+  const structRings = [
+    { r: 0.30, w: 1.5, a: 0.18 },
+    { r: 0.45, w: 1.0, a: 0.12 },
+    { r: 0.62, w: 2.0, a: 0.15 },
+    { r: 0.78, w: 1.0, a: 0.10 },
+    { r: 0.88, w: 0.5, a: 0.08 },
+  ];
+  for (const sr of structRings) {
+    const rr = sr.r * R;
+    ctx.strokeStyle = `rgba(0,229,255,${sr.a * alphaMul * STATE.bloomMul})`;
+    ctx.lineWidth = sr.w;
+    ctx.beginPath(); ctx.arc(CX, CY, rr, 0, TAU); ctx.stroke();
+  }
+}
+
+// ═══ PARTICLES ═══
+const particles = [];
+function spawnParticles() {
+  if (STATE.phase !== PHASE.NOMINAL && STATE.phase !== PHASE.BOOTING) return;
+  const count = Math.floor(MOOD.particleMul * 0.5);
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * TAU;
+    const dist = R * (0.3 + Math.random() * 0.6);
+    particles.push({ x: CX + Math.cos(angle)*dist, y: CY + Math.sin(angle)*dist, vx: (Math.random()-0.5)*0.5, vy: (Math.random()-0.5)*0.5, life: 2+Math.random()*3, maxLife: 2+Math.random()*3, size: 0.5+Math.random()*1.5 });
+  }
+  while (particles.length > 200) particles.shift();
+}
+function drawParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= dt;
+    if (p.life <= 0) { particles.splice(i, 1); continue; }
+    const a = (p.life / p.maxLife) * 0.6;
+    ctx.fillStyle = `rgba(176,255,255,${a})`;
+    ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+    blCtx.fillStyle = `rgba(0,229,255,${a * 0.4})`;
+    blCtx.beginPath(); blCtx.arc(p.x, p.y, p.size + 2, 0, TAU); blCtx.fill();
+  }
+}
+
+// ═══ SPARKS ═══
+const sparks = [];
+function spawnSparks() {
+  for (let i = 0; i < 30; i++) {
+    const angle = Math.random() * TAU;
+    const speed = 2 + Math.random() * 5;
+    sparks.push({ x: CX, y: CY, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, life: 0.8+Math.random()*0.6, maxLife: 0.8+Math.random()*0.6 });
+  }
+}
+function drawSparks(dt) {
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const s = sparks[i]; s.x += s.vx; s.y += s.vy; s.vx *= 0.97; s.vy *= 0.97; s.life -= dt;
+    if (s.life <= 0) { sparks.splice(i, 1); continue; }
+    const a = s.life / s.maxLife;
+    fxCtx.fillStyle = `rgba(176,255,255,${a})`; fxCtx.fillRect(s.x-1, s.y-1, 2, 2);
+    blCtx.fillStyle = `rgba(0,229,255,${a * 0.5})`; blCtx.beginPath(); blCtx.arc(s.x, s.y, 4, 0, TAU); blCtx.fill();
+  }
+}
+
+// ═══ DISTANT TICKS ═══
+function drawDistantTicks() {
+  if (STATE.phase !== PHASE.NOMINAL) return;
+  const t = STATE.t;
+  ctx.save();
+  ctx.globalAlpha = 0.2 * STATE.vitality;
+  ctx.strokeStyle = 'rgba(0,229,255,0.4)'; ctx.lineWidth = 0.5;
+  for (let i = 0; i < 24; i++) {
+    const angle = (TAU / 24) * i + t * 0.02;
+    const innerR = R * 0.92;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2 + i * 0.5);
+    const outerR = R * (0.94 + pulse * 0.04);
+    ctx.beginPath();
+    ctx.moveTo(CX + Math.cos(angle)*innerR, CY + Math.sin(angle)*innerR);
+    ctx.lineTo(CX + Math.cos(angle)*outerR, CY + Math.sin(angle)*outerR);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ═══ LOCK OVERLAY ═══
+function drawLockOverlay(t) {
+  fxCtx.save();
+  fxCtx.fillStyle = 'rgba(2,8,16,0.6)'; fxCtx.fillRect(0,0,W,H);
+  fxCtx.strokeStyle = 'rgba(90,122,138,0.15)'; fxCtx.lineWidth = 0.5;
+  for (let i = 0; i < 40; i++) { const r = R*(0.05+i*0.022); fxCtx.beginPath(); fxCtx.arc(CX,CY,r,0,TAU); fxCtx.stroke(); }
+  for (let i = 0; i < 6; i++) { const lr = 2+i*R*0.012; fxCtx.fillStyle = `rgba(0,229,255,${0.08*(1-i/6)})`; fxCtx.beginPath(); fxCtx.arc(CX,CY,lr,0,TAU); fxCtx.fill(); }
+  const flicker = 0.82 + 0.18 * Math.sin(t*9.1+1.4) * Math.sin(t*21.7);
+  fxCtx.globalAlpha = flicker * 0.35;
+  fxCtx.font = `13px Menlo, "Share Tech Mono", monospace`; fxCtx.textAlign = 'center'; fxCtx.textBaseline = 'middle'; fxCtx.fillStyle = 'rgb(0,229,255)';
+  fxCtx.fillText('SYSTEM LOCKED', CX, CY - R*0.70);
+  fxCtx.globalAlpha = flicker * 0.15; fxCtx.font = `9px Menlo, "Share Tech Mono", monospace`;
+  fxCtx.fillText('AUTHENTICATION REQUIRED', CX, CY - R*0.70 + 20);
+  fxCtx.restore();
+}
+
+// ═══ CHROMATIC ABERRATION — subtle RGB split ═══
+function drawChromaticAberration() {
+  if (STATE.phase === PHASE.OFFLINE) return;
+  const offset = 1.5 + STATE.overdriveBloom * 0.5;
+  // We can't easily do full chromatic aberration without reading pixels,
+  // but we can simulate by drawing colored offset rings at the core
+  const coreR = R * 0.05;
+  chromCtx.save();
+  chromCtx.globalAlpha = 0.08 * STATE.bloomMul;
+  // Red channel offset
+  chromCtx.fillStyle = 'rgba(255,80,80,0.3)';
+  chromCtx.beginPath(); chromCtx.arc(CX - offset, CY, coreR * 3, 0, TAU); chromCtx.fill();
+  // Blue channel offset
+  chromCtx.fillStyle = 'rgba(80,80,255,0.3)';
+  chromCtx.beginPath(); chromCtx.arc(CX + offset, CY, coreR * 3, 0, TAU); chromCtx.fill();
+  chromCtx.restore();
+}
+
+// ═══ TELEMETRY UPDATE ═══
+function updateTelemetry(data) {
+  if (!data) return;
+  TEL._daemonConnected = true;
+  if (data.cpuECores) TEL.cpuECores = data.cpuECores;
+  if (data.cpuPCores) { TEL.cpuPCores = data.cpuPCores; const all = [...TEL.cpuPCores,...TEL.cpuECores]; TEL.cpuLoad = (all.reduce((a,b)=>a+b,0)/all.length)/100; }
+  if (data.gpuPct !== undefined) TEL.gpuLoad = data.gpuPct / 100;
+  if (data.cpuTempC !== undefined) TEL.tempCPU = data.cpuTempC;
+  if (data.gpuTempC !== undefined) TEL.tempGPU = data.gpuTempC;
+  if (data.totalPowerW !== undefined) TEL.powerW = data.totalPowerW;
+  if (data.memUsedGB !== undefined) TEL.memUsedGB = data.memUsedGB;
+  if (data.memTotalGB !== undefined) TEL.memTotalGB = data.memTotalGB;
+  if (data.swapUsedGB !== undefined && data.swapTotalGB !== undefined) TEL.swapPct = data.swapTotalGB > 0 ? (data.swapUsedGB/data.swapTotalGB)*100 : 0;
+  if (data.netInBps !== undefined) TEL.netInBps = data.netInBps;
+  if (data.netOutBps !== undefined) TEL.netOutBps = data.netOutBps;
+  if (data.diskReadKBps !== undefined) TEL.diskReadKBps = data.diskReadKBps;
+  if (data.diskWriteKBps !== undefined) TEL.diskWriteKBps = data.diskWriteKBps;
+  if (data.thermalState !== undefined) TEL.thermalState = data.thermalState;
+  if (data.batteryPct !== undefined) TEL.batteryPct = data.batteryPct;
+  if (data.batteryCharging !== undefined) TEL.batteryCharging = data.batteryCharging;
+  if (data.isDying !== undefined) TEL.isDying = data.isDying;
+  if (data.chargingJustAttached) { STATE.overdriveBloom=3.0; STATE.overdriveRings=3.0; spawnSparks(); }
+  updateMood(); tickAwareness(); refreshPanels();
+}
+
+// ═══ REFRESH HUD PANELS ═══
+function refreshPanels() {
+  const now = new Date();
+  const months = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+  const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+  document.getElementById('calMonth').textContent = months[now.getMonth()];
+  document.getElementById('calDay').textContent = now.getDate();
+  document.getElementById('timeH').textContent = String(now.getHours()).padStart(2,'0');
+  document.getElementById('timeM').textContent = String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('timeS').textContent = String(now.getSeconds()).padStart(2,'0');
+  document.getElementById('weekday').textContent = days[now.getDay()];
+  document.getElementById('centerClock').textContent = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')} AEST`;
+  document.getElementById('centerDate').textContent = `${now.getDate()} · ${months[now.getMonth()].substring(0,3).toUpperCase()} · ${now.getFullYear()}`;
+  document.getElementById('battPct').textContent = TEL.batteryPct;
+  document.getElementById('battTag').textContent = TEL.batteryCharging ? 'AC POWER' : 'BATTERY';
+  document.getElementById('battSub').textContent = TEL.batteryCharging ? 'CHARGING' : `${TEL.batteryPct}% REMAINING`;
+  document.getElementById('cpuPct').textContent = Math.round(TEL.cpuLoad * 100);
+  document.getElementById('gpuPct').textContent = Math.round(TEL.gpuLoad * 100);
+  document.getElementById('memPct').textContent = Math.round((TEL.memUsedGB / TEL.memTotalGB) * 100);
+  document.getElementById('tempC').textContent = Math.round(TEL.tempCPU);
+  document.getElementById('powerW').textContent = TEL.powerW.toFixed(0);
+  document.getElementById('netRate').textContent = (Math.max(TEL.netInBps, TEL.netOutBps) / 1048576).toFixed(1);
+  document.getElementById('btCpu').textContent = Math.round(TEL.cpuLoad * 100) + '%';
+  document.getElementById('btGpu').textContent = Math.round(TEL.gpuLoad * 100) + '%';
+  document.getElementById('btMem').textContent = TEL.memUsedGB.toFixed(1) + 'G';
+  document.getElementById('btTemp').textContent = Math.round(TEL.tempCPU) + '°C';
+  document.getElementById('btPwr').textContent = TEL.powerW.toFixed(0) + 'W';
+  document.getElementById('btUp').textContent = `${Math.floor(TEL.uptime/3600)}h ${Math.floor((TEL.uptime%3600)/60)}m`;
+  updateAmberReasons();
+}
+
+function setAmberReason(id, text, active, critical = false) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('active', Boolean(active));
+  el.dataset.level = critical ? 'critical' : 'amber';
+}
+
+function updateAmberReasons() {
+  const cpuPct = Math.round(TEL.cpuLoad * 100);
+  const memPct = Math.round((TEL.memUsedGB / TEL.memTotalGB) * 100);
+  const tempC = Math.round(TEL.tempCPU);
+  const pwrW = Math.round(TEL.powerW);
+  const netMbps = (Math.max(TEL.netInBps, TEL.netOutBps) / 1048576);
+
+  const cpuHot = cpuPct >= 75;
+  const memHot = memPct >= 82 || TEL.swapPct >= 25;
+  const thermHot = tempC >= 55;
+  const thermCritical = tempC >= 70;
+  const pwrHot = pwrW >= 45 || netMbps >= 25;
+
+  setAmberReason(
+    'amberReasonCpu',
+    cpuHot ? `CPU ${cpuPct}% · HIGH THREAD SATURATION` : `CPU ${cpuPct}% · NOMINAL LOAD`,
+    cpuHot
+  );
+  setAmberReason(
+    'amberReasonMem',
+    memHot ? `MEM ${memPct}% · PRESSURE${TEL.swapPct >= 25 ? ' + SWAP' : ''}` : `MEM ${memPct}% · STABLE`,
+    memHot
+  );
+  setAmberReason(
+    'amberReasonThermal',
+    thermCritical ? `THERM ${tempC}C · HOTSPOT / FAN RAMP` : thermHot ? `THERM ${tempC}C · ELEVATED CORE TEMP` : `THERM ${tempC}C · STABLE`,
+    thermHot || thermCritical,
+    thermCritical
+  );
+  setAmberReason(
+    'amberReasonPower',
+    pwrHot ? `PWR ${pwrW}W · HIGH DRAW${netMbps >= 25 ? ' / NET BURST' : ''}` : `PWR ${pwrW}W · IDLE BAND`,
+    pwrHot
+  );
+}
+
+function tickTelemetry() {
+  TEL.uptime++;
+  if (!TEL._daemonConnected) {
+    TEL.cpuLoad = 0.10 + Math.random()*0.15;
+    TEL.gpuLoad = 0.05 + Math.random()*0.10;
+    TEL.tempCPU = 40 + Math.random()*8;
+    TEL.tempGPU = 36 + Math.random()*6;
+    TEL.powerW = 12 + Math.random()*8;
+    TEL.memUsedGB = 14 + Math.random()*4;
+    updateMood();
+  }
+  refreshPanels();
+}
+
+// ═══ AWARENESS ENGINE ═══
+const AWARENESS = { lastFired:0, lastTempCPU:TEL.tempCPU, lastCpuLoad:TEL.cpuLoad, lastGpuLoad:TEL.gpuLoad, lastSwap:TEL.swapPct, lastPower:TEL.powerW };
+function crossed(o,n,t) { return (o<t&&n>=t)||(o>=t&&n<t); }
+function firePulse(color,msg) {
+  const now = Date.now()/1000;
+  if (now - AWARENESS.lastFired < 5) return;
+  AWARENESS.lastFired = now;
+  const ring = document.createElement('div');
+  ring.className = 'awareness-ring' + (color==='amber'?' amber':color==='crimson'?' crimson':'');
+  document.body.appendChild(ring);
+  setTimeout(() => ring.remove(), 1400);
+  pushChatter('left', msg, color==='crimson'?'critical':color==='amber'?'warn':null);
+}
+function tickAwareness() {
+  const tc = [45,50,55].find(t => crossed(AWARENESS.lastTempCPU, TEL.tempCPU, t));
+  if (tc) firePulse(tc>=55?'crimson':tc>=50?'amber':'cyan', `CPU TEMP THRESHOLD: ${tc}°C CROSSED`);
+  if (crossed(AWARENESS.lastCpuLoad, TEL.cpuLoad, 0.50)) firePulse('cyan','CPU LOAD 50% CROSSED');
+  if (crossed(AWARENESS.lastCpuLoad, TEL.cpuLoad, 0.80)) firePulse('amber','CPU LOAD 80% CROSSED');
+  AWARENESS.lastTempCPU = TEL.tempCPU; AWARENESS.lastCpuLoad = TEL.cpuLoad;
+  AWARENESS.lastGpuLoad = TEL.gpuLoad; AWARENESS.lastSwap = TEL.swapPct; AWARENESS.lastPower = TEL.powerW;
+  document.body.classList.toggle('threat', TEL.tempCPU >= 65);
+}
+
+// ═══ CHATTER ENGINE ═══
+const CHATTER = { leftEl:null, rightEl:null, leftLines:[], rightLines:[], maxLeft:14, maxRight:10, lastLeftT:0, lastRightT:0 };
+function pushChatter(side, text, cls) {
+  const isLeft = side==='left'; const el = isLeft?CHATTER.leftEl:CHATTER.rightEl; if(!el)return;
+  const arr = isLeft?CHATTER.leftLines:CHATTER.rightLines; const max = isLeft?CHATTER.maxLeft:CHATTER.maxRight;
+  const div = document.createElement('div'); div.className = 'line fresh'+(cls?' '+cls:''); div.textContent = text;
+  el.appendChild(div); arr.push(div);
+  requestAnimationFrame(()=>{div.classList.add('visible');setTimeout(()=>div.classList.remove('fresh'),800);});
+  while(arr.length>max){const old=arr.shift();old.classList.add('gone');setTimeout(()=>old.remove(),500);}
+}
+function randomLeftChatter(){const pick=Math.random();if(pick<0.15)return[`P-CORE ${Math.floor(Math.random()*10)}: FREQ BOOST → ${Math.round(3200+Math.random()*900)} MHz`,null];if(pick<0.30)return[`E-CORE ${Math.floor(Math.random()*4)}: ${(TEL.cpuLoad*100).toFixed(1)}% UTILIZATION`,null];if(pick<0.45)return[`TOTAL POWER: ${TEL.powerW.toFixed(1)}W`,null];if(pick<0.60)return[`CPU TEMP: ${TEL.tempCPU.toFixed(1)}°C`,TEL.tempCPU>60?'warn':null];if(pick<0.75)return[`DRAM WRITE BW: ${TEL.dramBwGBs.toFixed(1)} GB/s`,null];return[`GPU CLUSTER: ${Math.round(TEL.gpuLoad*100)}% ACTIVE`,null];}
+function randomRightChatter(){const pick=Math.random();if(pick<0.25)return[`MONITORING ${Math.floor(700+Math.random()*400)} ACTIVE THREADS`,null];if(pick<0.50)return[`MEMORY ${TEL.memUsedGB.toFixed(1)} GB / ${TEL.memTotalGB} GB`,null];if(pick<0.75)return[`GPU COMPLEX ${Math.round(TEL.gpuLoad*100)}% — 40 CORES`,null];return[`UPTIME: ${Math.floor(TEL.uptime/3600)}h ${Math.floor((TEL.uptime%3600)/60)}m`,null];}
+function tickChatter(){const now=STATE.t;if(now-CHATTER.lastLeftT>1.2+Math.random()*1.8){const[m,c]=randomLeftChatter();pushChatter('left',m,c);CHATTER.lastLeftT=now;}if(now-CHATTER.lastRightT>2.5+Math.random()*3.5){const[m,c]=randomRightChatter();pushChatter('right',m,c);CHATTER.lastRightT=now;}}
+
+// ═══ HOLOGRAPHIC FLICKER ═══
+let nextFlicker = 20 + Math.random() * 25;
+function tickFlicker(){if(STATE.phase!==PHASE.NOMINAL)return;if(STATE.t<nextFlicker)return;nextFlicker=STATE.t+20+Math.random()*25;const hud=document.getElementById('hud');hud.classList.remove('holo-flicker');void hud.offsetWidth;hud.classList.add('holo-flicker');}
+
+// ═══ FLOATING PANELS ═══
+let nextPanelT=8,activePanels=0;
+function tickFloatingPanels(){if(STATE.phase!==PHASE.NOMINAL)return;if(STATE.t<nextPanelT)return;if(activePanels>=2){nextPanelT=STATE.t+3;return;}spawnFloatingPanel();nextPanelT=STATE.t+8+Math.random()*7;}
+function spawnFloatingPanel(){const types=['core','thermal','memory','power','snapshot'];const type=types[Math.floor(Math.random()*types.length)];const panel=document.createElement('div');panel.className='float-panel';const sides=[{left:'14%',top:`${25+Math.random()*40}%`},{right:'14%',top:`${25+Math.random()*40}%`}];Object.assign(panel.style,sides[Math.floor(Math.random()*2)]);let html='';switch(type){case'core':html=`<div class="fp-title">Core Topology</div>`+Array.from({length:6},(_,i)=>{const v=Math.floor(Math.random()*95+5);return`<div class="fp-row"><span>CORE ${i}</span><span class="v">${v}%</span></div><div class="fp-bar"><i style="width:${v}%"></i></div>`;}).join('');break;case'thermal':html=`<div class="fp-title">Thermal Map</div><div class="fp-row"><span>CPU</span><span class="v">${TEL.tempCPU.toFixed(1)}°C</span></div><div class="fp-bar"><i style="width:${Math.min(100,TEL.tempCPU-30)*2}%"></i></div><div class="fp-row"><span>GPU</span><span class="v">${TEL.tempGPU.toFixed(1)}°C</span></div><div class="fp-bar"><i style="width:${Math.min(100,TEL.tempGPU-30)*2}%"></i></div>`;break;case'memory':const mp=(TEL.memUsedGB/TEL.memTotalGB*100);html=`<div class="fp-title">Memory</div><div class="fp-row"><span>USED</span><span class="v">${TEL.memUsedGB.toFixed(1)}G</span></div><div class="fp-bar"><i style="width:${mp}%"></i></div><div class="fp-row"><span>SWAP</span><span class="v">${TEL.swapPct.toFixed(0)}%</span></div><div class="fp-bar"><i style="width:${TEL.swapPct}%"></i></div>`;break;case'power':html=`<div class="fp-title">Power Budget</div><div class="fp-row"><span>CPU</span><span class="v">${(TEL.powerW*0.6).toFixed(1)}W</span></div><div class="fp-bar"><i style="width:60%"></i></div><div class="fp-row"><span>GPU</span><span class="v">${(TEL.powerW*0.28).toFixed(1)}W</span></div><div class="fp-bar"><i style="width:28%"></i></div>`;break;default:html=`<div class="fp-title">System Snapshot</div><div class="fp-row"><span>CHIP</span><span class="v">APPLE M-MAX</span></div><div class="fp-row"><span>MOOD</span><span class="v">${MOOD.current.toUpperCase()}</span></div>`;}
+panel.innerHTML=html;document.getElementById('floatPanels').appendChild(panel);activePanels++;requestAnimationFrame(()=>panel.classList.add('show'));setTimeout(()=>{panel.classList.remove('show');setTimeout(()=>{panel.remove();activePanels--;},700);},(5+Math.random()*3)*1000);}
+
+// ═══ MAIN LOOP ═══
+const BOOT_T0 = Date.now() / 1000;
+let lastFrame = Date.now() / 1000;
+let grainCooldown = 0;
+STATE.t = 0;
+
+function frame() {
+  const now = Date.now() / 1000;
+  const dt = Math.min(0.05, now - lastFrame);
+  lastFrame = now;
+  STATE.t = now - BOOT_T0;
+
+  tickVitality(dt);
+  tickPeripheral(dt);
+  updatePhase(dt);
+
+  STATE.breathingPhase = breathSkew(STATE.t, 0.4 + 0.7 * STATE.vitality);
+
+  // Desktop light
+  if (STATE.castsDesktopLight) {
+    const vMul = 0.5 + 0.5 * STATE.vitality;
+    const dop = Math.max(0, Math.min(0.95, (0.25 + STATE.bloomMul * 0.55) * vMul));
+    document.body.style.setProperty('--desktop-light-opacity', String(dop));
+  }
+
+  // Mood modulation
+  const baseRing = STATE.ringSpeedMul;
+  const baseBloom = STATE.bloomMul;
+  if (STATE.phase === PHASE.NOMINAL) {
+    STATE.ringSpeedMul = baseRing * MOOD.ringSpeedMul * (0.70 + 0.55 * STATE.vitality);
+    STATE.bloomMul = baseBloom * MOOD.glowMul * cardiacPulse(STATE.t) * (0.72 + 0.58 * STATE.vitality) + STATE.flickerT * 0.30;
+  }
+
+  let alphaMul = 1.0;
+  if (STATE.phase === PHASE.OFFLINE) alphaMul = 0;
+  if (STATE.phase === PHASE.BOOTING) alphaMul = easeOutCubic(Math.min(1, STATE.phaseT / 2.0));
+  if (STATE.phase === PHASE.SHUTDOWN) alphaMul = Math.max(0, 1 - STATE.phaseT / STATE.shutdownDur);
+
+  // Clear
+  ctx.clearRect(0,0,W,H);
+  blCtx.clearRect(0,0,W,H);
+  bl2Ctx.clearRect(0,0,W,H);
+  haloCtx.clearRect(0,0,W,H);
+  anaCtx.clearRect(0,0,W,H);
+  fxCtx.clearRect(0,0,W,H);
+  scanCtx.clearRect(0,0,W,H);
+  raysCtx.clearRect(0,0,W,H);
+  chromCtx.clearRect(0,0,W,H);
+
+  // Draw — layered from back to front
+  drawDotGrid(STATE.t, alphaMul);
+  drawOuterDialRings(STATE.t, alphaMul);
+  drawWhiteOuterRing(STATE.t, alphaMul);
+  drawStructuralRings(STATE.t, alphaMul);
+  drawRings(STATE.t, alphaMul);
+  drawOrangeArc(STATE.t, alphaMul);
+  drawDataSpikes(STATE.t, alphaMul);
+  drawScanner(STATE.t, alphaMul * (STATE.phase === PHASE.BOOTING ? Math.max(0, (STATE.phaseT - 6) / 1.5) : 1));
+  drawCore(STATE.t, alphaMul);
+  drawInnerGaugeLabels(alphaMul);
+  drawGodRays(STATE.t);
+  drawChromaticAberration();
+
+  spawnParticles();
+  drawParticles(dt);
+  drawSparks(dt);
+
+  if (STATE.phase === PHASE.LOCK) drawLockOverlay(STATE.t);
+
+  // Restore base
+  STATE.ringSpeedMul = baseRing;
+  STATE.bloomMul = baseBloom;
+
+  // Overlays
+  tickChatter();
+  tickFlicker();
+  tickFloatingPanels();
+  drawDistantTicks();
+  if (typeof tickNeuralPulse === 'function') tickNeuralPulse(STATE.t);
+
+  // Film grain
+  grainCooldown--;
+  if (grainCooldown <= 0) { drawGrain(); grainCooldown = 3; }
+
+  // Anamorphic flare pulse
+  const flareOp = 0.45 + 0.25 * Math.sin(STATE.t * 0.5) * (STATE.bloomMul + STATE.overdriveBloom * 0.3);
+  document.querySelector('.anamorphic-flare').style.opacity = flareOp;
+  document.querySelector('.anamorphic-flare-wide').style.opacity = flareOp * 0.5;
+
+  requestAnimationFrame(frame);
+}
+
+// ═══ INPUT ═══
+window.addEventListener('keydown', e => {
+  switch (e.code) {
+    case 'Space': e.preventDefault(); setPhase(PHASE.BOOTING); STATE.bloomMul=0; STATE.ringSpeedMul=0; break;
+    case 'Enter': setPhase(PHASE.SHUTDOWN); break;
+    case 'KeyB': STATE.batteryLow=!STATE.batteryLow; TEL.batteryPct=STATE.batteryLow?4:100; TEL.batteryCharging=!STATE.batteryLow; refreshPanels(); setPhase(STATE.batteryLow?PHASE.DIMMED:PHASE.NOMINAL); break;
+    case 'KeyC': STATE.overdriveBloom=3; STATE.overdriveRings=3; TEL.batteryCharging=true; spawnSparks(); document.body.classList.remove('shake'); void document.body.offsetWidth; document.body.classList.add('shake'); setPhase(PHASE.NOMINAL); break;
+    case 'KeyR': setPhase(PHASE.BOOTING); STATE.bloomMul=0; STATE.ringSpeedMul=0; break;
+    case 'KeyL': setPhase(PHASE.LOCK); break;
+  }
+});
+
+window.addEventListener('mousemove', () => { const now=Date.now(); if(now-STATE.lastMouseTick<1000)return; STATE.lastMouseTick=now; STATE.deepSleepIdleSec=0; });
+
+// ═══ TRIGGER PANEL (JT) ═══
+const JT = (() => {
+  const TRIGGER_DURATION = 4000;
+  let _timers = {}, _panelOpen = false;
+  function snapshot(){return{cpuLoad:TEL.cpuLoad,gpuLoad:TEL.gpuLoad,tempCPU:TEL.tempCPU,tempGPU:TEL.tempGPU,powerW:TEL.powerW,memUsedGB:TEL.memUsedGB,swapPct:TEL.swapPct,overdriveBloom:STATE.overdriveBloom,overdriveRings:STATE.overdriveRings};}
+  function restore(s){TEL.cpuLoad=s.cpuLoad;TEL.gpuLoad=s.gpuLoad;TEL.tempCPU=s.tempCPU;TEL.tempGPU=s.tempGPU;TEL.powerW=s.powerW;TEL.memUsedGB=s.memUsedGB;TEL.swapPct=s.swapPct;STATE.overdriveBloom=s.overdriveBloom;STATE.overdriveRings=s.overdriveRings;refreshPanels();}
+  function $btn(k){return document.querySelector(`.jt-btn[data-jt="${k}"]`);}
+  function activateBtn(k){const el=$btn(k);if(!el)return;el.classList.add('active');const bar=document.createElement('div');bar.className='jt-countdown';el.appendChild(bar);const st=Date.now();const tick=setInterval(()=>{const p=100-Math.min(100,(Date.now()-st)/TRIGGER_DURATION*100);if(bar.isConnected)bar.style.width=p+'%';},40);_timers[k]={tick};}
+  function deactivateBtn(k){const el=$btn(k);if(el){el.classList.remove('active');const b=el.querySelector('.jt-countdown');if(b)b.remove();}if(_timers[k]){clearInterval(_timers[k].tick);clearTimeout(_timers[k].timeout);delete _timers[k];}}
+  function forceFirePulse(c,m){AWARENESS.lastFired=0;firePulse(c,m);}
+  const RECIPES = {
+    cpu:()=>{TEL.cpuLoad=0.92;STATE.overdriveRings=1.8;forceFirePulse('amber','CPU SPIKE — 92% LOAD · ALL P-CORES SATURATED');},
+    gpu:()=>{TEL.gpuLoad=0.91;STATE.overdriveBloom=1.8;forceFirePulse('amber','GPU SURGE — 91% UTILISATION');},
+    thermal:()=>{TEL.tempCPU=96.5;TEL.tempGPU=83;TEL.thermalState='Critical';forceFirePulse('crimson','THERMAL CRITICAL — CPU 96.5°C');},
+    power:()=>{TEL.powerW=58;STATE.overdriveBloom=2.6;STATE.overdriveRings=2.0;forceFirePulse('cyan','POWER SURGE — 58W ARC REACTOR DRAW');},
+    charge:()=>{STATE.overdriveBloom=3;STATE.overdriveRings=3;TEL.batteryCharging=true;spawnSparks();document.body.classList.remove('shake');void document.body.offsetWidth;document.body.classList.add('shake');forceFirePulse('cyan','POWER CELL CONNECTED — CHARGING');},
+    memory:()=>{TEL.memUsedGB=TEL.memTotalGB*0.96;TEL.swapPct=72;forceFirePulse('amber','MEMORY PRESSURE — 96% UTILISED');},
+    network:()=>{TEL.netInBps=52428800;TEL.netOutBps=26214400;forceFirePulse('cyan','NETWORK BURST — 50MB/s INBOUND');},
+    disk:()=>{TEL.diskReadKBps=750000;TEL.diskWriteKBps=350000;forceFirePulse('cyan','DISK I/O — 730MB/s READ');},
+  };
+  function trigger(k){if(STATE.phase===PHASE.SHUTDOWN||STATE.phase===PHASE.OFFLINE)return;if(_timers[k]){const s=_timers[k].snap;deactivateBtn(k);if(s)restore(s);return;}const snap=snapshot();if(RECIPES[k])RECIPES[k]();refreshPanels();activateBtn(k);const tid=setTimeout(()=>{restore(snap);deactivateBtn(k);},TRIGGER_DURATION);_timers[k].timeout=tid;_timers[k].snap=snap;}
+  function toggle(){_panelOpen=!_panelOpen;document.getElementById('jt-panel').classList.toggle('open',_panelOpen);document.getElementById('jt-toggle').textContent=_panelOpen?'✕ CLOSE':'⚡ TRIGGERS';}
+  setInterval(()=>{const el=document.getElementById('jt-status');const tx=document.getElementById('jt-status-text');if(!el||!tx)return;if(TEL._daemonConnected){el.className='live';tx.textContent='LIVE';}else{el.className='sim';tx.textContent='SIM';}},1500);
+  return { trigger, toggle };
+})();
+
+// ═══ PUBLIC API — matches production JARVIS interface ═══
+window.JARVIS = {
+  setPhase,
+  freezeAt: (phase, t) => { setPhase(phase); STATE.frozenPhaseT = t; },
+  unfreeze: () => { STATE.frozenPhaseT = null; STATE.phaseStart = Date.now()/1000; },
+  triggerChargeEvent: () => { STATE.overdriveBloom=3; STATE.overdriveRings=3; spawnSparks(); document.body.classList.remove('shake'); void document.body.offsetWidth; document.body.classList.add('shake'); setPhase(PHASE.NOMINAL); },
+  setBatteryLow: (low) => { STATE.batteryLow=low; TEL.batteryPct=low?4:100; TEL.batteryCharging=!low; refreshPanels(); setPhase(low?PHASE.DIMMED:PHASE.NOMINAL); },
+  lock: () => setPhase(PHASE.LOCK),
+  unlock: () => { STATE.bootDur=3.5; STATE.bloomMul=0; STATE.ringSpeedMul=0; setPhase(PHASE.BOOTING); },
+  shutdown: () => setPhase(PHASE.SHUTDOWN),
+  boot: () => { STATE.bootDur=10.0; STATE.bloomMul=0; STATE.ringSpeedMul=0; setPhase(PHASE.BOOTING); },
+  state: STATE,
+  tel: TEL
+};
+
+// V3 introspection hook is mounted AFTER the NEURAL block to satisfy const TDZ
+// rules (NEURAL_ANCHOR_FRAC / NEURAL_PULSE_TRAVERSAL_S are declared in that block).
+// See "// ═══ V3 INTROSPECTION HOOKS ═══" definition just before the BOOT block.
+
+// ═══ V3 NEURAL PATHWAY ROUTING (D-3, R-4, R-5) ═══
+// V3 deltas vs V2:
+//   • Replaces orthogonal/45° polylines with thin ORGANIC DENDRITIC cubic-Bézier
+//     <path> elements that branch outward from the reactor edge (V3 R-4.1).
+//   • Anchor radius shrinks from R*0.955 to R*0.555 — pathways now visibly
+//     "branch" from the central reactor disk's perimeter, just outside the
+//     V3 R*0.55 exclusion disk (R-3.1, HC-2).
+//   • Each path carries a moving pulse particle (<circle class="neural-pulse">
+//     with <animateMotion dur="2.4s">) — traversal period ≥ 2 s (R-4.2, SC-4.2).
+//   • Stroke colour stays in the existing palette (--neural-pathway/-hot, both
+//     palette-set members) — V3 R-4.3, HC-1, SC-4.3.
+//   • Z-order: SVG overlay z-index 5 < endpoints z-index 6 (V3 R-4.4, SC-4.4).
+const NEURAL = {
+  svg: null,
+  paths: [],         // [{ el, id, phaseOffset, anchor: {x,y}, end: {x,y} }]
+  anchors: [],       // [{ el, ax, ay }]
+  pulses: [],        // [{ el, motionEl, pathId }]
+  lastBuildW: 0,
+  lastBuildH: 0,
+  lastBuildT: 0,
+};
+const NEURAL_SVG_NS = 'http://www.w3.org/2000/svg';
+const NEURAL_XLINK_NS = 'http://www.w3.org/1999/xlink';
+// Anchor radius — fraction of R. Just outside the V3 R*0.55 reactor exclusion
+// disk so pathways visibly branch from the central reactor surface (R-3.1, R-4.1).
+const NEURAL_ANCHOR_FRAC = 0.555;
+// Pulse traversal period in seconds (V3 R-4.2 floor: ≥ 2 s).
+const NEURAL_PULSE_TRAVERSAL_S = 2.4;
+
+function pickPerimeterAnchor(tx, ty) {
+  // Map text midpoint to a reactor-edge point at NEURAL_ANCHOR_FRAC * R.
+  const dx = tx - CX, dy = ty - CY;
+  const len = Math.hypot(dx, dy) || 1;
+  const ar = R * NEURAL_ANCHOR_FRAC;
+  return { x: CX + (dx / len) * ar, y: CY + (dy / len) * ar };
+}
+
+// V3 ITERATION (USER ANNOTATION 1 MATCH): dendritic branching tree topology.
+// Endpoints are clustered by angular zone (left, right, top, bottom). Each cluster
+// has a SHARED REACTOR ANCHOR + a SHARED JUNCTION POINT so all leaves in the same
+// cluster visibly converge at the junction and fan out — dendritic look.
+//
+// Per-cluster topology:
+//   reactor-anchor (R*0.555, on perimeter)
+//     ↓ TRUNK (cubic-Bézier from anchor to junction)
+//   junction (R*1.05, between reactor edge and label band)
+//     ↓ MULTIPLE LEAF BRANCHES (cubic-Bézier from junction to each label)
+//   leaves (one per data-neural endpoint at the label position)
+
+// Returns the angular zone (radians from +x axis, canvas-Y-down) of a viewport point.
+function angleFromCentre(x, y) {
+  return Math.atan2(y - CY, x - CX);
+}
+
+// Cluster definitions — each cluster covers an angular wedge centred on `centreAngle`
+// with half-width `halfArc`. The trunk anchor sits on the reactor perimeter at
+// `centreAngle`, the junction sits at the same angle but at radius R * junctionFrac.
+const NEURAL_CLUSTERS = [
+  { id: 'L', centreAngle:  Math.PI,         halfArc: Math.PI * 0.42, junctionFrac: 1.10, name: 'left'   },
+  { id: 'R', centreAngle:  0,               halfArc: Math.PI * 0.42, junctionFrac: 1.10, name: 'right'  },
+  { id: 'T', centreAngle: -Math.PI / 2,     halfArc: Math.PI * 0.18, junctionFrac: 1.40, name: 'top'    },
+  { id: 'B', centreAngle:  Math.PI / 2,     halfArc: Math.PI * 0.18, junctionFrac: 1.40, name: 'bottom' },
+];
+
+function clusterFor(ex, ey) {
+  const a = angleFromCentre(ex, ey);
+  // Pick cluster whose centre angle is nearest (using shortest signed angular distance).
+  let best = null, bestDist = Infinity;
+  for (const c of NEURAL_CLUSTERS) {
+    let d = a - c.centreAngle;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    const ad = Math.abs(d);
+    if (ad < bestDist) { bestDist = ad; best = c; }
+  }
+  return best;
+}
+
+// V3 LEAF route — cubic-Bézier from a JUNCTION point (shared across cluster leaves)
+// to the leaf endpoint. CP1 leaves the junction along the trunk's outward direction;
+// CP2 sits near the leaf with a small per-idx perpendicular sway for organic fan-out.
+function routeLeafBezier(jx, jy, ex, ey, idx, junctionOutwardAngle) {
+  const dx = ex - jx, dy = ey - jy;
+  const dist = Math.hypot(dx, dy) || 1;
+  const tdx = dx / dist, tdy = dy / dist;
+  const px = -tdy, py = tdx;
+  // CP1: extends outward from junction toward leaf along the trunk's outward angle.
+  const cp1Mag = dist * 0.40;
+  const cp1x = jx + Math.cos(junctionOutwardAngle) * cp1Mag * 0.55 + tdx * cp1Mag * 0.45;
+  const cp1y = jy + Math.sin(junctionOutwardAngle) * cp1Mag * 0.55 + tdy * cp1Mag * 0.45;
+  // CP2: pulled back from leaf with a per-idx perpendicular sway.
+  const swayDir = (idx % 2 === 0 ? 1 : -1);
+  const sway = swayDir * dist * 0.18;
+  const cp2x = ex - tdx * dist * 0.30 + px * sway;
+  const cp2y = ey - tdy * dist * 0.30 + py * sway;
+  return 'M ' + jx.toFixed(2) + ',' + jy.toFixed(2)
+       + ' C ' + cp1x.toFixed(2) + ',' + cp1y.toFixed(2)
+       + ' ' + cp2x.toFixed(2) + ',' + cp2y.toFixed(2)
+       + ' ' + ex.toFixed(2) + ',' + ey.toFixed(2);
+}
+
+// V3 TRUNK route — cubic-Bézier from a reactor-edge anchor to the cluster junction.
+// Tangent at the anchor points radially outward from reactor centre (so the trunk
+// visibly emerges from the reactor surface), tangent at the junction points outward
+// along the cluster's centre angle so leaves fan out cleanly.
+function routeTrunkBezier(ax, ay, jx, jy, clusterAngle) {
+  const ndx = Math.cos(clusterAngle), ndy = Math.sin(clusterAngle);
+  const dx = jx - ax, dy = jy - ay;
+  const dist = Math.hypot(dx, dy) || 1;
+  // CP1: just outside the anchor, along the radial direction (smooth emergence).
+  const cp1x = ax + ndx * dist * 0.40;
+  const cp1y = ay + ndy * dist * 0.40;
+  // CP2: just inside the junction, also along the radial direction (smooth arrival).
+  const cp2x = jx - ndx * dist * 0.20;
+  const cp2y = jy - ndy * dist * 0.20;
+  return 'M ' + ax.toFixed(2) + ',' + ay.toFixed(2)
+       + ' C ' + cp1x.toFixed(2) + ',' + cp1y.toFixed(2)
+       + ' ' + cp2x.toFixed(2) + ',' + cp2y.toFixed(2)
+       + ' ' + jx.toFixed(2) + ',' + jy.toFixed(2);
+}
+
+// Backwards-compat shim — old callers (and external code) can still reach this signature.
+// In V3 dendritic mode this is unused for the SVG build (we route through clusters)
+// but kept exported so introspection / tests don't break.
+function routeOrganicBezier(ax, ay, ex, ey, idx) {
+  return routeLeafBezier(ax, ay, ex, ey, idx, Math.atan2(ay - CY, ax - CX));
+}
+
+function buildNeuralPathways() {
+  if (!NEURAL.svg) NEURAL.svg = document.getElementById('neuralOverlay');
+  const svg = NEURAL.svg; if (!svg) return;
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  NEURAL.paths.length = 0;
+  NEURAL.anchors.length = 0;
+  NEURAL.pulses.length = 0;
+
+  // Set SVG viewBox to match viewport pixel coords so connector points are in viewport px.
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  svg.setAttribute('width', String(W));
+  svg.setAttribute('height', String(H));
+  svg.setAttribute('xmlns', NEURAL_SVG_NS);
+  svg.setAttribute('xmlns:xlink', NEURAL_XLINK_NS);
+
+  // Stroke width scales with viewport — sub-pixel anti-aliased at 1920 baseline (C-3).
+  const stroke = Math.max(0.55, Math.min(1.10 * (W / 1920), 2.2));
+  // Pulse particle radius scales with viewport — keeps it visible without dominating.
+  const pulseR = Math.max(1.4, Math.min(2.4 * (W / 1920), 4.6));
+
+  // ── PHASE 1: collect every endpoint and assign each to a cluster ──────────
+  const allEndpoints = [];
+  const nodes = document.querySelectorAll('[data-neural="1"]');
+  for (const el of nodes) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    const tx = rect.left + rect.width / 2;
+    const ty = rect.top + rect.height / 2;
+    const cluster = clusterFor(tx, ty);
+    allEndpoints.push({ el, tx, ty, cluster });
+  }
+
+  // ── PHASE 2: for each cluster with members, draw the TRUNK + leaf branches ─
+  let idx = 0;
+  for (const cluster of NEURAL_CLUSTERS) {
+    const members = allEndpoints.filter(e => e.cluster === cluster);
+    if (members.length === 0) continue;
+
+    // Trunk anchor on reactor perimeter (at cluster centre angle, on R*0.555).
+    const ax = CX + Math.cos(cluster.centreAngle) * R * NEURAL_ANCHOR_FRAC;
+    const ay = CY + Math.sin(cluster.centreAngle) * R * NEURAL_ANCHOR_FRAC;
+    // Junction at R * junctionFrac along the same angle.
+    const jx = CX + Math.cos(cluster.centreAngle) * R * cluster.junctionFrac;
+    const jy = CY + Math.sin(cluster.centreAngle) * R * cluster.junctionFrac;
+
+    // ── 2a: TRUNK path (anchor → junction) — visible "stalk" from reactor edge ──
+    const trunkD = routeTrunkBezier(ax, ay, jx, jy, cluster.centreAngle);
+    const trunk = document.createElementNS(NEURAL_SVG_NS, 'path');
+    const trunkId = 'neural-trunk-' + cluster.id;
+    trunk.setAttribute('id', trunkId);
+    trunk.setAttribute('d', trunkD);
+    // Trunk uses the "hot" pathway colour — visually heavier than leaves (it carries
+    // the consolidated signal of the whole cluster). stroke-width slightly wider.
+    trunk.setAttribute('class', 'neural-path hot');
+    trunk.setAttribute('stroke-width', String(stroke * 1.7));
+    NEURAL.paths.push({ el: trunk, id: trunkId, phaseOffset: 0, anchor: { x: ax, y: ay }, end: { x: jx, y: jy }, isTrunk: true, cluster: cluster.id });
+
+    // Trunk root anchor dot (where it meets the reactor surface).
+    const rootDot = document.createElementNS(NEURAL_SVG_NS, 'circle');
+    rootDot.setAttribute('cx', String(ax));
+    rootDot.setAttribute('cy', String(ay));
+    rootDot.setAttribute('r', String(Math.max(1.8, stroke * 2.2)));
+    rootDot.setAttribute('class', 'neural-path anchor-dot');
+    NEURAL.anchors.push({ el: rootDot });
+
+    // Junction dot (the dendritic fork point).
+    const junctionDot = document.createElementNS(NEURAL_SVG_NS, 'circle');
+    junctionDot.setAttribute('cx', String(jx));
+    junctionDot.setAttribute('cy', String(jy));
+    junctionDot.setAttribute('r', String(Math.max(2.0, stroke * 2.6)));
+    junctionDot.setAttribute('class', 'neural-path anchor-dot');
+    NEURAL.anchors.push({ el: junctionDot });
+
+    svg.appendChild(trunk);
+
+    // ── 2b: LEAF paths (junction → each label) — fan out from the junction ───
+    for (const m of members) {
+      const d = routeLeafBezier(jx, jy, m.tx, m.ty, idx, cluster.centreAngle);
+      const path = document.createElementNS(NEURAL_SVG_NS, 'path');
+      const pathId = 'neural-path-' + idx;
+      path.setAttribute('id', pathId);
+      path.setAttribute('d', d);
+      path.setAttribute('class', idx % 3 === 0 ? 'neural-path hot' : 'neural-path');
+      path.setAttribute('stroke-width', String(stroke));
+      const phaseOffset = (idx * 0.71) % (Math.PI * 2);
+      NEURAL.paths.push({ el: path, id: pathId, phaseOffset, anchor: { x: jx, y: jy }, end: { x: m.tx, y: m.ty }, isTrunk: false, cluster: cluster.id });
+
+      // Small leaf dot at the junction-side end of each leaf (matches V2 anchor dot pattern).
+      const dot = document.createElementNS(NEURAL_SVG_NS, 'circle');
+      dot.setAttribute('cx', String(jx));
+      dot.setAttribute('cy', String(jy));
+      dot.setAttribute('r', String(Math.max(1.0, stroke * 1.2)));
+      dot.setAttribute('class', 'neural-path anchor-dot');
+      NEURAL.anchors.push({ el: dot });
+
+      // V3 R-4.2 / SC-4.2: pulse particle traversing the leaf path via SVG <animateMotion>.
+      // Period = NEURAL_PULSE_TRAVERSAL_S (2.4 s ≥ 2 s floor).
+      // Per-path begin offset desyncs pulses so they don't strobe in unison.
+      const pulse = document.createElementNS(NEURAL_SVG_NS, 'circle');
+      pulse.setAttribute('class', 'neural-pulse');
+      pulse.setAttribute('r', String(pulseR));
+      pulse.setAttribute('cx', '0');
+      pulse.setAttribute('cy', '0');
+      const motion = document.createElementNS(NEURAL_SVG_NS, 'animateMotion');
+      motion.setAttribute('dur', NEURAL_PULSE_TRAVERSAL_S.toFixed(2) + 's');
+      motion.setAttribute('repeatCount', 'indefinite');
+      motion.setAttribute('begin', (-(idx * 0.31) % NEURAL_PULSE_TRAVERSAL_S).toFixed(2) + 's');
+      motion.setAttribute('rotate', 'auto');
+      motion.setAttribute('calcMode', 'spline');
+      motion.setAttribute('keySplines', '0.42 0 0.58 1');         // easeInOutSine-equivalent
+      motion.setAttribute('keyTimes', '0;1');
+      const mpath = document.createElementNS(NEURAL_SVG_NS, 'mpath');
+      mpath.setAttributeNS(NEURAL_XLINK_NS, 'xlink:href', '#' + pathId);
+      motion.appendChild(mpath);
+      pulse.appendChild(motion);
+      NEURAL.pulses.push({ el: pulse, motionEl: motion, pathId });
+
+      svg.appendChild(path);
+      svg.appendChild(dot);
+      svg.appendChild(pulse);
+      idx++;
+    } // close inner for-of (members)
+  } // close outer for-of (NEURAL_CLUSTERS)
+  NEURAL.lastBuildW = W;
+  NEURAL.lastBuildH = H;
+} // close function buildNeuralPathways
+
+// V3 pulse driver — alpha-envelope on each cubic-Bézier path (the moving pulse particle
+// is driven separately by SVG <animateMotion> at 2.4 s per traversal, see buildNeuralPathways).
+// Base period = 2.6 s / line — > 1.8 s floor (C-6) and complementary to the 2.4 s traversal
+// so the alpha envelope and traversal pulse don't lock-step into a single beat.
+// Alpha peak-to-peak Δ per line ≤ 0.32 — accessibility safety floor (C-6).
+const NEURAL_PULSE_PERIOD = 2.6;
+const NEURAL_ALPHA_BASE = 0.42;
+const NEURAL_ALPHA_AMP  = 0.16;
+
+function tickNeuralPulse(t) {
+  for (let i = 0; i < NEURAL.paths.length; i++) {
+    const pn = NEURAL.paths[i];
+    // easeInOutSine envelope between [base-amp, base+amp]
+    const ph = (t / NEURAL_PULSE_PERIOD) * TAU + pn.phaseOffset;
+    const e = (1 - Math.cos(ph)) / 2;
+    const alpha = NEURAL_ALPHA_BASE + NEURAL_ALPHA_AMP * (e * 2 - 1);
+    pn.el.style.opacity = String(Math.max(0, Math.min(1, alpha)));
+  }
+}
+
+// resize() already invokes buildNeuralPathways when defined; no re-wrap needed.
+
+// ═══ V3 INTROSPECTION HOOKS — expose named omegas + mech ring config + neural
+// pathway parameters to the Playwright verification battery so audits prove
+// R-1.1, R-1.2, R-1.3, R-1.4, R-4.1, R-4.2, R-6.x directly off the live runtime
+// instead of by re-greppping source (D-6 evidence trail). ═══
+window.JARVIS_V3 = {
+  outerLayers: {
+    A: { omega: OUTER_LAYER_A_OMEGA, dir: OUTER_LAYER_A_OMEGA > 0 ? 'CW' : 'CCW' },
+    B: { omega: OUTER_LAYER_B_OMEGA, dir: OUTER_LAYER_B_OMEGA > 0 ? 'CW' : 'CCW' },
+    C: { omega: OUTER_LAYER_C_OMEGA, dir: OUTER_LAYER_C_OMEGA > 0 ? 'CW' : 'CCW' },
+  },
+  outerCuts: [[30, 40], [180, 190], [210, 220]],
+  outerDoubleSpans: [[40, 170], [230, 350]],
+  mechRings: MECH_RINGS.map(r => Object.assign({}, r, { periodS: (2 * Math.PI / r.omega) })),
+  reactorExclusionDiskFrac: 0.55,
+  neuralAnchorFrac: NEURAL_ANCHOR_FRAC,
+  neuralPulseTraversalS: NEURAL_PULSE_TRAVERSAL_S,
+  velocityVarianceFrac: function (baseOmega, wobbleAmp, wobbleFreq) {
+    if (Math.abs(baseOmega) < 1e-9) return Infinity;
+    return Math.abs(wobbleAmp * wobbleFreq) / Math.abs(baseOmega);
+  },
+  // R-7.3 / SC-7.3: documented JARVIS.gif baseline ring proportions for the
+  // parity report's ±5% comparison. (Image path is documented in the report.)
+  jarvisGifProportions: {
+    innerRings: [0.24, 0.27, 0.30],   // measured from /Users/vic/Downloads/JARVIS.gif frame
+    outerPerimeter: 0.78,             // per the same measurement
+  },
+};
+
+// ═══ BOOT ═══
+CHATTER.leftEl = document.getElementById('chatterLeft');
+CHATTER.rightEl = document.getElementById('chatterRight');
+try { if (new URLSearchParams(location.search).has('hifi')) STATE.highFidelityCore = true; } catch(e) {}
+resize();
+refreshPanels();
+buildNeuralPathways();
+// Pulse on top of the main rAF loop — integrated into frame() via STATE.t.
+setPhase(PHASE.BOOTING);
+setInterval(tickTelemetry, 1000);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+[project]
+name = "jarvis-animation-stack"
+version = "1.0.0"
+description = "JARVIS Cinematic Animation Stack — Python tooling and testing"
+requires-python = ">=3.12"
+dependencies = [
+    "playwright>=1.50",
+    "numpy>=2.4",
+    "Pillow>=11",
+    "pytest>=9",
+    "ffmpeg-python>=0.2",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

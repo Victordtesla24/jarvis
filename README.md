@@ -58,6 +58,12 @@
 
 ---
 
+## ◆ Recent changes
+
+**2026-05-16 — HUD performance crisis remediation (ralph-loop-infinite iteration 1).** macOS attributed a sustained WindowServer 50 %/180 s CPU resource breach to `JarvisTelemetry` on 2026-05-11 13:39 and a watchdog-timeout kernel panic at 20:11:04 the same day. Eight surgical edits were applied to `jarvis-full-animation.html` (sole impacted file; 524 other files SHA-256 byte-frozen): three unguarded `setInterval` call sites are now gated by `JARVIS.paused`; the adaptive FPS controller now requires ≥ 3 consecutive good 60-frame windows before restoring 60 fps (RC-D anti-flap); the opt-in WebGL plasma core now registers `webglcontextlost` / `webglcontextrestored` listeners with `preventDefault()` per the Khronos `WEBGL_lose_context` spec; six bare `} catch (e) {}` swallow patterns are now structured `console.error(...)` lines that route through the `WKUserContentController` host-log bridge in `AppDelegate.swift:295-299`; a new pre-emptive auto-Low-Power-Mode trigger engages `window.JARVIS.setLowPower(true)` after 30 s of smoothed CPU or GPU load ≥ 0.80 and releases after 60 s below 0.50. **Read more:** [docs/jarvis-hud-rca.md](docs/jarvis-hud-rca.md) (root-cause analysis with Mermaid error trail) · [docs/jarvis-hud-test-report.md](docs/jarvis-hud-test-report.md) (7/7 static pytest tests + macOS-side soak trace).
+
+---
+
 ## ◆ What it is
 
 **JARVIS Telemetry** turns your macOS desktop into a live Iron Man arc-reactor HUD that sits beneath every window and pulses with the actual heartbeat of your Apple Silicon: per-core CPU load, GPU saturation, SoC temperature, DRAM bandwidth, power draw and battery state — all rendered as **700+ vector paths a frame at a steady 60 fps**.

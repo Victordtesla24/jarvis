@@ -200,12 +200,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         for screen in NSScreen.screens {
             let (win, wv) = buildWallpaperWindow(for: screen)
-            win.makeKeyAndOrderFront(nil)
+            // .accessory apps cannot become key; orderFrontRegardless
+            // forces the wallpaper window onto the screen list even when
+            // the app is not active.
+            win.orderFrontRegardless()
             wallpaperWindows.append(win)
             webViews.append(wv)
         }
         // R-14: observer registration is now a one-shot in
         // applicationDidFinishLaunching. No per-screens-change re-register.
+
+        // PERF: forward NSWindow occlusion state into the HTML engine so the
+        // animation loop can drop to 8fps when the desktop is fully covered
+        // by app windows (the common case for a wallpaper). Reverses to
+        // 60fps the instant occlusion clears. Cuts steady-state GPU/CPU
+        // usage by an order of magnitude during normal work.
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSWindow.didChangeOcclusionStateNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(wallpaperOcclusionChanged(_:)),
+            name: NSWindow.didChangeOcclusionStateNotification,
+            object: nil
+        )
+    }
+
+    @objc private func wallpaperOcclusionChanged(_ note: Notification) {
+        guard let win = note.object as? NSWindow,
+              wallpaperWindows.contains(win) else { return }
+        // Compute aggregate visibility — if ANY wallpaper window is visible
+        // we keep ALL at full FPS (user may be glancing at any screen).
+        let anyVisible = wallpaperWindows.contains { $0.occlusionState.contains(.visible) }
+        let js = "if(window.JARVIS&&JARVIS.setOccluded){JARVIS.setOccluded(\(anyVisible ? "false" : "true"))}"
+        for wv in webViews {
+            wv.evaluateJavaScript(js) { _, _ in }
+        }
+        let thisOccluded = !win.occlusionState.contains(.visible)
+        NSLog("[AppDelegate] occlusion changed — anyVisible=%@ (this win occluded=%@)",
+              anyVisible ? "YES" : "NO", thisOccluded ? "YES" : "NO")
     }
 
     private func buildWallpaperWindow(for screen: NSScreen) -> (NSWindow, WKWebView) {
@@ -217,13 +252,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             screen:       screen
         )
         // Promo capture mode raises the window above everything so ffmpeg
-        // screen capture can actually see it. In normal use, the window is
-        // glued to the desktop wallpaper layer.
+        // screen capture can actually see it. In normal use, sit above
+        // the macOS wallpaper image while staying far below normal app
+        // windows. On this macOS build, desktopIconWindow - 1 still sits
+        // behind WallpaperAgent, so use +1 and rely on ignoresMouseEvents
+        // to keep desktop interactions passing through.
         if ProcessInfo.processInfo.environment["JARVIS_PROMO_CAPTURE"] == "1" {
             win.level = .floating
             win.ignoresMouseEvents = false
         } else {
-            win.level = NSWindow.Level(Int(CGWindowLevelForKey(.desktopWindow)))
+            win.level = NSWindow.Level(
+                Int(CGWindowLevelForKey(.desktopIconWindow)) + 1
+            )
             win.ignoresMouseEvents = true
         }
         win.backgroundColor = NSColor(red: 0.02, green: 0.04, blue: 0.08, alpha: 1.0)
@@ -232,19 +272,110 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         win.collectionBehavior  = [.canJoinAllSpaces, .stationary, .ignoresCycle]
 
         let config = WKWebViewConfiguration()
+        let ucc = WKUserContentController()
+        ucc.add(self, name: "jarvisLog")
+        let diagnosticsJS = """
+        (function(){
+          function post(level, message, detail) {
+            try {
+              window.webkit.messageHandlers.jarvisLog.postMessage({
+                level: level,
+                message: String(message),
+                detail: detail ? String(detail) : ""
+              });
+            } catch (_) {}
+          }
+          window.addEventListener('error', function(e) {
+            post('error', e.message || 'window error',
+                 (e.filename || '') + ':' + (e.lineno || 0) + ':' + (e.colno || 0));
+          });
+          window.addEventListener('unhandledrejection', function(e) {
+            post('promise', e.reason && (e.reason.stack || e.reason.message || e.reason));
+          });
+          var originalError = console.error;
+          console.error = function() {
+            post('console.error', Array.prototype.join.call(arguments, ' '));
+            if (originalError) originalError.apply(console, arguments);
+          };
+        })();
+        """
+        ucc.addUserScript(WKUserScript(
+            source: diagnosticsJS,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true
+        ))
+        config.userContentController = ucc
         // Allow JS + WebGL (required by the canvas animation and optional HiFi core)
         config.defaultWebpagePreferences.allowsContentJavaScript = true
+        // Memory tuning for a long-running, single-page wallpaper view that
+        // never navigates and has no third-party content. nonPersistent
+        // dataStore writes nothing to disk (no HTTP cache, cookies, or
+        // IndexedDB). Per-WKWebsiteDataStore docs.
+        config.websiteDataStore = .nonPersistent()
+        // No audio/video — block media subsystem allocations.
+        config.mediaTypesRequiringUserActionForPlayback = .all
+        // Allow the HUD to paint as soon as the first canvas frame is ready.
+        // Suppressing incremental rendering can leave WKWebView blank when
+        // the large single-file renderer keeps the load/font pipeline open.
+        config.suppressesIncrementalRendering = false
+        // (WKProcessPool deprecated since macOS 12 — WebKit collapses web
+        // content into a single process automatically; nothing to set.)
 
         let wv = WKWebView(frame: screen.frame, configuration: config)
         wv.autoresizingMask = [.width, .height]
-        // Make WKWebView background transparent so the window colour shows if
-        // the HTML takes a moment to paint on first load.
-        wv.setValue(false, forKey: "drawsBackground")
+        // No navigation gestures, link previews, or magnification — pure HUD.
+        wv.allowsBackForwardNavigationGestures = false
+        wv.allowsLinkPreview = false
+        wv.allowsMagnification = false
+        // Keep WKWebView opaque. On desktop-level/accessory wallpaper windows,
+        // disabling drawsBackground can leave WebKit's layer tree as a black
+        // backing surface even while JS and telemetry are alive.
+        wv.setValue(true, forKey: "drawsBackground")
+        wv.layer?.isOpaque = true
 
         if let url = htmlFileURL() {
             // allowingReadAccessTo: parent dir so the HTML can load web fonts
             // from the same directory (none needed for bundled file, but safe).
             wv.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+
+            // JARVIS_NATIVE_CANVAS_PROBE_V1: pull canvas state from Swift after
+            // startup. This bypasses in-page console hooks and tells us whether
+            // WKWebView has non-zero canvas buffers even when the captured window
+            // is black.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak wv] in
+                let js = """
+                (function(){
+                  function sum(id){
+                    var cv=document.getElementById(id);
+                    if(!cv) return {id:id, missing:true};
+                    var c=cv.getContext('2d');
+                    var sw=Math.min(160,cv.width||0), sh=Math.min(90,cv.height||0);
+                    if(!sw||!sh) return {id:id,w:cv.width,h:cv.height,sum:0,alpha:0};
+                    var sx=Math.max(0,Math.floor((cv.width-sw)/2));
+                    var sy=Math.max(0,Math.floor((cv.height-sh)/2));
+                    var d=c.getImageData(sx,sy,sw,sh).data;
+                    var sum=0, alpha=0;
+                    for(var i=0;i<d.length;i+=4){sum+=d[i]+d[i+1]+d[i+2];alpha+=d[i+3];}
+                    return {id:id,w:cv.width,h:cv.height,sum:sum,alpha:alpha};
+                  }
+                  return JSON.stringify({
+                    ready:document.readyState,
+                    body:document.body.className,
+                    state:(typeof STATE==='undefined'?null:{phase:STATE.phase,t:STATE.t}),
+                    jarvis:(window.JARVIS?{paused:window.JARVIS.paused,lowPower:window.JARVIS.lowPower}:null),
+                    perf:(typeof PERF==='undefined'?null:{dpr:PERF.dpr,targetFPS:PERF.targetFPS,occluded:PERF.occluded,pageHidden:PERF.pageHidden}),
+                    canvases:['hexCanvas','bloomCanvas','mainCanvas','scanCanvas','fxCanvas','grainCanvas'].map(sum)
+                  });
+                })();
+                """
+                wv?.evaluateJavaScript(js) { result, error in
+                    if let error {
+                        NSLog("[JARVIS_NATIVE_CANVAS_PROBE_V1] ERROR %@", String(describing: error))
+                    } else {
+                        NSLog("[JARVIS_NATIVE_CANVAS_PROBE_V1] %@", String(describing: result ?? "nil"))
+                    }
+                }
+            }
         }
 
         win.contentView = wv
@@ -669,15 +800,74 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         //    subtle visual "yawn" for sleep-wake events that don't otherwise
         //    cross the lock or session boundary. Debounced to ignore the 2-3
         //    rapid-fire wake notifications macOS posts on lid-open.
+        //    Also resumes the HTML render loop (paused on willSleep below).
         wsCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
             guard let self else { return }
-            Task { @MainActor in self.injectWakeExhale() }
+            Task { @MainActor in
+                for wv in self.webViews {
+                    wv.evaluateJavaScript(
+                        "window.JARVIS&&JARVIS.resume&&JARVIS.resume()"
+                    ) { _, _ in }
+                }
+                self.injectWakeExhale()
+            }
         }
         NSLog("[AppDelegate] wake-exhale observer installed (didWakeNotification)")
+
+        // ── Pause the HTML render loop on display sleep / system sleep.
+        //    The wallpaper is invisible during sleep so the 60fps Canvas
+        //    redraw is pure CPU/GPU/battery waste. JARVIS.pause() clears
+        //    canvases once and stops re-scheduling requestAnimationFrame.
+        //    Resumed via the didWakeNotification handler above.
+        wsCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in
+                for wv in self.webViews {
+                    wv.evaluateJavaScript(
+                        "window.JARVIS&&JARVIS.pause&&JARVIS.pause()"
+                    ) { _, _ in }
+                }
+                NSLog("[AppDelegate] willSleep — sent JARVIS.pause() to all webviews")
+            }
+        }
+        NSLog("[AppDelegate] sleep-pause observer installed (willSleepNotification)")
+
+        // ── Track Low Power Mode (macOS 12+). When the user enables LPM
+        //    or the system asserts it (e.g. low battery threshold),
+        //    NSProcessInfoPowerStateDidChange fires. Forward the boolean
+        //    to the HTML so the render loop can throttle to ~30fps.
+        NotificationCenter.default.addObserver(
+            forName: .NSProcessInfoPowerStateDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            Task { @MainActor in self.broadcastLowPowerState() }
+        }
+        // Also push the current state immediately so a session that started
+        // already in LPM picks it up without waiting for a transition.
+        broadcastLowPowerState()
+        NSLog("[AppDelegate] low-power observer installed (NSProcessInfoPowerStateDidChange)")
+    }
+
+    /// Send the current `isLowPowerModeEnabled` to every WKWebView so the
+    /// HTML render loop can throttle accordingly. Cheap — one JS call per
+    /// webview per state change.
+    private func broadcastLowPowerState() {
+        let on = ProcessInfo.processInfo.isLowPowerModeEnabled
+        let js = "window.JARVIS&&JARVIS.setLowPower&&JARVIS.setLowPower(\(on ? "true" : "false"))"
+        for wv in webViews {
+            wv.evaluateJavaScript(js) { _, _ in }
+        }
+        NSLog("[AppDelegate] low-power=%@ broadcast to %d webview(s)", on ? "on" : "off", webViews.count)
     }
 
     // MARK: - Living-Shrine Wake Exhale
@@ -1286,6 +1476,20 @@ extension AppDelegate: WKScriptMessageHandler {
     /// `window`. So `window.JT` is always undefined. Use `typeof JT !== 'undefined'` instead.
     func userContentController(_ userContentController: WKUserContentController,
                                didReceive message: WKScriptMessage) {
+        if message.name == "jarvisLog" {
+            if let body = message.body as? [String: Any] {
+                NSLog(
+                    "[JARVIS JS] %@: %@ %@",
+                    String(describing: body["level"] ?? "log"),
+                    String(describing: body["message"] ?? ""),
+                    String(describing: body["detail"] ?? "")
+                )
+            } else {
+                NSLog("[JARVIS JS] %@", String(describing: message.body))
+            }
+            return
+        }
+
         guard message.name == "jarvisAction",
               let body   = message.body as? [String: Any],
               let action = body["action"] as? String else { return }

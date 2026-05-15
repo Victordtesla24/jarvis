@@ -1,0 +1,38 @@
+JARVIS Animation Stack — Clean-Room Restore Log
+================================================
+Date: 2026-04-19
+Operator: ralph-loop-infinite iteration 1
+
+## Pre-restore lockfile hashes
+uv.lock:              3cd8b76d4016d8f6bb7173411750ee028454b78d7edf0e0ea76e375baee8c814
+js/package-lock.json: deece888843ecc168fc063b953f342fa42e92fc707882ddf50166c95fef91b5b
+
+## Steps executed
+1. rm -rf .venv js/node_modules
+2. uv sync                         → exit 0, 13 packages installed
+3. npm ci --prefix js              → exit 0, 119 packages installed, 0 vulnerabilities
+4. uv sync --frozen                → exit 0, no drift detected
+5. uv run playwright install chromium → exit 0
+
+## Post-restore smoke results
+node js/smoke/three-smoke.mjs         → THREE r184          PASS
+node js/smoke/postprocessing-smoke.mjs → EffectComposer OK  PASS
+node js/smoke/motion-smoke.mjs        → GSAP OK / AnimeJS OK PASS
+node js/smoke/meyda-smoke.mjs         → Meyda OK            PASS
+node js/smoke/particles-smoke.mjs     → tsParticles OK      PASS
+node js/smoke/pixi-smoke.mjs          → PixiJS OK           PASS
+node js/smoke/ogl-regl-smoke.mjs      → OGL OK / regl OK   PASS
+node js/smoke/motion-one-smoke.mjs    → Motion One OK       PASS
+
+uv run pytest tests/smoke/test_cinema_pipeline.py -v
+  → test_cinema_pipeline_bloom PASSED  (bloom pixel count ≥ 500)
+
+## Post-restore lockfile hashes (must equal pre-restore)
+uv.lock:              3cd8b76d4016d8f6bb7173411750ee028454b78d7edf0e0ea76e375baee8c814  ✓ MATCH
+js/package-lock.json: deece888843ecc168fc063b953f342fa42e92fc707882ddf50166c95fef91b5b  ✓ MATCH
+
+## Verdict
+SC-7.1: PASS — clean-room restore + all smoke tests pass
+SC-7.2: PASS — uv.lock hash identical
+SC-7.3: PASS — js/package-lock.json hash identical
+VG-7:   PASS — no dep drift detected

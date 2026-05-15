@@ -1,0 +1,530 @@
+{
+  "url": "http://localhost:8899/jarvis-uhd-cinematic-v2.html",
+  "capturedAt": "2026-04-19T09:59:50.229Z",
+  "viewports": [
+    {
+      "name": "1280",
+      "w": 1280,
+      "h": 720,
+      "audit": {
+        "viewport": {
+          "W": 1280,
+          "H": 720,
+          "CX": 640,
+          "CY": 360,
+          "R": 230.4,
+          "rezR": 126.72000000000001,
+          "dprCap": 1
+        },
+        "zonal": {
+          "wheelWhite": 4226,
+          "spikeCyan": 1504,
+          "ratio": 2.809840425531915
+        },
+        "rez": {
+          "viol": 0,
+          "examples": []
+        },
+        "neural": {
+          "trunks": 4,
+          "leaves": 22,
+          "pulses": 22,
+          "dataNeural": 22,
+          "oneToOne": true
+        },
+        "plates": {
+          "passing": 22,
+          "failing": 0,
+          "total": 22
+        },
+        "animations": 50,
+        "v3": {
+          "outerLayers": {
+            "A": {
+              "omega": 0.108,
+              "dir": "CW"
+            },
+            "B": {
+              "omega": -0.072,
+              "dir": "CCW"
+            },
+            "C": {
+              "omega": 0.054,
+              "dir": "CW"
+            }
+          },
+          "outerCuts": [
+            [
+              30,
+              40
+            ],
+            [
+              180,
+              190
+            ],
+            [
+              210,
+              220
+            ]
+          ],
+          "outerDoubleSpans": [
+            [
+              40,
+              170
+            ],
+            [
+              230,
+              350
+            ]
+          ],
+          "mechRings": [
+            {
+              "label": "L1",
+              "r": 0.228,
+              "w": 3.5,
+              "teeth": 40,
+              "lugs": 16,
+              "dir": 1,
+              "omega": 0.4,
+              "wobble": 0.18,
+              "gapCentre": 2.356194490192345,
+              "gapWidth": 1.4,
+              "periodS": 15.707963267948966
+            },
+            {
+              "label": "L2",
+              "r": 0.27,
+              "w": 3.2,
+              "teeth": 44,
+              "lugs": 20,
+              "dir": -1,
+              "omega": 0.31,
+              "wobble": 0.18,
+              "gapCentre": 0.7853981633974483,
+              "gapWidth": 1.4,
+              "periodS": 20.26833970057931
+            },
+            {
+              "label": "L3",
+              "r": 0.315,
+              "w": 2.8,
+              "teeth": 48,
+              "lugs": 24,
+              "dir": 1,
+              "omega": 0.24,
+              "wobble": 0.18,
+              "gapCentre": 1.5707963267948966,
+              "gapWidth": 1.55,
+              "periodS": 26.179938779914945
+            }
+          ],
+          "reactorExclusionDiskFrac": 0.55,
+          "neuralAnchorFrac": 0.555,
+          "neuralPulseTraversalS": 2.4,
+          "jarvisGifProportions": {
+            "innerRings": [
+              0.24,
+              0.27,
+              0.3
+            ],
+            "outerPerimeter": 0.78
+          }
+        }
+      },
+      "errs": []
+    },
+    {
+      "name": "1920",
+      "w": 1920,
+      "h": 1080,
+      "audit": {
+        "viewport": {
+          "W": 1920,
+          "H": 1080,
+          "CX": 960,
+          "CY": 540,
+          "R": 345.6,
+          "rezR": 190.08000000000004,
+          "dprCap": 1
+        },
+        "zonal": {
+          "wheelWhite": 6685,
+          "spikeCyan": 2641,
+          "ratio": 2.531238167360848
+        },
+        "rez": {
+          "viol": 0,
+          "examples": []
+        },
+        "neural": {
+          "trunks": 4,
+          "leaves": 22,
+          "pulses": 22,
+          "dataNeural": 22,
+          "oneToOne": true
+        },
+        "plates": {
+          "passing": 22,
+          "failing": 0,
+          "total": 22
+        },
+        "animations": 49,
+        "v3": {
+          "outerLayers": {
+            "A": {
+              "omega": 0.108,
+              "dir": "CW"
+            },
+            "B": {
+              "omega": -0.072,
+              "dir": "CCW"
+            },
+            "C": {
+              "omega": 0.054,
+              "dir": "CW"
+            }
+          },
+          "outerCuts": [
+            [
+              30,
+              40
+            ],
+            [
+              180,
+              190
+            ],
+            [
+              210,
+              220
+            ]
+          ],
+          "outerDoubleSpans": [
+            [
+              40,
+              170
+            ],
+            [
+              230,
+              350
+            ]
+          ],
+          "mechRings": [
+            {
+              "label": "L1",
+              "r": 0.228,
+              "w": 3.5,
+              "teeth": 40,
+              "lugs": 16,
+              "dir": 1,
+              "omega": 0.4,
+              "wobble": 0.18,
+              "gapCentre": 2.356194490192345,
+              "gapWidth": 1.4,
+              "periodS": 15.707963267948966
+            },
+            {
+              "label": "L2",
+              "r": 0.27,
+              "w": 3.2,
+              "teeth": 44,
+              "lugs": 20,
+              "dir": -1,
+              "omega": 0.31,
+              "wobble": 0.18,
+              "gapCentre": 0.7853981633974483,
+              "gapWidth": 1.4,
+              "periodS": 20.26833970057931
+            },
+            {
+              "label": "L3",
+              "r": 0.315,
+              "w": 2.8,
+              "teeth": 48,
+              "lugs": 24,
+              "dir": 1,
+              "omega": 0.24,
+              "wobble": 0.18,
+              "gapCentre": 1.5707963267948966,
+              "gapWidth": 1.55,
+              "periodS": 26.179938779914945
+            }
+          ],
+          "reactorExclusionDiskFrac": 0.55,
+          "neuralAnchorFrac": 0.555,
+          "neuralPulseTraversalS": 2.4,
+          "jarvisGifProportions": {
+            "innerRings": [
+              0.24,
+              0.27,
+              0.3
+            ],
+            "outerPerimeter": 0.78
+          }
+        }
+      },
+      "errs": []
+    },
+    {
+      "name": "2560",
+      "w": 2560,
+      "h": 1440,
+      "audit": {
+        "viewport": {
+          "W": 2560,
+          "H": 1440,
+          "CX": 1280,
+          "CY": 720,
+          "R": 460.8,
+          "rezR": 253.44000000000003,
+          "dprCap": 1
+        },
+        "zonal": {
+          "wheelWhite": 9073,
+          "spikeCyan": 3438,
+          "ratio": 2.6390343222803954
+        },
+        "rez": {
+          "viol": 0,
+          "examples": []
+        },
+        "neural": {
+          "trunks": 4,
+          "leaves": 22,
+          "pulses": 22,
+          "dataNeural": 22,
+          "oneToOne": true
+        },
+        "plates": {
+          "passing": 22,
+          "failing": 0,
+          "total": 22
+        },
+        "animations": 50,
+        "v3": {
+          "outerLayers": {
+            "A": {
+              "omega": 0.108,
+              "dir": "CW"
+            },
+            "B": {
+              "omega": -0.072,
+              "dir": "CCW"
+            },
+            "C": {
+              "omega": 0.054,
+              "dir": "CW"
+            }
+          },
+          "outerCuts": [
+            [
+              30,
+              40
+            ],
+            [
+              180,
+              190
+            ],
+            [
+              210,
+              220
+            ]
+          ],
+          "outerDoubleSpans": [
+            [
+              40,
+              170
+            ],
+            [
+              230,
+              350
+            ]
+          ],
+          "mechRings": [
+            {
+              "label": "L1",
+              "r": 0.228,
+              "w": 3.5,
+              "teeth": 40,
+              "lugs": 16,
+              "dir": 1,
+              "omega": 0.4,
+              "wobble": 0.18,
+              "gapCentre": 2.356194490192345,
+              "gapWidth": 1.4,
+              "periodS": 15.707963267948966
+            },
+            {
+              "label": "L2",
+              "r": 0.27,
+              "w": 3.2,
+              "teeth": 44,
+              "lugs": 20,
+              "dir": -1,
+              "omega": 0.31,
+              "wobble": 0.18,
+              "gapCentre": 0.7853981633974483,
+              "gapWidth": 1.4,
+              "periodS": 20.26833970057931
+            },
+            {
+              "label": "L3",
+              "r": 0.315,
+              "w": 2.8,
+              "teeth": 48,
+              "lugs": 24,
+              "dir": 1,
+              "omega": 0.24,
+              "wobble": 0.18,
+              "gapCentre": 1.5707963267948966,
+              "gapWidth": 1.55,
+              "periodS": 26.179938779914945
+            }
+          ],
+          "reactorExclusionDiskFrac": 0.55,
+          "neuralAnchorFrac": 0.555,
+          "neuralPulseTraversalS": 2.4,
+          "jarvisGifProportions": {
+            "innerRings": [
+              0.24,
+              0.27,
+              0.3
+            ],
+            "outerPerimeter": 0.78
+          }
+        }
+      },
+      "errs": []
+    },
+    {
+      "name": "3840",
+      "w": 3840,
+      "h": 2160,
+      "audit": {
+        "viewport": {
+          "W": 3840,
+          "H": 2160,
+          "CX": 1920,
+          "CY": 1080,
+          "R": 691.2,
+          "rezR": 380.1600000000001,
+          "dprCap": 1
+        },
+        "zonal": {
+          "wheelWhite": 13904,
+          "spikeCyan": 5416,
+          "ratio": 2.567208271787297
+        },
+        "rez": {
+          "viol": 0,
+          "examples": []
+        },
+        "neural": {
+          "trunks": 4,
+          "leaves": 22,
+          "pulses": 22,
+          "dataNeural": 22,
+          "oneToOne": true
+        },
+        "plates": {
+          "passing": 22,
+          "failing": 0,
+          "total": 22
+        },
+        "animations": 52,
+        "v3": {
+          "outerLayers": {
+            "A": {
+              "omega": 0.108,
+              "dir": "CW"
+            },
+            "B": {
+              "omega": -0.072,
+              "dir": "CCW"
+            },
+            "C": {
+              "omega": 0.054,
+              "dir": "CW"
+            }
+          },
+          "outerCuts": [
+            [
+              30,
+              40
+            ],
+            [
+              180,
+              190
+            ],
+            [
+              210,
+              220
+            ]
+          ],
+          "outerDoubleSpans": [
+            [
+              40,
+              170
+            ],
+            [
+              230,
+              350
+            ]
+          ],
+          "mechRings": [
+            {
+              "label": "L1",
+              "r": 0.228,
+              "w": 3.5,
+              "teeth": 40,
+              "lugs": 16,
+              "dir": 1,
+              "omega": 0.4,
+              "wobble": 0.18,
+              "gapCentre": 2.356194490192345,
+              "gapWidth": 1.4,
+              "periodS": 15.707963267948966
+            },
+            {
+              "label": "L2",
+              "r": 0.27,
+              "w": 3.2,
+              "teeth": 44,
+              "lugs": 20,
+              "dir": -1,
+              "omega": 0.31,
+              "wobble": 0.18,
+              "gapCentre": 0.7853981633974483,
+              "gapWidth": 1.4,
+              "periodS": 20.26833970057931
+            },
+            {
+              "label": "L3",
+              "r": 0.315,
+              "w": 2.8,
+              "teeth": 48,
+              "lugs": 24,
+              "dir": 1,
+              "omega": 0.24,
+              "wobble": 0.18,
+              "gapCentre": 1.5707963267948966,
+              "gapWidth": 1.55,
+              "periodS": 26.179938779914945
+            }
+          ],
+          "reactorExclusionDiskFrac": 0.55,
+          "neuralAnchorFrac": 0.555,
+          "neuralPulseTraversalS": 2.4,
+          "jarvisGifProportions": {
+            "innerRings": [
+              0.24,
+              0.27,
+              0.3
+            ],
+            "outerPerimeter": 0.78
+          }
+        }
+      },
+      "errs": []
+    }
+  ]
+}

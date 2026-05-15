@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JARVIS Reactor Core — Marvel-Grade V4 Cinematic Baseline</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Audiowide&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:     #050A14;
+      --cy:     #1AE6F5;
+      --cy-hot: #B0FFFF;
+      --amber:  #FFC800;
+      --crimson:#FF2633;
+      --steel:  #668494;
+      --marvel-emissive: #6FFCFF;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 100%; height: 100%;
+      background: #000000;
+      color: var(--cy);
+      font-family: 'Rajdhani', sans-serif;
+      overflow: hidden;
+      font-size: 14px;
+    }
+    body { position: relative; }
+
+    /* Compare-mode: hide HUD chrome, show only the reactor core circle.
+       Activated by `?compare=1` query param — set via inline script below. */
+    body.compare-mode .tl-calendar,
+    body.compare-mode .left-power,
+    body.compare-mode .left-comm,
+    body.compare-mode .mode-bar,
+    body.compare-mode .cat-row,
+    body.compare-mode .telemetry-grid,
+    body.compare-mode .amber-reason,
+    body.compare-mode .jt-panel,
+    body.compare-mode #marvel-neural { display: none !important; }
+
+    /* Pure-black background in compare mode so the reactor sits on the same
+       surface as the Vecteezy-1 target reference */
+    body.compare-mode { background: #000000; }
+    body.compare-mode::before { display: none; }
+    canvas#marvel-canvas {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      z-index: 1;
+      display: block;
+    }
+
+    /* Vignette + atmosphere */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background:
+        radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(5, 10, 20, 0.55) 100%),
+        radial-gradient(circle at 50% 50%, rgba(26, 230, 245, 0.04) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Calendar dial (carried from V3) */
+    .tl-calendar {
+      position: fixed; top: 40px; left: 40px;
+      width: 180px; height: 180px;
+      z-index: 5;
+    }
+    .tl-calendar .dial { position: absolute; inset: 0; border: 1.5px solid var(--cy); border-radius: 50%; box-shadow: 0 0 22px rgba(26,230,245,0.4), inset 0 0 16px rgba(26,230,245,0.15); }
+    .tl-calendar .dial-outer { position: absolute; inset: -10px; border: 1px dashed rgba(26,230,245,0.35); border-radius: 50%; opacity: 0.55; }
+    .tl-calendar .month { position: absolute; left: 50%; top: 24%; transform: translate(-50%, -50%); font-family: 'Audiowide', sans-serif; font-size: 12px; letter-spacing: 0.2em; color: var(--cy); }
+    .tl-calendar .day { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 56px; color: var(--cy-hot); text-shadow: 0 0 20px rgba(176,255,255,0.7); }
+    .tl-calendar .lbl { position: absolute; left: 50%; top: 76%; transform: translate(-50%, -50%); font-size: 10px; letter-spacing: 0.3em; color: var(--cy); }
+
+    /* Left-side Power cell (carried from V3) */
+    .left-power {
+      position: fixed; left: 80px; top: 260px;
+      width: 126px; height: 126px;
+      z-index: 5;
+    }
+    .left-power .ring { position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--cy); box-shadow: 0 0 22px rgba(26,230,245,0.4), inset 0 0 16px rgba(26,230,245,0.15); }
+    .left-power .pct { position: absolute; left: 50%; top: 44%; transform: translate(-50%, -50%); font-family: 'Orbitron', sans-serif; font-weight: 700; font-size: 17px; color: var(--cy-hot); text-shadow: 0 0 12px rgba(176,255,255,0.8); }
+    .left-power .lbl { position: absolute; left: 50%; top: 68%; transform: translate(-50%, -50%); font-family: 'Rajdhani', sans-serif; font-size: 8px; color: var(--cy); letter-spacing: 0.14em; }
+    .left-power .tag { position: absolute; left: calc(100% + 8px); top: 22%; font-size: 12px; color: var(--cy); letter-spacing: 0.08em; }
+    .left-power .tag-sub { position: absolute; left: calc(100% + 8px); top: 40%; font-size: 10px; color: rgba(26,230,245,0.55); letter-spacing: 0.06em; }
+
+    /* Left-side Comm dial (carried from V3) */
+    .left-comm {
+      position: fixed; left: 80px; top: 420px;
+      width: 126px; height: 126px;
+      z-index: 5;
+    }
+    .left-comm .outer { position: absolute; inset: 0; border: 1.5px solid var(--cy); border-radius: 50%; box-shadow: 0 0 20px rgba(26,230,245,0.5), inset 0 0 12px rgba(26,230,245,0.15); clip-path: polygon(0 0, 88% 0, 88% 100%, 0 100%); }
+    .left-comm .inner { position: absolute; inset: 12px; border: 1px solid var(--cy); border-radius: 50%; opacity: 0.5; }
+    .left-comm .lbl-main { position: absolute; left: 46%; top: 50%; transform: translate(-50%, -50%); font-family: 'Audiowide', sans-serif; font-size: 13px; color: var(--cy-hot); letter-spacing: 0.04em; text-shadow: 0 0 12px rgba(176,255,255,0.9); }
+    .left-comm .tag { position: absolute; right: 100%; top: 38%; padding-right: 12px; font-size: 11px; color: var(--cy); letter-spacing: 0.06em; white-space: nowrap; }
+
+    /* Top-right mode bar */
+    .mode-bar {
+      position: fixed; top: 40px; right: 40px;
+      display: flex; gap: 2px;
+      z-index: 5;
+      border: 1px solid rgba(26, 230, 245, 0.4);
+      padding: 2px;
+      background: rgba(5, 10, 20, 0.65);
+      backdrop-filter: blur(6px);
+    }
+    .mode-btn {
+      padding: 6px 16px;
+      font-family: 'Audiowide', sans-serif; font-size: 12px;
+      letter-spacing: 0.18em;
+      color: var(--cy);
+      cursor: pointer;
+      user-select: none;
+      transition: background 140ms, color 140ms;
+    }
+    .mode-btn:hover { background: rgba(26, 230, 245, 0.1); }
+    .mode-btn.active {
+      background: rgba(26, 230, 245, 0.22);
+      color: var(--cy-hot);
+      text-shadow: 0 0 8px rgba(176, 255, 255, 0.8);
+    }
+
+    /* Telemetry grid (carried from V3) — OUTSIDE reactor central disk */
+    .telemetry-grid {
+      position: fixed;
+      right: 40px;
+      top: 220px;
+      display: grid;
+      grid-template-columns: repeat(3, 88px);
+      grid-template-rows: repeat(2, 88px);
+      gap: 10px;
+      z-index: 5;
+    }
+    .telemetry-grid > div {
+      border: 1px solid rgba(26, 230, 245, 0.45);
+      background: rgba(5, 10, 20, 0.55);
+      backdrop-filter: blur(4px);
+      display: grid;
+      place-items: center;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: var(--cy-hot);
+      text-align: center;
+      box-shadow: inset 0 0 12px rgba(26, 230, 245, 0.08);
+    }
+    .telemetry-grid .sm {
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 500;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: rgba(26, 230, 245, 0.88);
+      display: block;
+      margin-top: 3px;
+    }
+
+    /* Amber-reason endpoint plates */
+    .amber-reason {
+      position: fixed;
+      padding: 6px 12px;
+      border: 1px solid var(--amber);
+      background: rgba(5, 10, 20, 0.82);
+      font-family: 'Rajdhani', sans-serif;
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0.10em;
+      color: #ffe690;
+      text-shadow: 0 0 4px rgba(255, 200, 0, 0.4);
+      z-index: 6;
+      pointer-events: auto;
+    }
+    .amber-reason.left { left: 24%; }
+    .amber-reason.right { right: 24%; }
+
+    /* SVG neural pathway layer */
+    #marvel-neural {
+      position: fixed; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    /* Trigger panel (bottom) */
+    .jt-panel {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 6px;
+      padding: 6px 10px;
+      border: 1px solid rgba(26, 230, 245, 0.38);
+      background: rgba(5, 10, 20, 0.75);
+      backdrop-filter: blur(6px);
+      z-index: 7;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 880px;
+    }
+    .jt-btn {
+      padding: 8px 14px;
+      font-family: 'Audiowide', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      background: transparent;
+      border: 1px solid var(--cy);
+      color: var(--cy);
+      cursor: pointer;
+      transition: all 160ms;
+    }
+    .jt-btn:hover { background: rgba(26, 230, 245, 0.12); color: var(--cy-hot); box-shadow: 0 0 10px rgba(26, 230, 245, 0.5); }
+    .jt-btn.amber { border-color: var(--amber); color: var(--amber); }
+    .jt-btn.amber:hover { background: rgba(255, 200, 0, 0.14); box-shadow: 0 0 10px rgba(255, 200, 0, 0.5); }
+    .jt-btn.crimson { border-color: var(--crimson); color: var(--crimson); }
+    .jt-btn.crimson:hover { background: rgba(255, 38, 51, 0.14); box-shadow: 0 0 10px rgba(255, 38, 51, 0.5); }
+
+    /* Vecteezy-1 side labels (0.41 / 0.06) — only shown in compare mode */
+    .vecteezy-label {
+      position: fixed;
+      top: 50%;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: 400;
+      font-size: 16px;
+      letter-spacing: 0.05em;
+      color: #e6e6e6;
+      text-shadow: 0 0 6px rgba(255, 255, 255, 0.25);
+      pointer-events: none;
+      z-index: 8;
+      display: none;
+    }
+    .vecteezy-label.left { left: 31%; transform: translateY(-50%); }
+    .vecteezy-label.right { right: 31%; transform: translateY(-50%); }
+    body.compare-mode .vecteezy-label { display: block; }
+
+    /* Phase overlays */
+    body.phase-boot::after,
+    body.phase-lock::after,
+    body.phase-shutdown::after {
+      content: attr(data-phase);
+      position: fixed;
+      left: 50%; bottom: 110px;
+      transform: translateX(-50%);
+      font-family: 'Audiowide', sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.28em;
+      color: var(--cy-hot);
+      opacity: 0.85;
+      text-shadow: 0 0 10px rgba(176, 255, 255, 0.7);
+      z-index: 6;
+      pointer-events: none;
+    }
+    body.phase-boot { --phase: 'BOOT SEQUENCE'; }
+    body.phase-boot::after { content: 'BOOT SEQUENCE'; }
+    body.phase-lock::after { content: 'LOCK ENGAGED'; }
+    body.phase-shutdown::after { content: 'SHUTDOWN PROTOCOL'; color: var(--crimson); }
+
+    /* Mode-bar category row */
+    .cat-row {
+      position: fixed; top: 110px; right: 40px;
+      display: flex; gap: 8px;
+      z-index: 5;
+    }
+    .cat-btn {
+      padding: 4px 10px;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      border: 1px solid rgba(26, 230, 245, 0.4);
+      color: var(--cy);
+      background: rgba(5, 10, 20, 0.55);
+    }
+  </style>
+</head>
+<body data-phase="BOOT">
+  <script>
+    // Apply compare-mode class early so the CSS above takes effect before paint.
+    if (new URLSearchParams(location.search).get('compare') === '1') {
+      document.body.classList.add('compare-mode');
+    }
+  </script>
+  <!-- Reactor canvas (Three.js + postprocessing EffectComposer renders here) -->
+  <canvas id="marvel-canvas"></canvas>
+
+  <!-- Side labels "0.41" / "0.06" — Vecteezy-1 parity (compare-mode only) -->
+  <div class="vecteezy-label left" id="labelLeft">0.41</div>
+  <div class="vecteezy-label right" id="labelRight">0.06</div>
+
+  <!-- SVG dendritic neural pathway layer (4 trunks + ≥20 leaves) -->
+  <svg id="marvel-neural" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="neural-glow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="2.5" />
+      </filter>
+    </defs>
+    <g stroke="rgba(26, 230, 245, 0.55)" stroke-width="1.2" fill="none" filter="url(#neural-glow)">
+      <!-- TRUNK 1 : Left-Top (to amberReasonCpu) -->
+      <path class="stroke-draw" id="neural-line-amberReasonCpu" d="M 960 540 L 780 420 L 500 290 L 380 260" />
+      <path class="stroke-draw" d="M 780 420 L 720 380 L 640 330" />
+      <path class="stroke-draw" d="M 500 290 L 460 260 L 420 240" />
+      <path class="stroke-draw" d="M 780 420 L 760 500 L 700 540" />
+      <path class="stroke-draw" d="M 500 290 L 520 230 L 540 200" />
+      <!-- TRUNK 2 : Left-Bottom (to amberReasonMem) -->
+      <path class="stroke-draw" id="neural-line-amberReasonMem" d="M 960 540 L 780 660 L 500 790 L 380 820" />
+      <path class="stroke-draw" d="M 780 660 L 720 700 L 640 750" />
+      <path class="stroke-draw" d="M 500 790 L 460 820 L 420 840" />
+      <path class="stroke-draw" d="M 780 660 L 760 580 L 700 540" />
+      <path class="stroke-draw" d="M 500 790 L 520 850 L 540 880" />
+      <!-- TRUNK 3 : Right-Top (to amberReasonThermal) -->
+      <path class="stroke-draw" id="neural-line-amberReasonThermal" d="M 960 540 L 1140 420 L 1420 290 L 1540 260" />
+      <path class="stroke-draw" d="M 1140 420 L 1200 380 L 1280 330" />
+      <path class="stroke-draw" d="M 1420 290 L 1460 260 L 1500 240" />
+      <path class="stroke-draw" d="M 1140 420 L 1160 500 L 1220 540" />
+      <path class="stroke-draw" d="M 1420 290 L 1400 230 L 1380 200" />
+      <!-- TRUNK 4 : Right-Bottom (to amberReasonPower) -->
+      <path class="stroke-draw" id="neural-line-amberReasonPower" d="M 960 540 L 1140 660 L 1420 790 L 1540 820" />
+      <path class="stroke-draw" d="M 1140 660 L 1200 700 L 1280 750" />
+      <path class="stroke-draw" d="M 1420 790 L 1460 820 L 1500 840" />
+      <path class="stroke-draw" d="M 1140 660 L 1160 580 L 1220 540" />
+      <path class="stroke-draw" d="M 1420 790 L 1400 850 L 1380 880" />
+    </g>
+    <!-- Pulse leaves (animateMotion dur ≥ 2s) -->
+    <g>
+      <circle r="3" fill="#B0FFFF"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 960 540 L 380 260" /></circle>
+      <circle r="3" fill="#B0FFFF"><animateMotion dur="2.6s" repeatCount="indefinite" path="M 960 540 L 380 820" /></circle>
+      <circle r="3" fill="#B0FFFF"><animateMotion dur="2.8s" repeatCount="indefinite" path="M 960 540 L 1540 260" /></circle>
+      <circle r="3" fill="#B0FFFF"><animateMotion dur="3.0s" repeatCount="indefinite" path="M 960 540 L 1540 820" /></circle>
+      <circle r="2.4" fill="#6FFCFF"><animateMotion dur="2.2s" repeatCount="indefinite" path="M 960 540 L 640 330" /></circle>
+      <circle r="2.4" fill="#6FFCFF"><animateMotion dur="2.5s" repeatCount="indefinite" path="M 960 540 L 1280 330" /></circle>
+      <circle r="2.4" fill="#6FFCFF"><animateMotion dur="2.5s" repeatCount="indefinite" path="M 960 540 L 640 750" /></circle>
+      <circle r="2.4" fill="#6FFCFF"><animateMotion dur="2.8s" repeatCount="indefinite" path="M 960 540 L 1280 750" /></circle>
+      <circle r="2" fill="#1AE6F5"><animateMotion dur="3.2s" repeatCount="indefinite" path="M 960 540 L 420 240" /></circle>
+      <circle r="2" fill="#1AE6F5"><animateMotion dur="3.4s" repeatCount="indefinite" path="M 960 540 L 420 840" /></circle>
+      <circle r="2" fill="#1AE6F5"><animateMotion dur="3.6s" repeatCount="indefinite" path="M 960 540 L 1500 240" /></circle>
+      <circle r="2" fill="#1AE6F5"><animateMotion dur="3.8s" repeatCount="indefinite" path="M 960 540 L 1500 840" /></circle>
+      <circle r="2.2" fill="#B0FFFF"><animateMotion dur="2.3s" repeatCount="indefinite" path="M 960 540 L 540 200" /></circle>
+      <circle r="2.2" fill="#B0FFFF"><animateMotion dur="2.7s" repeatCount="indefinite" path="M 960 540 L 540 880" /></circle>
+      <circle r="2.2" fill="#B0FFFF"><animateMotion dur="2.9s" repeatCount="indefinite" path="M 960 540 L 1380 200" /></circle>
+      <circle r="2.2" fill="#B0FFFF"><animateMotion dur="3.1s" repeatCount="indefinite" path="M 960 540 L 1380 880" /></circle>
+      <circle r="2" fill="#6FFCFF"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 960 540 L 700 540" /></circle>
+      <circle r="2" fill="#6FFCFF"><animateMotion dur="2.6s" repeatCount="indefinite" path="M 960 540 L 1220 540" /></circle>
+      <circle r="2" fill="#6FFCFF"><animateMotion dur="2.8s" repeatCount="indefinite" path="M 960 540 L 720 380" /></circle>
+      <circle r="2" fill="#6FFCFF"><animateMotion dur="3.0s" repeatCount="indefinite" path="M 960 540 L 1200 380" /></circle>
+      <circle r="2.4" fill="#1AE6F5"><animateMotion dur="2.5s" repeatCount="indefinite" path="M 960 540 L 720 700" /></circle>
+      <circle r="2.4" fill="#1AE6F5"><animateMotion dur="2.8s" repeatCount="indefinite" path="M 960 540 L 1200 700" /></circle>
+    </g>
+  </svg>
+
+  <!-- Calendar dial (carried from V3) -->
+  <div class="tl-calendar">
+    <div class="dial-outer"></div>
+    <div class="dial"></div>
+    <div class="month">APR</div>
+    <div class="day">19</div>
+    <div class="lbl">SAT</div>
+  </div>
+
+  <!-- Power cell (carried from V3) -->
+  <div class="left-power">
+    <div class="ring"></div>
+    <div class="pct">92%</div>
+    <div class="lbl">POWER</div>
+    <div class="tag">ARC CELL</div>
+    <div class="tag-sub">12.4 kWh</div>
+  </div>
+
+  <!-- Comm dial (carried from V3) -->
+  <div class="left-comm">
+    <div class="outer"></div>
+    <div class="inner"></div>
+    <div class="lbl-main" id="commLabel">NET</div>
+    <div class="tag">COMM BUS</div>
+  </div>
+
+  <!-- Mode bar (carried from V3) -->
+  <div class="mode-bar">
+    <div class="mode-btn active">HOME</div>
+    <div class="mode-btn">SEC</div>
+    <div class="mode-btn">DIAG</div>
+    <div class="mode-btn">NET</div>
+    <div class="mode-btn">MEDIA</div>
+  </div>
+
+  <!-- Category row -->
+  <div class="cat-row">
+    <div class="cat-btn" id="catNet" data-neural="1">NET</div>
+    <div class="cat-btn" id="catSec" data-neural="1">SEC</div>
+    <div class="cat-btn" id="catDiag" data-neural="1">DIAG</div>
+  </div>
+
+  <!-- Telemetry grid (OUTSIDE reactor central disk — HC-2) -->
+  <div class="telemetry-grid">
+    <div id="snCpuCell"><span id="cpuPct">12</span>%<br><span class="sm">CPU</span></div>
+    <div id="snGpuCell"><span id="gpuPct">8</span>%<br><span class="sm">GPU</span></div>
+    <div id="snMemCell"><span id="memPct">48</span>%<br><span class="sm">MEM</span></div>
+    <div id="snTempCell"><span id="tempC">42</span>°<br><span class="sm">TEMP</span></div>
+    <div id="snPowerCell"><span id="powerW">15</span>W<br><span class="sm">POWER</span></div>
+    <div id="snNetCell"><span id="netRate">2.4</span><br><span class="sm">MB/s</span></div>
+  </div>
+
+  <!-- Amber-reason endpoint plates -->
+  <div class="amber-reason left" style="top: 22%;" id="amberReasonCpu" data-neural="1" role="status">CPU LOAD 12% · NOMINAL</div>
+  <div class="amber-reason left" style="top: 82%;" id="amberReasonMem" data-neural="1" role="status">MEM 48% · STABLE</div>
+  <div class="amber-reason right" style="top: 22%;" id="amberReasonThermal" data-neural="1" role="status">THERM 42C · STABLE</div>
+  <div class="amber-reason right" style="top: 82%;" id="amberReasonPower" data-neural="1" role="status">PWR 15W · IDLE</div>
+
+  <!-- Trigger panel (carried from V3) -->
+  <div class="jt-panel">
+    <button class="jt-btn amber" data-jt="cpu">CPU SPIKE</button>
+    <button class="jt-btn amber" data-jt="gpu">GPU SURGE</button>
+    <button class="jt-btn crimson" data-jt="thermal">THERMAL</button>
+    <button class="jt-btn" data-jt="power">POWER SURGE</button>
+    <button class="jt-btn" data-jt="charge">CHARGE SURGE</button>
+    <button class="jt-btn amber" data-jt="memory">MEM PRESSURE</button>
+    <button class="jt-btn" data-jt="network">NET BURST</button>
+    <button class="jt-btn" data-jt="disk">DISK I/O</button>
+  </div>
+
+  <!-- V4 marvel bundle -->
+  <script type="module" src="./dist/reactor-cinematic-marvel.js"></script>
+</body>
+</html>

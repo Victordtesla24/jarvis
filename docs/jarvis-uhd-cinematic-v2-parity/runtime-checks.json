@@ -1,0 +1,75 @@
+{
+  "errors": [],
+  "amberCount": 4,
+  "amber": [
+    {
+      "id": "amberReasonCpu",
+      "text": "CPU 15% · NOMINAL LOAD",
+      "fontFamily": "\"Share Tech Mono\", monospace",
+      "fontSize": "10px",
+      "fontWeight": "500",
+      "textTransform": "uppercase",
+      "color": "rgb(255, 217, 128)",
+      "backgroundColor": "rgba(28, 16, 4, 0.54)",
+      "borderColor": "rgba(255, 200, 0, 0.55)",
+      "bbox": {
+        "x": 676.1875,
+        "y": 540,
+        "w": 167.203125,
+        "h": 21
+      }
+    },
+    {
+      "id": "amberReasonMem",
+      "text": "MEM 52% · STABLE",
+      "fontFamily": "\"Share Tech Mono\", monospace",
+      "fontSize": "10px",
+      "fontWeight": "500",
+      "textTransform": "uppercase",
+      "color": "rgb(255, 217, 128)",
+      "backgroundColor": "rgba(28, 16, 4, 0.54)",
+      "borderColor": "rgba(255, 200, 0, 0.55)",
+      "bbox": {
+        "x": 650.390625,
+        "y": 540,
+        "w": 128,
+        "h": 21
+      }
+    },
+    {
+      "id": "amberReasonThermal",
+      "text": "THERM 45C · STABLE",
+      "fontFamily": "\"Share Tech Mono\", monospace",
+      "fontSize": "10px",
+      "fontWeight": "500",
+      "textTransform": "uppercase",
+      "color": "rgb(255, 217, 128)",
+      "backgroundColor": "rgba(28, 16, 4, 0.54)",
+      "borderColor": "rgba(255, 200, 0, 0.55)",
+      "bbox": {
+        "x": 1128.796875,
+        "y": 540,
+        "w": 140.8125,
+        "h": 21
+      }
+    },
+    {
+      "id": "amberReasonPower",
+      "text": "PWR 18W · IDLE BAND",
+      "fontFamily": "\"Share Tech Mono\", monospace",
+      "fontSize": "10px",
+      "fontWeight": "500",
+      "textTransform": "uppercase",
+      "color": "rgb(255, 217, 128)",
+      "backgroundColor": "rgba(28, 16, 4, 0.54)",
+      "borderColor": "rgba(255, 200, 0, 0.55)",
+      "bbox": {
+        "x": 1096.40625,
+        "y": 540,
+        "w": 147.40625,
+        "h": 21
+      }
+    }
+  ],
+  "fps": 6.5
+}
