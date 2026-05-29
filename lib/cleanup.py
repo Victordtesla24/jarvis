@@ -103,6 +103,7 @@ def find_cleanup_targets(
 
     base = Path(base_path).expanduser().resolve()
     seen: set[str] = set()
+    yielded_dirs: set[Path] = set()
 
     for pattern in patterns:
         try:
@@ -122,8 +123,18 @@ def find_cleanup_targets(
                     if match.is_symlink():
                         continue
 
-                    size = get_directory_size(match_str) if match.is_dir() else match.stat().st_size
+                    # Skip anything nested under a directory we've already
+                    # yielded: its bytes were counted as part of that directory,
+                    # so yielding it again would double-count the total (e.g.
+                    # *.pyc files inside an already-yielded __pycache__).
+                    if yielded_dirs.intersection(match.parents):
+                        continue
+
+                    is_dir = match.is_dir()
+                    size = get_directory_size(match_str) if is_dir else match.stat().st_size
                     seen.add(match_str)
+                    if is_dir:
+                        yielded_dirs.add(match)
                     yield match_str, size
                 except (OSError, PermissionError, FileNotFoundError):
                     pass

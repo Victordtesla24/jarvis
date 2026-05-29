@@ -118,17 +118,19 @@ def update_pip() -> UpdateResult:
                 output="uv pip: all packages up to date",
             )
 
-        # Try upgrade (non-fatal)
-        stdout2, stderr2, rc2 = run_command(
+        # uv has no bulk "upgrade all" for a non-project environment; refresh
+        # pip itself but report the outdated set honestly — the outdated
+        # packages themselves are NOT upgraded here.
+        _, stderr2, rc2 = run_command(
             "uv pip install --upgrade pip 2>/dev/null",
             timeout=300
         )
 
         return UpdateResult(
             success=rc2 == 0,
-            packages_updated=count,
+            packages_updated=0,
             packages_failed=0,
-            output=f"uv pip: {count} packages outdated, pip upgraded",
+            output=f"uv pip: {count} packages outdated (upgrade manually)",
             error=stderr2 if rc2 != 0 else None
         )
     else:
@@ -153,7 +155,7 @@ def update_pip() -> UpdateResult:
 
         return UpdateResult(
             success=True,
-            packages_updated=count,
+            packages_updated=0,
             packages_failed=0,
             output=f"pip: {count} packages outdated (upgrade manually)",
         )

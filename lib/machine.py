@@ -178,8 +178,10 @@ def get_cpu_idle() -> float:
         stdout, _, _ = run_command("iostat -c 2 -w 1 2>/dev/null | tail -2 | head -1")
         parts = stdout.split()
         if len(parts) >= 6:
-            # iostat shows: us sy id
-            return float(parts[-1])  # last column is idle
+            # iostat's CPU columns are `us sy id` followed by three load
+            # averages (`1m 5m 15m`), so idle is the 4th-from-last field —
+            # regardless of how many disk columns precede it.
+            return float(parts[-4])
     except Exception:
         pass
 

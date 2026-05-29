@@ -162,9 +162,10 @@ Always be helpful, proactive, and explain major decisions."""
                     "details": {"trigger": "low_space"}
                 }
             else:
+                free = free_gb if isinstance(free_gb, (int, float)) else 0
                 return {
                     "action": "monitor",
-                    "reasoning": f"System healthy: {disk_pct}% used, {free_gb:.0f}GB free",
+                    "reasoning": f"System healthy: {disk_pct}% used, {free:.0f}GB free",
                     "confidence": 0.7,
                     "details": {}
                 }

@@ -100,24 +100,28 @@ def tidy_job():
                 success_count = sum(1 for r in results if r.success)
                 freed = sum(r.size_bytes for r in results if r.success)
 
+                # In a dry run nothing was actually deleted, so the byte total
+                # is only an estimate — label it as such and don't fire the
+                # "cleanup complete" notification for work that didn't happen.
+                verb = "Would clean" if dry_run else "Cleaned"
                 log_action(
                     machine="mac",
                     action_type="tidy",
-                    description=f"Cleaned {success_count} items",
+                    description=f"{verb} {success_count} items",
                     files_affected=paths[:20],
                     bytes_freed=freed,
-                    outcome="success",
+                    outcome="dry_run" if dry_run else "success",
                     llm_reasoning=f"Disk at {info.disk.used_pct}%, {info.disk.free_gb:.0f}GB free"
                 )
 
-                freed_mb = freed / (1024 * 1024)
-
-                notifier = get_notifier()
-                notifier.notify_significant(
-                    title="JARVIS: Cleanup Complete",
-                    message=f"Mac: {success_count} items, {format_size(freed)} freed",
-                    size_freed_mb=freed_mb
-                )
+                if not dry_run:
+                    freed_mb = freed / (1024 * 1024)
+                    notifier = get_notifier()
+                    notifier.notify_significant(
+                        title="JARVIS: Cleanup Complete",
+                        message=f"Mac: {success_count} items, {format_size(freed)} freed",
+                        size_freed_mb=freed_mb
+                    )
             else:
                 logger.info("JARVIS: No cleanup targets found")
         else:
@@ -338,10 +342,13 @@ def deep_clean_job():
 
         for machine_name in list(ssh.connections.keys()):
             try:
-                # apt update && upgrade on VPS
+                # apt update && upgrade on VPS. Run under `bash -o pipefail` so
+                # the exit code reflects apt-get's status rather than `tail`'s
+                # (a plain pipe would always report success).
                 stdout, stderr, rc = ssh.exec_command(
                     machine_name,
-                    "apt-get update -qq 2>&1 && DEBIAN_FRONTEND=noninteractive apt-get upgrade -yqq 2>&1 | tail -5",
+                    "bash -o pipefail -c 'apt-get update -qq 2>&1 && "
+                    "DEBIAN_FRONTEND=noninteractive apt-get upgrade -yqq 2>&1 | tail -5'",
                     timeout=120
                 )
                 if rc == 0:
