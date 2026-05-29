@@ -17,6 +17,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import shutil
+import subprocess
+import threading
 import webbrowser
 from contextlib import closing
 from datetime import datetime
@@ -38,6 +42,7 @@ from lib.machine import get_system_info
 logger = logging.getLogger(__name__)
 
 WEB_DIR = Path(__file__).resolve().parent / "dashboard_web"
+APP_DIR = Path(__file__).resolve().parent / "dashboard_app"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 7327  # J-A-R-V on the dialpad
 
@@ -337,7 +342,7 @@ def make_server(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> Threading
 
 
 def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
-    """Run the dashboard server until interrupted."""
+    """Run the dashboard server until interrupted (browser / headless mode)."""
     server = make_server(host, port)
     bound_host, bound_port = server.server_address[:2]
     url = f"http://{bound_host}:{bound_port}"
@@ -356,3 +361,64 @@ def serve(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, open_browser: bool
     finally:
         server.shutdown()
         server.server_close()
+
+
+# --------------------------------------------------------------------------- #
+# Floating-window desktop app — a transparent, always-on-top Electron shell
+# that loads this loopback HUD (SC5). No browser involved.
+# --------------------------------------------------------------------------- #
+def find_electron() -> str | None:
+    """Locate an Electron binary: project-local install first, then ``$PATH``."""
+    local = APP_DIR / "node_modules" / ".bin" / "electron"
+    if local.exists():
+        return str(local)
+    return shutil.which("electron")
+
+
+def launch_app(
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    *,
+    electron: str | None = None,
+    spawn=subprocess.Popen,
+):
+    """Spawn the Electron HUD shell pointed at the loopback backend.
+
+    The window discovers the backend through ``JARVIS_DASHBOARD_URL`` so no
+    browser is ever opened. Raises ``RuntimeError`` if Electron is unavailable.
+    """
+    electron = electron or find_electron()
+    if not electron:
+        raise RuntimeError(
+            "Electron not found. Install the app shell with "
+            "`cd lib/dashboard_app && npm install`, or run `jarvis dashboard --browser`."
+        )
+    env = dict(os.environ, JARVIS_DASHBOARD_URL=f"http://{host}:{port}")
+    return spawn([electron, str(APP_DIR)], env=env)
+
+
+def run_app(
+    host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, *, electron: str | None = None
+) -> int:
+    """Start the loopback backend and float the ``.app`` over the desktop.
+
+    Blocks until the window closes, then tears the backend down. Returns the
+    Electron exit code.
+    """
+    server = make_server(host, port)
+    bound_host, bound_port = server.server_address[:2]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        proc = launch_app(bound_host, bound_port, electron=electron)
+    except Exception:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+        raise
+    try:
+        return proc.wait()
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

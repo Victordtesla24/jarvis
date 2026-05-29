@@ -1,0 +1,32 @@
+{
+  "name": "jarvis-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "JARVIS floating HUD — a transparent, always-on-top desktop shell over the loopback dashboard backend.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.jarvis.dashboard",
+    "productName": "JARVIS",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        "dir"
+      ]
+    }
+  }
+}

@@ -258,7 +258,7 @@
         <h2>Docker Bay</h2>
         <div id="docker"><div class="muted">probing containers…</div></div>
       </section>
-      <section class="panel" style="animation-delay:.25s;flex:1;display:flex;flex-direction:column">
+      <section class="panel" data-interactive style="animation-delay:.25s;flex:1;display:flex;flex-direction:column">
         <h2>Command Console</h2>
         <div class="cmds">
           <button class="cmd" data-action="refresh">↻ Refresh</button>
@@ -275,7 +275,7 @@
     <span>STARK INDUSTRIES · LOCAL NODE</span>
     <div class="corner" style="background:linear-gradient(90deg,var(--line),transparent)"></div>
     <span id="recent-feed">awaiting activity log…</span>
-    <a id="toggle-void">▢ TRANSPARENT MODE</a>
+    <a id="toggle-void" data-interactive>▢ TRANSPARENT MODE</a>
   </footer>
 </div>
 
@@ -403,6 +403,7 @@ async function initReactor() {
     const THREE = await import("three");
     const w = canvas.clientWidth || 360, h = canvas.clientHeight || 360;
     const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setClearColor(0x000000, 0); // clear to full transparency for the floating .app
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     renderer.setSize(w, h, false);
     const scene = new THREE.Scene();

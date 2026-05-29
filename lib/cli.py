@@ -241,20 +241,52 @@ def stats(args):
 
 
 def dashboard_command(args):
-    """Launch the JARVIS holographic dashboard & command centre."""
-    from lib.dashboard import DEFAULT_HOST, DEFAULT_PORT, serve
+    """Launch the JARVIS holographic dashboard & command centre.
 
-    host = args.host or DEFAULT_HOST
-    port = args.port or DEFAULT_PORT
+    By default this launches the real transparent, always-on-top floating
+    ``.app`` (no browser). ``--browser`` serves the same HUD in a web browser
+    instead, for headless or quick-look use.
+    """
+    from lib import dashboard
+
+    host = args.host or dashboard.DEFAULT_HOST
+    port = args.port or dashboard.DEFAULT_PORT
+
+    if args.browser:
+        console.print(
+            Panel(
+                f"[bold cyan]JARVIS Command Centre[/bold cyan]\n"
+                f"Serving holographic HUD at [cyan]http://{host}:{port}[/cyan]",
+                border_style="cyan",
+            )
+        )
+        try:
+            dashboard.serve(host=host, port=port, open_browser=not args.no_browser)
+        except OSError as e:
+            console.print(f"[red]Could not start dashboard: {e}[/red]")
+        return
+
+    if not dashboard.find_electron():
+        console.print(
+            Panel(
+                "[bold yellow]Electron shell not installed[/bold yellow]\n"
+                "The floating dashboard app needs Electron. Install it once:\n"
+                "  [cyan]cd lib/dashboard_app && npm install[/cyan]\n"
+                "Or view the HUD in a browser: [cyan]jarvis dashboard --browser[/cyan]",
+                border_style="yellow",
+            )
+        )
+        return
+
     console.print(
         Panel(
-            f"[bold cyan]JARVIS Command Centre[/bold cyan]\n"
-            f"Opening holographic HUD at [cyan]http://{host}:{port}[/cyan]",
+            "[bold cyan]JARVIS Command Centre[/bold cyan]\n"
+            "Engaging floating HUD — transparent, always-on-top.",
             border_style="cyan",
         )
     )
     try:
-        serve(host=host, port=port, open_browser=not args.no_browser)
+        dashboard.run_app(host=host, port=port)
     except OSError as e:
         console.print(f"[red]Could not start dashboard: {e}[/red]")
 
@@ -282,7 +314,8 @@ def main():
     dash_parser = subparsers.add_parser("dashboard", help="Launch the holographic dashboard & command centre")
     dash_parser.add_argument("--host", default=None, help="Bind host (default 127.0.0.1, loopback only)")
     dash_parser.add_argument("--port", type=int, default=None, help="Bind port (default 7327)")
-    dash_parser.add_argument("--no-browser", action="store_true", help="Don't auto-open a browser")
+    dash_parser.add_argument("--browser", action="store_true", help="Serve the HUD in a web browser instead of the floating .app")
+    dash_parser.add_argument("--no-browser", action="store_true", help="With --browser, don't auto-open a browser")
 
     args = parser.parse_args()
 

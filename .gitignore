@@ -24,5 +24,9 @@ __pycache__/
 .ralphy-worktrees/
 .ralphy-sandboxes/
 
+# Electron dashboard app (deps + build output)
+lib/dashboard_app/node_modules/
+lib/dashboard_app/dist/
+
 # macOS
 .DS_Store
