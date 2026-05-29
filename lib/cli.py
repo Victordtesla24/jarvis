@@ -240,25 +240,49 @@ def stats(args):
         console.print(f"  - {machine}: {count} actions")
 
 
+def dashboard_command(args):
+    """Launch the JARVIS holographic dashboard & command centre."""
+    from lib.dashboard import DEFAULT_HOST, DEFAULT_PORT, serve
+
+    host = args.host or DEFAULT_HOST
+    port = args.port or DEFAULT_PORT
+    console.print(
+        Panel(
+            f"[bold cyan]JARVIS Command Centre[/bold cyan]\n"
+            f"Opening holographic HUD at [cyan]http://{host}:{port}[/cyan]",
+            border_style="cyan",
+        )
+    )
+    try:
+        serve(host=host, port=port, open_browser=not args.no_browser)
+    except OSError as e:
+        console.print(f"[red]Could not start dashboard: {e}[/red]")
+
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description="JARVIS - Autonomous Machine Agent", prog="jarvis")
-    
+
     subparsers = parser.add_subparsers(dest="command", help="Commands")
-    
+
     subparsers.add_parser("status", help="Show system status").add_argument("-v", "--verbose", action="store_true")
-    
+
     log_parser = subparsers.add_parser("log", help="View audit log")
     log_parser.add_argument("-n", "--limit", type=int, default=20)
-    
+
     tidy_parser = subparsers.add_parser("tidy", help="Run cleanup now")
     tidy_parser.add_argument("-n", "--dry-run", action="store_true")
     tidy_parser.add_argument("-p", "--preview", action="store_true")
-    
+
     subparsers.add_parser("stats", help="Show JARVIS statistics")
 
     ask_parser = subparsers.add_parser("ask", help="Ask the JARVIS AI brain a question")
     ask_parser.add_argument("question", nargs="+", help="Your question")
+
+    dash_parser = subparsers.add_parser("dashboard", help="Launch the holographic dashboard & command centre")
+    dash_parser.add_argument("--host", default=None, help="Bind host (default 127.0.0.1, loopback only)")
+    dash_parser.add_argument("--port", type=int, default=None, help="Bind port (default 7327)")
+    dash_parser.add_argument("--no-browser", action="store_true", help="Don't auto-open a browser")
 
     args = parser.parse_args()
 
@@ -272,6 +296,8 @@ def main():
         stats(args)
     elif args.command == "ask":
         ask_command(args)
+    elif args.command == "dashboard":
+        dashboard_command(args)
     else:
         # Default: show status
         status_command(argparse.Namespace(verbose=False))
