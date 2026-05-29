@@ -15,6 +15,7 @@ from lib.cleanup import find_cleanup_targets, create_cleanup_plan, execute_clean
 from lib.package_managers import update_all_packages
 from lib.docker_ops import system_prune, is_docker_running
 from lib.notifier import get_notifier
+from lib.autopilot import find_bloat, plan_reclamation, IDLE_CPU_THRESHOLD
 
 
 logger = logging.getLogger(__name__)
@@ -211,6 +212,87 @@ def tidy_job():
         logger.error(f"JARVIS tidy job failed: {e}", exc_info=True)
 
 
+def autopilot_job():
+    """Idle-aware autonomous self-healing for the Mac.
+
+    JARVIS's proactive sweep: find regenerable space-eaters (``node_modules``,
+    build output, framework/tool caches) that have gone dormant and reclaim
+    them WITHOUT asking — but only while the machine is idle, so a reclamation
+    never competes with the user's running build ("IDLE TIME=SLEEP").
+
+    Detection always runs; reclamation is deferred when the system is busy or
+    when ``safety.dry_run`` is set. Every run is recorded in the audit trail.
+    """
+    logger.info("JARVIS: Running autopilot (idle-aware self-healing)")
+
+    config = get_config_safe()
+    safety = config.safety
+
+    try:
+        info = get_system_info()
+        home = str(Path.home())
+
+        targets = find_bloat(
+            home,
+            min_age_days=safety.get("bloat_min_age_days", 7),
+        )
+        plan = plan_reclamation(
+            info.cpu_idle_pct,
+            targets,
+            idle_threshold=safety.get("idle_cpu_threshold", IDLE_CPU_THRESHOLD),
+            max_targets=safety.get("max_bloat_targets", 50),
+        )
+
+        if not plan.should_run:
+            logger.info("JARVIS: Autopilot — %s", plan.reason)
+            log_action(
+                machine="mac",
+                action_type="autopilot",
+                # "deferred" when dormant bloat exists but we held off (busy);
+                # plain "success" when there was simply nothing to reclaim.
+                outcome="deferred" if any(t.reclaimable for t in targets) else "success",
+                description=plan.reason,
+                llm_reasoning=(
+                    f"CPU idle {info.cpu_idle_pct:.0f}%, "
+                    f"{len(targets)} bloat dir(s) seen"
+                ),
+            )
+            return
+
+        dry_run = safety.get("dry_run", False)
+        cleanup_plan = create_cleanup_plan(
+            "mac", [t.path for t in plan.targets], plan.reason
+        )
+        results = execute_cleanup(cleanup_plan, dry_run=dry_run)
+
+        success = sum(1 for r in results if r.success)
+        freed = sum(r.size_bytes for r in results if r.success)
+        verb = "Would reclaim" if dry_run else "Reclaimed"
+
+        log_action(
+            machine="mac",
+            action_type="autopilot",
+            description=f"{verb} {success} dormant bloat dir(s)",
+            files_affected=[t.path for t in plan.targets][:20],
+            bytes_freed=freed,
+            outcome="dry_run" if dry_run else "success",
+            llm_reasoning=plan.reason,
+        )
+
+        if not dry_run and freed > 0:
+            notifier = get_notifier()
+            notifier.notify_significant(
+                title="JARVIS: Autopilot reclaimed space",
+                message=f"Mac: {success} dir(s), {format_size(freed)} freed",
+                size_freed_mb=freed / (1024 * 1024),
+            )
+
+        logger.info("JARVIS: Autopilot completed — %s", plan.reason)
+
+    except Exception as e:
+        logger.error(f"JARVIS autopilot failed: {e}", exc_info=True)
+
+
 def health_check_job():
     """Run hourly: check disk, RAM, CPU on all machines."""
     logger.info("JARVIS: Running health check")
@@ -404,6 +486,19 @@ def setup_scheduler() -> BackgroundScheduler:
         name="Tidy Cleanup",
         replace_existing=True,
         misfire_grace_time=300,  # 5 min grace for missed runs
+        next_run_time=datetime.now(),
+    )
+
+    # Autopilot — idle-aware autonomous reclamation of dormant bloat.
+    # Fires shortly after startup, then on its own cadence; it self-defers
+    # whenever the machine is busy, so a frequent interval is harmless.
+    scheduler.add_job(
+        autopilot_job,
+        trigger=IntervalTrigger(minutes=schedule.get("autopilot_every", 30)),
+        id="autopilot",
+        name="Autopilot Self-Healing",
+        replace_existing=True,
+        misfire_grace_time=600,
         next_run_time=datetime.now(),
     )
 

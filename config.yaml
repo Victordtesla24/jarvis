@@ -27,6 +27,7 @@ machines:
 # Scheduling
 schedule:
   tidy_every: 15        # minutes
+  autopilot_every: 30   # minutes — idle-aware reclamation of dormant bloat
   health_check: 60      # minutes
   deep_clean: "00:00"   # daily at midnight
   update_check: "weekly"
@@ -35,6 +36,11 @@ schedule:
 safety:
   dry_run: false
   confirm_threshold_mb: 1024
+  # Autopilot: reclaim regenerable bloat (node_modules, build, dist, caches)
+  # only while the Mac is idle and only when the dir has been dormant a while.
+  idle_cpu_threshold: 80      # % CPU idle required before autopilot reclaims
+  bloat_min_age_days: 7       # only reclaim dirs untouched for this many days
+  max_bloat_targets: 50       # cap reclaimed dirs per autopilot run
   skip_paths:
     - "~/.ssh"
     - "~/.config"
