@@ -50,7 +50,19 @@ CLEANUP_PATTERNS = [
 # Patterns to always skip (protected paths)
 SKIP_PATTERNS = [
     ".jarvis",  # never clean our own logs / memory.db / config
+    ".claude",  # Claude Code config + plugin cache — deleting node_modules here breaks plugins
+    "mcp-servers",  # actively-used MCP servers — their node_modules are live, not bloat
+    ".cursor",
+    ".hermes",
+    ".minimax",
+    ".sub-agents",
+    ".minimax-agent",
+    ".minimaxagent", 
+    ".codex",
+    ".gemini", 
+    "claude/", 
     ".ssh",
+    ".antigravity",
     ".config",
     ".local",
     ".kube",

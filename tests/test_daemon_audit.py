@@ -370,6 +370,18 @@ class TestCleanupSafety:
 
         assert should_skip("/Users/vic/projects/app/__pycache__") is False
 
+    def test_protects_live_tooling_from_autopilot(self):
+        """Autopilot must not reclaim node_modules of connected MCP servers
+        or the Claude Code plugin cache — deleting those breaks running tools."""
+        from lib.cleanup import should_skip
+
+        assert should_skip("/Users/vic/mcp-servers/1mcp-agent/node_modules") is True
+        assert should_skip(
+            "/Users/vic/.claude/plugins/cache/x/chrome-devtools-mcp/node_modules"
+        ) is True
+        # An unrelated stale project is still fair game for reclamation.
+        assert should_skip("/Users/vic/oldproj/node_modules") is False
+
 
 class TestCleanupThresholds:
     """Tests for configurable cleanup thresholds."""
