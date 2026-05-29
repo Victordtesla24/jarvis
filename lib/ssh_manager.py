@@ -131,12 +131,15 @@ class SSHManager:
         """Execute command on remote machine. Returns (stdout, stderr, exit_code)."""
         client = self.get_connection(machine)
         stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
+        # Drain stdout/stderr BEFORE reading the exit status. recv_exit_status()
+        # blocks until the remote command exits; a command whose output overflows
+        # the channel window (~2 MB) blocks on write until we read, so reading the
+        # status first would deadlock. read() returns at EOF (command done), after
+        # which recv_exit_status() returns immediately.
+        out = stdout.read().decode('utf-8', errors='replace')
+        err = stderr.read().decode('utf-8', errors='replace')
         exit_code = stdout.channel.recv_exit_status()
-        return (
-            stdout.read().decode('utf-8', errors='replace'),
-            stderr.read().decode('utf-8', errors='replace'),
-            exit_code
-        )
+        return out, err, exit_code
 
     def exec_with_retry(
         self, machine: str, command: str, retries: int = 3, timeout: int = 30

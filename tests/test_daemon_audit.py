@@ -209,6 +209,56 @@ class TestSSHRetry:
         assert calls["n"] == 2
 
 
+class TestSSHExecOrdering:
+    """exec_command must drain stdout/stderr BEFORE blocking on the exit status.
+
+    recv_exit_status() blocks (with no timeout) until the remote command exits;
+    a command whose output overflows the channel window (~2 MB) blocks on write
+    until the client reads, so reading the exit status first deadlocks forever.
+    The safe order is read-then-status.
+    """
+
+    def _manager(self):
+        from lib.ssh_manager import SSHManager
+        return SSHManager.__new__(SSHManager)  # bypass config-driven __init__
+
+    def _fake_client(self, events):
+        class FakeChannel:
+            def recv_exit_status(self):
+                events.append("recv_exit_status")
+                return 0
+
+        class FakeStream:
+            def __init__(self, name, data, channel=None):
+                self._name = name
+                self._data = data
+                self.channel = channel
+
+            def read(self):
+                events.append(f"read_{self._name}")
+                return self._data
+
+        class FakeClient:
+            def exec_command(self, command, timeout=30):
+                channel = FakeChannel()
+                stdout = FakeStream("stdout", b"out-data", channel=channel)
+                stderr = FakeStream("stderr", b"err-data")
+                return object(), stdout, stderr
+
+        return FakeClient()
+
+    def test_reads_streams_before_exit_status(self, monkeypatch):
+        mgr = self._manager()
+        events: list[str] = []
+        monkeypatch.setattr(mgr, "get_connection", lambda machine: self._fake_client(events))
+
+        out, err, code = mgr.exec_command("vps", "echo hi")
+
+        assert (out, err, code) == ("out-data", "err-data", 0)
+        # stdout must be drained before the (potentially blocking) exit-status read.
+        assert events.index("read_stdout") < events.index("recv_exit_status")
+
+
 class TestDatabaseSchema:
     """Tests for database schema integrity."""
 
