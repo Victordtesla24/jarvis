@@ -30,7 +30,7 @@ def status_command(args):
     try:
         info = get_system_info()
         
-        console.print(f"\n[bold green]Mac (Local)[/bold green]")
+        console.print("\n[bold green]Mac (Local)[/bold green]")
         console.print(f"  Disk: {info.disk.free_gb:.1f}GB free / {info.disk.total_gb:.1f}GB ({info.disk.used_pct:.1f}% used)")
         console.print(f"  RAM: {info.ram_used_gb:.1f}GB / {info.ram_total_gb:.1f}GB ({info.ram_used_pct:.1f}% used)")
         console.print(f"  CPU Idle: {info.cpu_idle_pct:.1f}%")
@@ -40,7 +40,7 @@ def status_command(args):
             running = [c for c in containers if c.state == "running"]
             console.print(f"  Docker: Running ({len(running)} containers)")
         else:
-            console.print(f"  Docker: Not running")
+            console.print("  Docker: Not running")
             
     except Exception as e:
         console.print(f"[red]Mac: Error - {e}[/red]")
@@ -56,7 +56,7 @@ def status_command(args):
             config = get_config()
             if not config.machines.get(machine_name, {}).get("enabled", False):
                 console.print(f"\n[yellow]{display_name}[/yellow]")
-                console.print(f"  [yellow]Disabled (SSH key issue)[/yellow]")
+                console.print("  [yellow]Disabled (SSH key issue)[/yellow]")
                 continue
                 
             # Use ssh manager's exec_command method
@@ -69,7 +69,7 @@ def status_command(args):
             disk_usage = parts[4] if len(parts) > 4 else "unknown"
             
             console.print(f"\n[bold green]{display_name}[/bold green]")
-            console.print(f"  SSH: Connected")
+            console.print("  SSH: Connected")
             console.print(f"  Disk: {disk_usage} used")
             
         except Exception as e:
@@ -79,11 +79,11 @@ def status_command(args):
     # AI brain status
     brain = get_llm_brain()
     if brain.available:
-        console.print(f"\n[bold green]AI Brain[/bold green]")
+        console.print("\n[bold green]AI Brain[/bold green]")
         console.print(f"  Online (MiniMax · {brain.model})")
     else:
-        console.print(f"\n[yellow]AI Brain[/yellow]")
-        console.print(f"  [yellow]Offline — set MINIMAX_API_KEY in ~/.jarvis/.env[/yellow]")
+        console.print("\n[yellow]AI Brain[/yellow]")
+        console.print("  [yellow]Offline — set MINIMAX_API_KEY in ~/.jarvis/.env[/yellow]")
 
     console.print()
 

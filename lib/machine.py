@@ -48,7 +48,6 @@ def get_disk_info() -> DiskInfo:
 
     if rc == 0 and len(lines) >= 2:
         parts = lines[1].split()
-        total = 0.0; used = 0.0; free = 0.0
 
         def parse_size(s: str) -> float:
             s = s.upper()
@@ -122,9 +121,7 @@ def get_ram_info() -> tuple[float, float, float]:
         stdout, _, _ = run_command("vm_stat")
 
         page_size = 4096  # Default macOS page size
-        free_pages = 0
         active_pages = 0
-        inactive_pages = 0
         wired_pages = 0
         compressed_pages = 0
 
@@ -133,18 +130,10 @@ def get_ram_info() -> tuple[float, float, float]:
                 match = re.search(r'(\d+)', line)
                 if match:
                     page_size = int(match.group(1))
-            elif 'Pages free:' in line:
-                match = re.search(r'(\d+)', line)
-                if match:
-                    free_pages = int(match.group(1))
             elif 'Pages active:' in line:
                 match = re.search(r'(\d+)', line)
                 if match:
                     active_pages = int(match.group(1))
-            elif 'Pages inactive:' in line:
-                match = re.search(r'(\d+)', line)
-                if match:
-                    inactive_pages = int(match.group(1))
             elif 'Pages wired down:' in line:
                 match = re.search(r'(\d+)', line)
                 if match:

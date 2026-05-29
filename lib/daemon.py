@@ -70,7 +70,6 @@ def run_daemon() -> None:
     scheduler = None
 
     def _handle_signal(signum: int, _frame) -> None:
-        nonlocal scheduler
         logger.info("JARVIS: Received signal %d, shutting down...", signum)
         if scheduler:
             scheduler.shutdown(wait=True)

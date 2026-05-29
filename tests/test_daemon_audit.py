@@ -72,6 +72,53 @@ class TestDiskInfo:
         assert _parse_capacity("-") is None
 
 
+class TestRamInfo:
+    """RAM 'used' = active + wired + compressed; free/inactive are
+    reclaimable cache and must NOT count toward usage."""
+
+    VM_STAT = (
+        "Mach Virtual Memory Statistics: (page size of 16384 bytes)\n"
+        "Pages free:                          100000.\n"
+        "Pages active:                        200000.\n"
+        "Pages inactive:                      150000.\n"
+        "Pages wired down:                     50000.\n"
+        "Pages occupied by compressor:         30000.\n"
+    )
+
+    def _run(self, total_bytes=16 * 1024 ** 3, vm_stat=None):
+        vm_stat = self.VM_STAT if vm_stat is None else vm_stat
+
+        def fake(cmd, timeout=60):
+            if "hw.memsize" in cmd:
+                return (str(total_bytes), "", 0)
+            return (vm_stat, "", 0)
+
+        return fake
+
+    def test_used_counts_active_wired_compressed_only(self):
+        from lib import machine
+
+        with patch("lib.machine.run_command", side_effect=self._run()):
+            total_gb, used_gb, used_pct = machine.get_ram_info()
+
+        # (200000 + 50000 + 30000) pages * 16384 bytes = 4.27 GiB
+        assert total_gb == 16.0
+        assert used_gb == 4.3
+        assert used_pct == 26.7
+
+    def test_free_and_inactive_pages_do_not_change_usage(self):
+        from lib import machine
+
+        inflated = self.VM_STAT.replace("100000.", "9000000.").replace(
+            "150000.", "9000000."
+        )
+        with patch("lib.machine.run_command", side_effect=self._run(vm_stat=inflated)):
+            _, used_gb, _ = machine.get_ram_info()
+
+        # Free/inactive ballooned but usage stays pinned to active+wired+compressed.
+        assert used_gb == 4.3
+
+
 class TestDaemonLogging:
     """Tests for RotatingFileHandler configuration."""
 

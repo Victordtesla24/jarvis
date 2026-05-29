@@ -88,7 +88,6 @@ def tidy_job():
 
             if targets:
                 paths = [p[0] for p in targets]
-                total_size = sum(p[1] for p in targets)
 
                 dry_run = config.safety.get("dry_run", False)
 

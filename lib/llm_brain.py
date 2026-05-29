@@ -143,7 +143,6 @@ Always be helpful, proactive, and explain major decisions."""
 
         No API call needed. Fast, free, deterministic.
         """
-        machine = context.get("machine", "unknown")
         disk_pct = context.get("disk_used_pct", 0)
         free_gb = context.get("free_gb", 0)
 
