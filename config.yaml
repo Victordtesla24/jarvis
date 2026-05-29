@@ -1,0 +1,51 @@
+# JARVIS Configuration
+# Copy this to ~/.jarvis/config.yaml
+
+# API Keys
+minimax_api_key: "${MINIMAX_API_KEY}"
+
+# Machines
+machines:
+  mac:
+    enabled: true
+    hostname: "vics-macbook-pro"
+    sudo_password: "${MACOS_SUDO_PASSWORD}"
+
+  vps_main:
+    enabled: true
+    hostname: "187.77.12.13"
+    ssh_user: "root"
+    ssh_key: "~/.ssh/id_ed25519"
+
+  vps_hostinger:
+    enabled: false
+    hostname: "82.180.172.143"
+    ssh_user: "u970615914"
+    ssh_port: 65002
+    ssh_key: "~/.ssh/hos_vps_key"
+
+# Scheduling
+schedule:
+  tidy_every: 15        # minutes
+  health_check: 60      # minutes
+  deep_clean: "00:00"   # daily at midnight
+  update_check: "weekly"
+
+# Safety
+safety:
+  dry_run: false
+  confirm_threshold_mb: 1024
+  skip_paths:
+    - "~/.ssh"
+    - "~/.config"
+    - "~/Library/Application Support"
+  auto_exclude_patterns:
+    - "*.iso"
+    - "*.dmg"
+    - "*.sparsebundle"
+
+# Notifications
+notifications:
+  enabled: true
+  on_completion: false
+  min_significance_mb: 100

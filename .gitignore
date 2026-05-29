@@ -1,0 +1,28 @@
+# Secrets — NEVER commit
+.env
+*.key
+*.pem
+
+# Runtime data / state
+memory.db
+data/
+logs/
+diagnostics/
+.remember/
+.juno_task/
+*.log
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ralphy working dirs
+.ralphy-worktrees/
+.ralphy-sandboxes/
+
+# macOS
+.DS_Store
