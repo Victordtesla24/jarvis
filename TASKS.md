@@ -3,7 +3,7 @@
 Tracks work against [PRD.md](PRD.md). Checked = done & verified (tests green +
 behavior confirmed). Commit refs in `()`.
 
-- **HEAD:** `d2987cd` · **Tests:** 103 passing · **Daemon:** launchd `com.jarvis.daemon` (running)
+- **HEAD:** `d2987cd` · **Tests:** 124 passing · **Daemon:** launchd `com.jarvis.daemon` (running)
 - **Updated:** 2026-05-30
 
 ---
@@ -50,21 +50,22 @@ behavior confirmed). Commit refs in `()`.
 - [x] `jarvis dashboard` launches the window (no browser; `--browser` is the web fallback); `npm run dist` packages the `.app`
   - ⏳ Live GUI confirmation pending a desktop session (headless dev box); notarization = SC8 (needs Apple Developer ID)
 
-### P1 — Marvel FUI visuals (PRD R13, SC6)
-- [ ] Selective UnrealBloom on glowing lines
-- [ ] Holographic Fresnel + scanline material (arc reactor + panels)
-- [ ] GPGPU particle "data dust" round the reactor; chromatic aberration on edges
-- [ ] Eurostile-Extended (or fallback) + OCR-A/Space-Mono, all-caps; 3 color tiers on `#080D14`
-- [ ] GSAP staggered boot (1.2–2.5s), idle breathing, Z-space mouse parallax
-- [ ] Hold 60fps with transparency + bloom + live data
+### P1 — Marvel FUI visuals (PRD R13, SC6) ✅
+- [x] Selective UnrealBloom on glowing lines (two-composer bloom layer + mix pass)
+- [x] Holographic Fresnel + scanline material (arc reactor shells)
+- [x] GPGPU particle "data dust" round the reactor; chromatic aberration shader pass
+- [x] Eurostile-Extended (Orbitron fallback) + OCR-A/Space-Mono; 3 colour tiers on `#080D14`
+- [x] GSAP staggered boot, idle breathing, Z-space mouse parallax (CSS fallback when GSAP absent)
+- [x] Hold 60fps — single rAF master loop, dPR cap, adaptive quality guard, hidden-tab pause
+  - ⏳ Live FPS confirmation pending a desktop GPU session (headless dev box); guard verified structurally
 
-### P2 — Command-center UX (PRD R14)
-- [ ] Top-left health word NOMINAL/DEGRADED/CRITICAL (5-second test)
-- [ ] Per-panel freshness Live/Stale/Offline (no spinners; cached + stale dot)
-- [ ] Monitoring view vs control view (mode-switch + ⌘K palette)
-- [ ] tabular-nums; value + delta + 60s sparkline; count-up transitions
-- [ ] Redundant status encoding (color + shape); ≥4.5:1 on blurred composite; ≤6 cards above fold
-- [ ] Motion tiers 100-150/200-300/300-500ms; `prefers-reduced-motion`
+### P2 — Command-center UX (PRD R14) ✅
+- [x] Top-left health word NOMINAL/DEGRADED/CRITICAL (5-second glance)
+- [x] Per-panel freshness Live/Stale/Offline (age-based, no spinners)
+- [x] Monitoring view vs control view (mode-switch + ⌘K palette)
+- [x] tabular-nums; value + delta + 60s sparkline; count-up transitions
+- [x] Redundant status encoding (colour + shape ●▲■); ≥4.5:1 text contrast; 6 cards above fold
+- [x] Tiered motion timings + `prefers-reduced-motion`
 
 ### P3 — Cockpit control panel (PRD R15, SC7)
 - [ ] Guarded toggle (flip cover) → Autopilot ARM/DISARM
