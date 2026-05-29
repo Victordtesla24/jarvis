@@ -14,7 +14,7 @@ JARVIS_HOME = Path(__file__).resolve().parent.parent
 LOG_DIR = JARVIS_HOME / "logs"
 
 
-def setup_daemon_logging() -> logging.Logger:
+def setup_daemon_logging(log_dir: Path | None = None) -> logging.Logger:
     """Configure daemon logging with rotation: 5 MB per file, 3 backups.
 
     Handlers are attached to the *root* logger so that messages from every
@@ -24,8 +24,14 @@ def setup_daemon_logging() -> logging.Logger:
     autonomous agent's actual job activity (tidy/health/deep-clean) was
     invisible. Idempotent: re-running replaces JARVIS's own handlers rather
     than stacking duplicates.
+
+    ``log_dir`` defaults to the production ``logs/`` directory. Tests pass a
+    temporary directory so configuring logging never writes to the real
+    ``jarvis.log`` — a leaked production-path handler used to pollute it with
+    later tests' warnings.
     """
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    log_dir = log_dir or LOG_DIR
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     root = logging.getLogger()
     root.setLevel(logging.INFO)
@@ -36,7 +42,7 @@ def setup_daemon_logging() -> logging.Logger:
             root.removeHandler(handler)
 
     fh = RotatingFileHandler(
-        LOG_DIR / "jarvis.log",
+        log_dir / "jarvis.log",
         maxBytes=5 * 1024 * 1024,
         backupCount=3,
     )

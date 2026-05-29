@@ -122,10 +122,10 @@ class TestRamInfo:
 class TestDaemonLogging:
     """Tests for RotatingFileHandler configuration."""
 
-    def test_rotating_handler_configured_correctly(self):
+    def test_rotating_handler_configured_correctly(self, tmp_path):
         from lib.daemon import setup_daemon_logging
 
-        logger = setup_daemon_logging()
+        logger = setup_daemon_logging(tmp_path)
 
         rotating_handlers = [
             h for h in logger.handlers
@@ -137,6 +137,38 @@ class TestDaemonLogging:
         handler = rotating_handlers[0]
         assert handler.maxBytes == 5 * 1024 * 1024, "maxBytes should be 5MB"
         assert handler.backupCount == 3, "backupCount should be 3"
+        # The handler must honour the requested directory, not the hardcoded
+        # production path — otherwise the test suite writes to the real log.
+        assert Path(handler.baseFilename) == tmp_path / "jarvis.log"
+
+    def test_setup_does_not_write_to_production_log(self, tmp_path):
+        """Regression: configuring daemon logging during tests must not append
+        to the real ~/.jarvis/logs/jarvis.log.
+
+        Previously this class called ``setup_daemon_logging()`` with no args,
+        attaching a RotatingFileHandler at the production path to the *root*
+        logger. That handler survived the whole pytest session, so a later
+        test's LLM-fallback warning ("...heuristics: boom") leaked into the
+        production log and showed up as a scary recurring WARNING.
+        """
+        import logging
+        from lib.daemon import setup_daemon_logging, LOG_DIR
+
+        prod_log = LOG_DIR / "jarvis.log"
+        before = prod_log.read_bytes() if prod_log.exists() else b""
+
+        setup_daemon_logging(tmp_path)
+        logging.getLogger("lib.llm_brain").warning(
+            "LLM API failed, falling back to heuristics: boom"
+        )
+
+        after = prod_log.read_bytes() if prod_log.exists() else b""
+        assert after == before, "daemon logging leaked into the production log"
+
+        # The warning must land in the hermetic temp log instead.
+        temp_log = tmp_path / "jarvis.log"
+        assert temp_log.exists()
+        assert "boom" in temp_log.read_text()
 
 
 class TestConfigReload:
