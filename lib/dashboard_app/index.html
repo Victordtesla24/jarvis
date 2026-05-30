@@ -5,55 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>JARVIS 3.0 — J.A.R.V.I.S. Protocol</title>
     <meta name="description" content="JARVIS holographic arc-reactor HUD — a three.js dashboard with live gauges polling /api/stats." />
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              'klein-blue': '#002FA7',
-              'holo-cyan': '#00F0FF',
-              'holo-blue': '#00A3FF',
-              'alert-red': '#FF2A2A',
-            },
-            fontFamily: {
-              sans: ['Rajdhani', 'sans-serif'],
-              display: ['Orbitron', 'sans-serif'],
-            },
-            animation: {
-              'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-              'scanline': 'scanline 8s linear infinite',
-              'spin-slow': 'spin 20s linear infinite',
-              'spin-reverse-slow': 'spin-reverse 25s linear infinite',
-              'blink': 'blink 1s step-end infinite',
-              'flash': 'flash 0.5s ease-out forwards',
-            },
-            keyframes: {
-              scanline: {
-                '0%': { transform: 'translateY(-100%)' },
-                '100%': { transform: 'translateY(100%)' },
-              },
-              blink: {
-                '0%, 100%': { opacity: '1' },
-                '50%': { opacity: '0' },
-              },
-              'spin-reverse': {
-                from: { transform: 'rotate(360deg)' },
-                to: { transform: 'rotate(0deg)' },
-              },
-              flash: {
-                '0%': { opacity: '0', transform: 'scale(0.9)' },
-                '50%': { opacity: '1', transform: 'scale(1.02)' },
-                '100%': { opacity: '1', transform: 'scale(1)' },
-              }
-            }
-          },
-        },
-      }
-    </script>
     <style>
       body {
         background-color: #000;
@@ -103,7 +57,6 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>

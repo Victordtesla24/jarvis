@@ -43,15 +43,47 @@ function DataRow({ label, pct, value }: { label: string; pct?: number; value: st
   );
 }
 
+// Radial CPU gauge (270° arc) — supplements the orbital NeuralCircle in the
+// STATUS panel. Driven by live CPU load.
+function Gauge({ pct }: { pct: number }) {
+  const p = Math.min(100, Math.max(0, pct));
+  const r = 52;
+  const circ = 2 * Math.PI * r;
+  const dash = (p / 100) * circ * 0.75; // 270° arc
+  const hot = p > 85 ? 'var(--accent-warning)' : p > 70 ? '#ffd54a' : 'var(--neon-cyan)';
+  return (
+    <div className="jh-gauge">
+      <svg viewBox="0 0 140 140" width="120" height="120">
+        <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(0,242,255,.12)" strokeWidth="6"
+          strokeDasharray={`${circ * 0.75} ${circ}`} transform="rotate(135 70 70)" strokeLinecap="round" />
+        <circle cx="70" cy="70" r={r} fill="none" stroke={hot} strokeWidth="6"
+          strokeDasharray={`${dash} ${circ}`} transform="rotate(135 70 70)" strokeLinecap="round"
+          style={{ filter: `drop-shadow(0 0 6px ${hot})`, transition: 'stroke-dasharray .6s ease, stroke .6s' }} />
+      </svg>
+      <div className="jh-gauge-val">
+        <b style={{ color: hot }}>{p.toFixed(0)}</b><span>%</span>
+        <em>CPU LOAD</em>
+      </div>
+    </div>
+  );
+}
+
 function MonitorWave() {
-  // SILENT visual "monitoring" waveform (no microphone, no audio)
-  const bars = useMemo(() => [...Array(28)].map((_, i) => ({ d: (i % 7) * 0.09, h: 0.3 + ((i * 37) % 70) / 100 })), []);
+  // SILENT, purely decorative "monitoring" waveform (no microphone, no audio,
+  // not telemetry). Heights regenerate every 150ms so the bars animate live.
+  const [heights, setHeights] = useState<number[]>(() => [...Array(28)].map(() => 0.3 + Math.random() * 0.7));
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setHeights([...Array(28)].map(() => 0.3 + Math.random() * 0.7));
+    }, 150);
+    return () => window.clearInterval(id);
+  }, []);
   return (
     <div className="jh-wave">
       <div className="jh-wave-label">— MONITORING —</div>
       <div className="jh-wave-bars">
-        {bars.map((b, i) => (
-          <span key={i} style={{ animationDelay: `${b.d}s`, ['--h' as any]: b.h }} />
+        {heights.map((h, i) => (
+          <span key={i} style={{ ['--h' as any]: h }} />
         ))}
       </div>
     </div>
@@ -97,6 +129,7 @@ function Launcher({ label, onClick }: { label: string; onClick?: () => void }) {
 }
 
 export default function JarvisHUD({ stats }: { stats: Stats }) {
+  const rootRef = React.useRef<HTMLDivElement>(null);
   const [clock, setClock] = useState('');
   useEffect(() => {
     const tick = () => {
@@ -107,6 +140,24 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
+  }, []);
+
+  // Pointer parallax (PHASE 4A): normalise cursor to [-1,1] and publish as CSS
+  // vars; the columns translate ≤6px in opposite directions. Skipped entirely
+  // when the user prefers reduced motion.
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const onMove = (e: MouseEvent) => {
+      const px = (e.clientX / window.innerWidth) * 2 - 1;
+      const py = (e.clientY / window.innerHeight) * 2 - 1;
+      const el = rootRef.current;
+      if (el) {
+        el.style.setProperty('--px', px.toFixed(3));
+        el.style.setProperty('--py', py.toFixed(3));
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
   }, []);
 
   const sys = stats?.system || {};
@@ -131,7 +182,7 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
   }, [stats]);
 
   return (
-    <div className="jh-root">
+    <div className="jh-root" ref={rootRef}>
       <div className="jh-scan" />
 
       {/* ===== Top bar ===== */}
@@ -149,6 +200,7 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
         <div className="glass-panel jh-panel">
           <div className="jh-panel-h">STATUS</div>
           <div className="jh-orbital"><NeuralCircle metrics={{ cpu, ram, disk }} /></div>
+          <Gauge pct={cpu} />
           <div className="jh-numrow">
             {[fix(cpu), fix(ram), fix(disk), num(docker.running_count), machines.length, num(audit.actions_24h)].map((n, i) => (
               <span key={i}>{n}</span>
@@ -186,7 +238,7 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
           <div className="jh-panel-h">LAUNCH</div>
           <Launcher label="Notepad" onClick={() => window.open('https://keep.google.com', '_blank')} />
           <Launcher label="Todo List" onClick={() => window.open('https://todoist.com', '_blank')} />
-          <Launcher label="My Files" onClick={() => window.open('file:///Users/' + (window as any).__user || 'file:///', '_blank')} />
+          <Launcher label="My Files" onClick={() => window.open('file:///Users/' + ((window as any).__user ?? ''), '_blank')} />
           <Launcher label="Youtube" onClick={() => window.open('https://youtube.com', '_blank')} />
         </div>
       </div>

@@ -1,6 +1,6 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { useFrame, extend } from '@react-three/fiber';
+import { useFrame, extend, type ReactThreeFiber } from '@react-three/fiber';
 import { shaderMaterial } from '@react-three/drei';
 import {
   EffectComposer,
@@ -19,9 +19,13 @@ import { BlendFunction } from 'postprocessing';
 // holographic energy field. Driven by live CPU load. Silent, holographic.
 // ============================================================================
 
-const CYAN = '#00F0FF';
+// Single source of cyan — matches --neon-cyan in styles/neocore-vars.css so the
+// 3D reactor and the HTML HUD read as one continuous holographic light. (4D)
+const CYAN = '#00f2ff';
 
 // ---- background holographic energy field (faint cyan polar grid behind) ----
+type GridMaterialImpl = THREE.ShaderMaterial & { uTime: number };
+
 const GridMaterial = shaderMaterial(
   { uTime: 0 },
   /* glsl */ `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
@@ -39,13 +43,18 @@ const GridMaterial = shaderMaterial(
 );
 extend({ GridMaterial });
 
+declare module '@react-three/fiber' {
+  interface ThreeElements {
+    gridMaterial: ReactThreeFiber.MaterialNode<GridMaterialImpl, typeof GridMaterial>;
+  }
+}
+
 function EnergyField() {
-  const m = useRef<any>(null);
+  const m = useRef<GridMaterialImpl>(null);
   useFrame((_, dt) => { if (m.current) m.current.uTime += dt; });
   return (
     <mesh position={[0, 0, -0.25]}>
       <circleGeometry args={[2.1, 96]} />
-      {/* @ts-ignore */}
       <gridMaterial ref={m} transparent depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
     </mesh>
   );
@@ -74,6 +83,17 @@ function VideoReactor({ load }: { load: number }) {
     // breathe the reactor brightness with load + a slow pulse
     if (mat.current) mat.current.opacity = 0.92 + 0.08 * Math.sin(t * 2.0) + load * 0.15;
   });
+  // Release the video + GPU texture on unmount (e.g. when toggling to globe mode)
+  // so we don't leak a decoding <video> and its VideoTexture.
+  useEffect(() => {
+    return () => {
+      video.pause();
+      video.src = '';
+      video.load();
+      tex.dispose();
+      if (mat.current) mat.current.map = null;
+    };
+  }, [video, tex]);
   return (
     <mesh position={[0, 0, 0]}>
       <planeGeometry args={[3.5, 3.5]} />
@@ -151,28 +171,70 @@ function EnergyArcs() {
 }
 
 // ---- outer holographic data ring (4 segments + data dots), slow rotate ----
+const DOT_COUNT = 56;
+
 function DataRing() {
   const g = useRef<THREE.Group>(null!);
-  useFrame((_, dt) => { if (g.current) g.current.rotation.z += dt * 0.08; });
-  const dots = useMemo(() => [...Array(56)].map((_, i) => {
-    const a = (i / 56) * Math.PI * 2;
-    return new THREE.Vector3(Math.cos(a) * 1.75, Math.sin(a) * 1.75, 0);
-  }), []);
+  const dotsRef = useRef<THREE.InstancedMesh>(null!);
+  const angle = useRef(0);
+  const lastAngle = useRef(Number.NaN);
+
+  // Base offsets for the 56 dots evenly around the ring (computed once).
+  const offsets = useMemo(
+    () => [...Array(DOT_COUNT)].map((_, i) => (i / DOT_COUNT) * Math.PI * 2),
+    [],
+  );
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  // Seed the instance matrices once on mount (useMemo side-effect tied to the
+  // instanced mesh ref via a callback so it runs after the mesh exists).
+  const seedMatrices = useMemo(() => (mesh: THREE.InstancedMesh | null) => {
+    dotsRef.current = mesh as THREE.InstancedMesh;
+    if (!mesh) return;
+    offsets.forEach((a, i) => {
+      dummy.position.set(Math.cos(a) * 1.75, Math.sin(a) * 1.75, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [offsets, dummy]);
+
+  useFrame((_, dt) => {
+    if (g.current) g.current.rotation.z += dt * 0.08;
+    angle.current += dt * 0.08;
+    const mesh = dotsRef.current;
+    if (!mesh) return;
+    // Only rewrite the 56 matrices when the rotation actually advanced.
+    if (angle.current === lastAngle.current) return;
+    lastAngle.current = angle.current;
+    const cos = Math.cos(angle.current);
+    const sin = Math.sin(angle.current);
+    for (let i = 0; i < DOT_COUNT; i++) {
+      const a = offsets[i];
+      const x = Math.cos(a) * 1.75;
+      const y = Math.sin(a) * 1.75;
+      dummy.position.set(x * cos - y * sin, x * sin + y * cos, 0);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+
   return (
-    <group ref={g} position={[0, 0, 0.02]}>
-      {[0, 1, 2, 3].map((i) => (
-        <mesh key={i} rotation={[0, 0, (i * Math.PI) / 2]}>
-          <torusGeometry args={[1.75, 0.006, 8, 64, Math.PI * 0.42]} />
-          <meshBasicMaterial color={CYAN} transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </mesh>
-      ))}
-      {dots.map((v, i) => (
-        <mesh key={`d${i}`} position={[v.x, v.y, 0]}>
-          <sphereGeometry args={[0.011, 6, 6]} />
-          <meshBasicMaterial color={CYAN} transparent opacity={0.7} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-        </mesh>
-      ))}
-    </group>
+    <>
+      <group ref={g} position={[0, 0, 0.02]}>
+        {[0, 1, 2, 3].map((i) => (
+          <mesh key={i} rotation={[0, 0, (i * Math.PI) / 2]}>
+            <torusGeometry args={[1.75, 0.006, 8, 64, Math.PI * 0.42]} />
+            <meshBasicMaterial color={CYAN} transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+          </mesh>
+        ))}
+      </group>
+      <instancedMesh ref={seedMatrices} args={[undefined, undefined, DOT_COUNT]} position={[0, 0, 0.02]}>
+        <sphereGeometry args={[0.011, 6, 6]} />
+        <meshBasicMaterial color={CYAN} transparent opacity={0.7} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </instancedMesh>
+    </>
   );
 }
 
@@ -221,7 +283,7 @@ export default function ReactorCore({ load = 0.1 }: { load?: number }) {
     <>
       <ambientLight intensity={0.5} />
       <Reactor load={load} />
-      <EffectComposer disableNormalPass frameBufferType={THREE.HalfFloatType}>
+      <EffectComposer enableNormalPass={false} frameBufferType={THREE.HalfFloatType}>
         <Bloom mipmapBlur luminanceThreshold={0.33} intensity={0.85} radius={0.7} levels={7} />
         <ChromaticAberration blendFunction={BlendFunction.NORMAL} offset={caOffset} radialModulation modulationOffset={0.4} />
         <Scanline blendFunction={BlendFunction.OVERLAY} density={1.2} opacity={0.1} />

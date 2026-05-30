@@ -24,7 +24,7 @@ const JarvisIntro: React.FC = () => {
         {/* 4. Core Text Container */}
         <div className="relative z-10 flex flex-col items-center justify-center transform transition-all duration-1000 scale-100">
             {/* Main Title */}
-            <h1 className="text-8xl font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-holo-cyan tracking-[0.15em] drop-shadow-[0_0_25px_rgba(0,240,255,0.8)] scale-y-90 animate-flash">
+            <h1 className="jh-holo-flicker text-8xl font-display font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-holo-cyan tracking-[0.15em] drop-shadow-[0_0_25px_rgba(0,240,255,0.8)] scale-y-90">
                 JARVIS
             </h1>
             
@@ -35,7 +35,7 @@ const JarvisIntro: React.FC = () => {
             <div className="mt-6 flex flex-col items-center gap-2">
                 <div className="h-[1px] w-32 bg-holo-cyan/50"></div>
                 <div className="text-2xl font-sans font-bold text-white tracking-[0.5em] drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">
-                    Hello, I am Jarvis
+                    SYSTEMS ONLINE — INITIALIZING
                 </div>
                 <div className="h-[1px] w-32 bg-holo-cyan/50"></div>
             </div>

@@ -76,19 +76,41 @@ export default function FlowchartWidget({ content }: Props) {
     const fromIdx = stepMap.get(edge.from)
     const toIdx = stepMap.get(edge.to)
     if (fromIdx === undefined || toIdx === undefined) return null
-    const startXPos = startX + nodeWidth
-    const startYPos = fromIdx * verticalGap + 20 + nodeHeight / 2
-    const endXPos = startX
-    const endYPos = toIdx * verticalGap + 20 + nodeHeight / 2
+    // Nodes are stacked vertically; connect the bottom edge of `from` to the
+    // top edge of `to`, leaving a gap so the arrowhead sits clear of the box.
+    const x = startX + nodeWidth / 2
+    const startYPos = fromIdx * verticalGap + 20 + nodeHeight
+    const endYPos = toIdx * verticalGap + 20
     return (
-null
+      <path
+        key={`${edge.from}-${edge.to}-${idx}`}
+        d={`M${x},${startYPos} L${x},${endYPos - 8}`}
+        stroke="var(--neon-cyan)"
+        strokeWidth={2}
+        fill="none"
+        markerEnd="url(#arrowhead)"
+        opacity={0.8}
+      />
     )
-  }).filter(Boolean)
+  })
 
   const viewHeight = data.steps.length * verticalGap + 40
 
   return (
     <svg width="100%" height={viewHeight} className="widget-svg">
+      <defs>
+        <marker
+          id="arrowhead"
+          markerWidth={8}
+          markerHeight={8}
+          refX={6}
+          refY={3}
+          orient="auto"
+          markerUnits="userSpaceOnUse"
+        >
+          <path d="M0,0 L6,3 L0,6 Z" fill="var(--neon-cyan)" />
+        </marker>
+      </defs>
       {edges}
       {nodes}
     </svg>

@@ -47,6 +47,13 @@ body.in-app, body.in-app #root, body.in-app .app-substrate{ background:transpare
   border-top:1px solid var(--glass-border);font-family:'Orbitron',sans-serif;font-size:13px;color:#bfeefb}
 .jh-numrow span{opacity:.85}
 
+/* radial CPU gauge (supplements NeuralCircle in STATUS) */
+.jh-gauge{position:relative;display:flex;justify-content:center;margin:6px 0 2px}
+.jh-gauge-val{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;line-height:1}
+.jh-gauge-val b{font-family:'Orbitron',sans-serif;font-size:26px;text-shadow:0 0 12px currentColor}
+.jh-gauge-val span{font-size:12px;opacity:.6}
+.jh-gauge-val em{display:block;font-style:normal;font-size:8px;letter-spacing:.2em;color:var(--text-secondary);margin-top:3px}
+
 /* data rows (the PLANET_xx rows in the reference) */
 .jh-rows{display:flex;flex-direction:column;gap:7px}
 .jh-datarow{display:grid;grid-template-columns:84px 1fr 52px;align-items:center;gap:8px;font-size:11px;

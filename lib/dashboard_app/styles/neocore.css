@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* HUD Container & Layout */
 .hud-container {
   position: fixed;
@@ -539,4 +543,60 @@
 
 .flickering-text {
   animation: flicker 0.1s ease-in-out infinite;
+}
+
+/* Hologram power-up flicker (PHASE 4B) — applied to the JARVIS title and the
+   boot status lines so they "ignite" like projected light. */
+@keyframes holo-flicker {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  40%  { opacity: 0.3; }
+  60%  { opacity: 1; }
+  80%  { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+.jh-holo-flicker {
+  animation: holo-flicker 0.2s ease-out both;
+}
+
+/* Centerpiece toggle: Reactor ↔ Holographic globe (PHASE 2A). Glowing glass
+   chip, top-right, above the HUD layer. */
+.jh-globe-toggle {
+  position: fixed;
+  top: 12px;
+  right: 18px;
+  z-index: 60;
+  padding: 7px 14px;
+  font-family: 'Orbitron', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: #eafdff;
+  background: rgba(0, 242, 255, 0.06);
+  border: 1px solid rgba(0, 242, 255, 0.35);
+  border-radius: 4px;
+  cursor: pointer;
+  pointer-events: auto;
+  text-shadow: 0 0 10px rgba(0, 242, 255, 0.5);
+  box-shadow: 0 0 14px rgba(0, 242, 255, 0.18), inset 0 0 12px rgba(0, 242, 255, 0.06);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.jh-globe-toggle:hover {
+  background: rgba(0, 242, 255, 0.16);
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.35), inset 0 0 14px rgba(0, 242, 255, 0.1);
+}
+
+/* Pointer parallax (PHASE 4A): root sets --px / --py in [-1,1]; the two HUD
+   columns drift a few px in opposite directions for holographic depth. */
+.jh-left {
+  transform: translate(calc(var(--px, 0) * 6px), calc(var(--py, 0) * 6px));
+  transition: transform 0.15s ease-out;
+}
+.jh-right {
+  transform: translate(calc(var(--px, 0) * -6px), calc(var(--py, 0) * -6px));
+  transition: transform 0.15s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .jh-holo-flicker { animation: none; }
+  .jh-left, .jh-right { transform: none; transition: none; }
 }
