@@ -6,6 +6,7 @@ import HolographicEarth from './components/HolographicEarth';
 import JarvisHUD from './components/JarvisHUD';
 import JarvisIntro from './components/JarvisIntro';
 import VideoFeed from './components/VideoFeed';
+import GestureDebugOverlay from './components/GestureDebugOverlay';
 import { useStats, pct01 } from './hooks/useStats';
 import { HandTrackingState } from './types';
 
@@ -146,6 +147,10 @@ const App: React.FC = () => {
 
       {/* JARVIS-3.0 desktop HUD (NeoCore-based, real /api/stats) */}
       <JarvisHUD stats={stats} />
+
+      {/* Live gesture-pipeline proof — reads the SAME handTrackingRef both 3D
+          views consume. Hidden unless ?debug or the corner toggle is active. */}
+      <GestureDebugOverlay handTrackingRef={handTrackingRef} />
     </div>
   );
 };

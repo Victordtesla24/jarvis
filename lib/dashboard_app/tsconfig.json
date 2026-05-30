@@ -25,5 +25,7 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": ["App.tsx", "index.tsx", "types.ts", "vite-env.d.ts", "components", "services", "hooks", "modules"],
+  "exclude": ["node_modules", "dist", "build", "_gesture_reference"]
 }
