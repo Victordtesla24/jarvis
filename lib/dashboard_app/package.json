@@ -55,7 +55,14 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "JARVIS uses the camera for real-time hand-gesture control of the holographic interface.",
+        "NSMicrophoneUsageDescription": "JARVIS uses the microphone for voice commands.",
+        "NSSpeechRecognitionUsageDescription": "JARVIS transcribes your voice commands locally.",
+        "NSAppleEventsUsageDescription": "JARVIS controls and launches applications on your behalf.",
+        "NSSystemAdministrationUsageDescription": "JARVIS performs system maintenance and cleanup actions."
+      }
     }
   }
 }
