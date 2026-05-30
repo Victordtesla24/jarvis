@@ -142,7 +142,10 @@
   .panel::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
   /* CSS boot reveal is the fallback; GSAP takes over when present (.gsap) */
   .panel,.kpi{opacity:0;transform:translateY(12px);animation:reveal .7s forwards}
-  .gsap .panel,.gsap .kpi{animation:none}
+  /* Under GSAP the CSS reveal is disabled AND the natural end-state must be
+     visible: gsap.from({opacity:0}) tweens to the element's *current* computed
+     opacity, so if that stays 0 the panels animate 0->0 and never appear. */
+  .gsap .panel,.gsap .kpi{animation:none;opacity:1;transform:none}
   @keyframes reveal{to{opacity:1;transform:none}}
   .panel h2{font-family:var(--font-display);font-size:10.5px;font-weight:700;
     letter-spacing:.3em;color:var(--cyan);text-transform:uppercase;
