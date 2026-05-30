@@ -27,13 +27,14 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from lib.autopilot import find_bloat
 from lib.cleanup import (
     create_cleanup_plan,
     execute_cleanup,
     find_cleanup_targets,
     format_size,
 )
-from lib.config import get_config
+from lib.config import get_config, update_config
 from lib.database import get_connection, get_machine_state, get_recent_logs, log_action
 from lib.docker_ops import get_containers, is_docker_running, system_prune
 from lib.llm_brain import get_llm_brain
@@ -47,10 +48,32 @@ DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 7327  # J-A-R-V on the dialpad
 
 MAX_TIDY_TARGETS = 50
+MAX_DEEP_CLEAN_TARGETS = 50
 RECENT_LOG_LIMIT = 15
 MAX_BODY_BYTES = 64 * 1024
 
-ALLOWED_ACTIONS = ("refresh", "tidy_preview", "tidy_execute", "docker_prune_preview")
+# The cockpit control panel (R15) drives this full allow-list. Settings persist
+# tunables; *_preview actions are read-only; *_execute / engage are destructive.
+ALLOWED_ACTIONS = (
+    "refresh",
+    "tidy_preview", "tidy_execute",
+    "docker_prune_preview", "docker_prune_execute",
+    "deep_clean_preview", "deep_clean_execute",
+    "set_dry_run", "set_notify",
+    "set_dormancy_days", "set_idle_threshold", "set_autopilot",
+    "engage",
+)
+
+# Actions that delete data or authorise autonomous deletion. Each is gated
+# behind a guarded control whose cover/lever throw supplies ``params.confirm`` —
+# the guard gesture IS the confirmation (R15).
+DESTRUCTIVE_ACTIONS = frozenset({
+    "tidy_execute",
+    "docker_prune_execute",
+    "deep_clean_execute",
+    "set_autopilot",
+    "engage",
+})
 
 
 # --------------------------------------------------------------------------- #
@@ -136,6 +159,20 @@ def _machines_section() -> list:
     return machines
 
 
+def _settings_section() -> dict:
+    """Live positions for the cockpit's tunable controls (so toggles, the
+    throttle lever and the rotary knob boot into their real state)."""
+    config = get_config()
+    safety = config.safety
+    return {
+        "dry_run": bool(safety.get("dry_run", False)),
+        "notify": bool(config.notifications.get("enabled", True)),
+        "dormancy_days": safety.get("bloat_min_age_days", 7),
+        "idle_threshold": safety.get("idle_cpu_threshold", 80),
+        "autopilot_armed": bool(safety.get("autopilot_armed", True)),
+    }
+
+
 def _recent_section() -> list:
     out = []
     for row in get_recent_logs(limit=RECENT_LOG_LIMIT):
@@ -173,6 +210,7 @@ def collect_stats() -> dict:
         "audit": _safe(_audit_summary),
         "machines": _safe(_machines_section),
         "recent": _safe(_recent_section),
+        "settings": _safe(_settings_section),
     }
 
 
@@ -208,11 +246,20 @@ def _tidy(execute: bool) -> dict:
     }
 
 
-def _docker_prune_preview() -> dict:
-    results = system_prune(dry_run=True)
+def _docker_prune(execute: bool) -> dict:
+    results = system_prune(dry_run=not execute)
+    removed = sum(r.removed for r in results)
+    if execute:
+        log_action(
+            machine="mac",
+            action_type="docker_prune",
+            description=f"Dashboard docker prune: {removed} item(s) removed",
+            outcome="success",
+            llm_reasoning="Triggered from the JARVIS cockpit control panel",
+        )
     return {
         "ok": True,
-        "mode": "preview",
+        "mode": "execute" if execute else "preview",
         "results": [
             {"action": r.action, "removed": r.removed, "detail": r.space_freed}
             for r in results
@@ -220,30 +267,133 @@ def _docker_prune_preview() -> dict:
     }
 
 
+def _deep_clean(execute: bool) -> dict:
+    """Reclaim dormant regenerable bloat (``node_modules``, build output,
+    caches) across the home tree — a deeper sweep than ``tidy``."""
+    dormancy = get_config().safety.get("bloat_min_age_days", 7)
+    targets = [
+        t for t in find_bloat(str(Path.home()), min_age_days=dormancy)
+        if t.reclaimable
+    ]
+    targets.sort(key=lambda t: t.size_bytes, reverse=True)
+    targets = targets[:MAX_DEEP_CLEAN_TARGETS]
+    paths = [t.path for t in targets]
+    plan = create_cleanup_plan("mac", paths, "Dashboard deep clean")
+    results = execute_cleanup(plan, dry_run=not execute)
+    freed = sum(r.size_bytes for r in results if r.success)
+
+    if execute:
+        succeeded = sum(1 for r in results if r.success)
+        log_action(
+            machine="mac",
+            action_type="deep_clean",
+            description=f"Dashboard deep clean: {succeeded} dormant bloat dir(s)",
+            files_affected=paths[:20],
+            bytes_freed=freed,
+            outcome="success" if succeeded == len(results) else "partial",
+            llm_reasoning="Triggered from the JARVIS cockpit control panel",
+        )
+
+    return {
+        "ok": True,
+        "mode": "execute" if execute else "preview",
+        "count": len(results),
+        "would_free_bytes": freed,
+        "would_free_human": format_size(freed),
+        "sample": paths[:10],
+    }
+
+
+def _apply_setting(key: str, value) -> dict:
+    """Persist one runtime setting and echo back its new value."""
+    try:
+        update_config({key: value})
+    except (KeyError, TypeError) as exc:
+        return {"ok": False, "error": str(exc), "actions": list(ALLOWED_ACTIONS)}
+    return {"ok": True, "setting": key, "value": value}
+
+
+def _set_dormancy_days(params: dict) -> dict:
+    days = params.get("days")
+    if not isinstance(days, int) or isinstance(days, bool) or not 0 <= days <= 365:
+        return {"ok": False, "error": "days must be an int in 0..365"}
+    return _apply_setting("safety.bloat_min_age_days", days)
+
+
+def _set_idle_threshold(params: dict) -> dict:
+    pct = params.get("percent")
+    if isinstance(pct, bool) or not isinstance(pct, (int, float)) or not 0 <= pct <= 100:
+        return {"ok": False, "error": "percent must be a number in 0..100"}
+    return _apply_setting("safety.idle_cpu_threshold", pct)
+
+
+def _engage() -> dict:
+    """Master ENGAGE — run the full optimisation sweep in one guarded throw:
+    execute tidy, docker prune, and a deep clean, then summarise."""
+    tidy = _tidy(execute=True)
+    docker = _docker_prune(execute=True)
+    deep = _deep_clean(execute=True)
+    freed = tidy.get("would_free_bytes", 0) + deep.get("would_free_bytes", 0)
+    return {
+        "ok": True,
+        "mode": "execute",
+        "freed_bytes": freed,
+        "freed_human": format_size(freed),
+        "steps": {"tidy": tidy, "docker_prune": docker, "deep_clean": deep},
+    }
+
+
 def run_command_action(action: str, params: dict | None = None) -> dict:
-    """Execute one allow-listed command. Never runs arbitrary input."""
+    """Execute one allow-listed command. Never runs arbitrary input.
+
+    Destructive actions (:data:`DESTRUCTIVE_ACTIONS`) require ``params.confirm``
+    — the guarded control's cover/lever throw supplies it.
+    """
     params = params or {}
+
+    if action not in ALLOWED_ACTIONS:
+        return {
+            "ok": False,
+            "error": f"unknown action: {action!r}",
+            "actions": list(ALLOWED_ACTIONS),
+        }
+
+    if action in DESTRUCTIVE_ACTIONS and not params.get("confirm"):
+        return {
+            "ok": False,
+            "error": f"{action} is destructive — requires the guard gesture (confirm=true)",
+            "actions": list(ALLOWED_ACTIONS),
+        }
 
     if action == "refresh":
         return {"ok": True, "stats": collect_stats()}
     if action == "tidy_preview":
         return _tidy(execute=False)
     if action == "tidy_execute":
-        if not params.get("confirm"):
-            return {
-                "ok": False,
-                "error": "tidy_execute requires confirm=true",
-                "actions": list(ALLOWED_ACTIONS),
-            }
         return _tidy(execute=True)
     if action == "docker_prune_preview":
-        return _docker_prune_preview()
+        return _docker_prune(execute=False)
+    if action == "docker_prune_execute":
+        return _docker_prune(execute=True)
+    if action == "deep_clean_preview":
+        return _deep_clean(execute=False)
+    if action == "deep_clean_execute":
+        return _deep_clean(execute=True)
+    if action == "set_dry_run":
+        return _apply_setting("safety.dry_run", bool(params.get("enabled")))
+    if action == "set_notify":
+        return _apply_setting("notifications.enabled", bool(params.get("enabled")))
+    if action == "set_dormancy_days":
+        return _set_dormancy_days(params)
+    if action == "set_idle_threshold":
+        return _set_idle_threshold(params)
+    if action == "set_autopilot":
+        return _apply_setting("safety.autopilot_armed", bool(params.get("armed")))
+    if action == "engage":
+        return _engage()
 
-    return {
-        "ok": False,
-        "error": f"unknown action: {action!r}",
-        "actions": list(ALLOWED_ACTIONS),
-    }
+    # Defensive: an allow-listed action with no handler.
+    return {"ok": False, "error": f"unhandled action: {action!r}"}
 
 
 # --------------------------------------------------------------------------- #

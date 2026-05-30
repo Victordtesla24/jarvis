@@ -209,9 +209,75 @@
   button.cmd:disabled{opacity:.4;cursor:wait}
   .console{font-family:var(--font-mono);font-size:11px;line-height:1.6;
     background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:3px;
-    padding:9px 11px;flex:1;min-height:120px;overflow:auto}
+    padding:9px 11px;flex:1;min-height:96px;overflow:auto}
   .console .t{color:var(--txt-dim)} .console .ok{color:var(--green)}
   .console .warn{color:var(--amber)} .console .err{color:#ff6b6b} .console .info{color:var(--cyan)}
+
+  /* ---- cockpit control panel (R15 / SC7): skeuomorphic, guarded ---- */
+  .rack{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px}
+  .ctl{display:flex;flex-direction:column;gap:7px;padding:9px 10px;border-radius:3px;
+    background:rgba(139,211,251,.04);border:1px solid var(--line)}
+  .ctl-lbl{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.22em;
+    color:var(--txt-dim);text-transform:uppercase}
+  .ctl-val{font-family:var(--font-mono);font-size:10px;color:var(--cyan);letter-spacing:.1em}
+  .ctl-val b{font-variant-numeric:tabular-nums;font-size:13px;color:#eafbff}
+  /* guarded toggle — a flip-up cover is the confirm gesture */
+  .guarded-toggle{position:relative;display:flex;align-items:center;gap:9px;cursor:pointer}
+  .guarded-toggle .cover{position:absolute;inset:-9px -10px;border-radius:3px;
+    background:repeating-linear-gradient(45deg,rgba(170,5,5,.34) 0 7px,rgba(0,0,0,.34) 7px 14px);
+    border:1px solid var(--red);transition:transform .25s ease;transform-origin:top center;z-index:2}
+  .guarded-toggle.guard-open .cover{transform:rotateX(105deg);pointer-events:none}
+  .guarded-toggle .toggle{width:46px;height:22px;border-radius:12px;border:1px solid var(--line-strong);
+    background:rgba(0,0,0,.45);position:relative;cursor:pointer;padding:0}
+  .tog-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+    background:var(--txt-dim);transition:.2s}
+  .guarded-toggle.on .toggle{border-color:var(--green);box-shadow:0 0 12px rgba(74,222,128,.4)}
+  .guarded-toggle.on .tog-knob{left:26px;background:var(--green)}
+  .tog-state{font-family:var(--font-display);font-weight:700;font-size:9.5px;letter-spacing:.18em;color:var(--txt-dim)}
+  .guarded-toggle.on .tog-state{color:var(--green)}
+  /* rocker switches */
+  .rocker{width:48px;height:24px;border-radius:3px;border:1px solid var(--line-strong);
+    background:rgba(0,0,0,.4);position:relative;cursor:pointer;padding:0;align-self:flex-start}
+  .rocker i{position:absolute;top:2px;left:2px;width:21px;height:18px;border-radius:2px;
+    background:var(--txt-dim);transition:.18s}
+  .rocker.on{border-color:var(--cyan);box-shadow:0 0 12px rgba(139,211,251,.35)}
+  .rocker.on i{left:23px;background:var(--cyan)}
+  /* throttle lever + rotary knob (range inputs) */
+  .throttle,.rotary{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:3px;
+    background:linear-gradient(90deg,var(--cyan),var(--amber));outline:none;cursor:pointer}
+  .throttle::-webkit-slider-thumb,.rotary::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:24px;
+    border-radius:3px;background:#0b1420;border:1px solid var(--cyan);box-shadow:0 0 10px rgba(139,211,251,.5)}
+  .rotary::-webkit-slider-thumb{width:22px;height:22px;border-radius:50%}
+  .throttle::-moz-range-thumb,.rotary::-moz-range-thumb{width:15px;height:24px;border-radius:3px;
+    background:#0b1420;border:1px solid var(--cyan)}
+  /* annunciator lamps — Mac / VPS health, redundant colour+shape */
+  .annunciator{display:flex;gap:8px;margin-bottom:10px}
+  .lamp{flex:1;display:flex;align-items:center;gap:7px;justify-content:center;
+    font-family:var(--font-mono);font-size:9px;letter-spacing:.2em;color:var(--txt-dim);
+    padding:7px 6px;border-radius:3px;border:1px solid var(--line);background:rgba(0,0,0,.3)}
+  .lamp i{width:9px;height:9px;border-radius:50%;background:var(--txt-dim)}
+  .lamp.nominal{color:var(--cyan);border-color:var(--line-strong)} .lamp.nominal i{background:var(--green);box-shadow:0 0 9px var(--green)}
+  .lamp.degraded{color:var(--amber)} .lamp.degraded i{background:var(--amber);box-shadow:0 0 9px var(--amber)}
+  .lamp.critical{color:#ff6b6b;border-color:var(--red)} .lamp.critical i{background:var(--red);box-shadow:0 0 10px var(--red);animation:lampblink 1s steps(2) infinite}
+  @keyframes lampblink{50%{opacity:.25}}
+  /* danger pushbutton armed (guard lifted) state */
+  button.cmd.danger.guard-open{background:rgba(170,5,5,.28);color:#fff;border-color:var(--red);
+    box-shadow:0 0 18px rgba(170,5,5,.55);animation:lampblink 1.1s steps(2) infinite}
+  /* master ENGAGE lever (guarded) */
+  .engage-bay{margin:4px 0 10px}
+  .engage-lever{position:relative;cursor:pointer;border:1px solid var(--line-strong);border-radius:4px;
+    padding:12px;text-align:center;background:rgba(251,202,3,.05);overflow:hidden}
+  .engage-lever .cover{position:absolute;inset:0;border-radius:4px;
+    background:repeating-linear-gradient(45deg,rgba(170,5,5,.42) 0 9px,rgba(0,0,0,.45) 9px 18px);
+    border:1px solid var(--red);display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);font-size:9px;letter-spacing:.22em;color:#ffd9d9;transition:transform .3s ease;
+    transform-origin:left center;z-index:2}
+  .engage-lever .cover::after{content:"⚠ LIFT GUARD"}
+  .engage-lever.guard-open .cover{transform:rotateY(108deg);pointer-events:none}
+  .engage-throw{font-family:var(--font-display);font-weight:700;font-size:15px;letter-spacing:.3em;
+    color:var(--amber);background:none;border:0;cursor:pointer;display:block;width:100%}
+  .engage-lever.guard-open .engage-throw{color:#fff;text-shadow:0 0 16px rgba(251,202,3,.7)}
+  .engage-lbl{display:block;font-family:var(--font-mono);font-size:8px;letter-spacing:.3em;color:var(--txt-dim);margin-top:4px}
 
   footer{display:flex;align-items:center;gap:14px;font-family:var(--font-mono);
     font-size:10px;letter-spacing:.18em;color:var(--txt-dim)}
@@ -385,16 +451,70 @@
       </section>
     </div>
 
-    <!-- RIGHT (CONTROL mode): command console -->
+    <!-- RIGHT (CONTROL mode): skeuomorphic cockpit control panel (R15 / SC7) -->
     <div class="col" id="control-col">
-      <section class="panel" data-interactive style="flex:1;display:flex;flex-direction:column">
-        <h2><span class="ttl">Command Console</span><span class="ln"></span></h2>
+      <section class="panel cockpit" data-interactive style="flex:1;display:flex;flex-direction:column">
+        <h2><span class="ttl">Cockpit Control Panel</span><span class="ln"></span></h2>
+
+        <!-- settings rack: guarded toggle + rockers + throttle lever + rotary knob -->
+        <div class="rack">
+          <!-- guarded toggle (autopilot ARM/DISARM) — cover is the confirm gesture -->
+          <div class="ctl">
+            <span class="ctl-lbl">Autopilot</span>
+            <div class="guarded-toggle" data-action="set_autopilot" data-guarded title="Lift guard to ARM/DISARM">
+              <div class="cover"></div>
+              <span class="toggle"><span class="tog-knob"></span></span>
+              <span class="tog-state">DISARMED</span>
+            </div>
+          </div>
+          <!-- rocker switches (dry-run / notify) -->
+          <div class="ctl">
+            <span class="ctl-lbl">Dry-Run · Notify</span>
+            <div style="display:flex;gap:14px;align-items:center">
+              <button class="rocker" role="switch" aria-checked="false" data-action="set_dry_run" title="Dry-run"><i></i></button>
+              <button class="rocker on" role="switch" aria-checked="true" data-action="set_notify" title="Notifications"><i></i></button>
+            </div>
+          </div>
+          <!-- throttle lever (dormancy days) -->
+          <div class="ctl">
+            <span class="ctl-lbl">Throttle · Dormancy</span>
+            <input class="throttle" type="range" min="0" max="90" step="1" value="7" data-action="set_dormancy_days" aria-label="dormancy days" />
+            <span class="ctl-val"><b id="throttle-val">7</b> days dormant</span>
+          </div>
+          <!-- rotary knob (idle threshold) -->
+          <div class="ctl">
+            <span class="ctl-lbl">Rotary · Idle Floor</span>
+            <input class="rotary" type="range" min="0" max="100" step="1" value="80" data-action="set_idle_threshold" aria-label="idle threshold" />
+            <span class="ctl-val"><b id="rotary-val">80</b>% CPU idle</span>
+          </div>
+        </div>
+
+        <!-- annunciator lamps — Mac / VPS health -->
+        <div class="annunciator" id="annunciator">
+          <span class="lamp" data-lamp="mac"><i></i>MAC</span>
+          <span class="lamp" data-lamp="vps_main"><i></i>VPS</span>
+        </div>
+
+        <!-- illuminated pushbuttons — previews are safe, executes are guarded -->
         <div class="cmds">
           <button class="cmd" data-action="refresh">↻ Refresh</button>
           <button class="cmd" data-action="docker_prune_preview">⌦ Prune Scan</button>
           <button class="cmd" data-action="tidy_preview">⚲ Tidy Preview</button>
-          <button class="cmd danger" data-action="tidy_execute">⚡ Execute Tidy</button>
+          <button class="cmd" data-action="deep_clean_preview">⚏ Deep Scan</button>
+          <button class="cmd danger" data-action="tidy_execute" data-guarded>⚡ Execute Tidy</button>
+          <button class="cmd danger" data-action="docker_prune_execute" data-guarded>⌫ Execute Prune</button>
+          <button class="cmd danger" data-action="deep_clean_execute" data-guarded>☢ Deep Clean</button>
         </div>
+
+        <!-- master ENGAGE lever (guarded) — full optimisation sweep -->
+        <div class="engage-bay">
+          <div class="engage-lever" data-action="engage" data-guarded title="Lift guard, then ENGAGE">
+            <div class="cover"></div>
+            <button class="engage-throw">⫸ ENGAGE</button>
+            <span class="engage-lbl">MASTER · FULL OPTIMISATION SWEEP</span>
+          </div>
+        </div>
+
         <div class="console" id="console"></div>
       </section>
     </div>
@@ -1034,6 +1154,38 @@ function render(stats) {
   $("#recent-feed").textContent = r.length
     ? `LAST: ${r[0].action} · ${r[0].machine} · ${r[0].freed_human}`
     : "no recorded activity";
+
+  renderControls(stats);
+}
+
+// Cockpit annunciators reflect fleet health every poll; the tunable controls
+// (toggle/rockers/throttle/rotary) boot once from the live settings section so
+// polling never fights a value the operator is dragging.
+let controlsBooted = false;
+function renderControls(stats) {
+  const machines = Array.isArray(stats.machines) ? stats.machines : [];
+  $$("#annunciator .lamp").forEach((lamp) => {
+    const m = machines.find((x) => x.name === lamp.dataset.lamp);
+    const pct = m && m.disk_used_pct != null ? m.disk_used_pct : null;
+    const cls = !m || !m.enabled ? "degraded" : pct == null ? "degraded"
+      : pct >= 92 ? "critical" : pct >= 80 ? "degraded" : "nominal";
+    lamp.className = "lamp " + cls;
+  });
+
+  const s = stats.settings;
+  if (controlsBooted || !s || s.error) return;
+  controlsBooted = true;
+  setRocker($('.rocker[data-action="set_dry_run"]'), !!s.dry_run);
+  setRocker($('.rocker[data-action="set_notify"]'), !!s.notify);
+  const thr = $(".throttle"); if (thr != null && s.dormancy_days != null) { thr.value = s.dormancy_days; $("#throttle-val").textContent = s.dormancy_days; }
+  const rot = $(".rotary"); if (rot != null && s.idle_threshold != null) { rot.value = s.idle_threshold; $("#rotary-val").textContent = s.idle_threshold; }
+  setAutopilotUI(!!s.autopilot_armed);
+}
+function setRocker(el, on) { if (!el) return; el.classList.toggle("on", on); el.setAttribute("aria-checked", String(on)); }
+function setAutopilotUI(on) {
+  const t = $('.guarded-toggle[data-action="set_autopilot"]'); if (!t) return;
+  t.classList.toggle("on", on);
+  t.querySelector(".tog-state").textContent = on ? "ARMED" : "DISARMED";
 }
 
 async function poll() {
@@ -1065,29 +1217,78 @@ async function sendCommand(action, params) {
   });
   return res.json();
 }
-async function runAction(action) {
-  let params = {};
-  if (action === "tidy_execute") {
-    if (!confirm("Execute real cleanup? Files matching JARVIS tidy patterns will be DELETED.")) return;
-    params = { confirm: true };
-    logc("⚡ executing cleanup — this is irreversible", "warn");
-  } else {
-    logc("› " + action.replace(/_/g, " "), "info");
+// Destructive actions: the backend rejects them without params.confirm, so the
+// guard gesture (a lifted cover / lever throw) IS the confirmation (R15).
+const GUARDED = new Set(["tidy_execute", "docker_prune_execute", "deep_clean_execute", "set_autopilot", "engage"]);
+async function runAction(action, params = {}) {
+  if (GUARDED.has(action) && !params.confirm) {
+    // Palette / keyboard path has no physical cover — fall back to a prompt.
+    if (!confirm("Confirm guarded action: " + action.replace(/_/g, " ") + "? This is destructive.")) return;
+    params = { ...params, confirm: true };
   }
+  logc("› " + action.replace(/_/g, " "), params.confirm ? "warn" : "info");
   try {
     const out = await sendCommand(action, params);
-    if (!out.ok) { logc("✕ " + (out.error || "command failed"), "err"); return; }
+    if (!out.ok) { logc("✕ " + (out.error || "command failed"), "err"); return out; }
     if (action === "refresh") { render(out.stats); logc("✓ telemetry refreshed", "ok"); }
-    else if (action.startsWith("tidy")) {
+    else if (action.startsWith("tidy") || action.startsWith("deep_clean")) {
       logc(`✓ ${out.mode}: ${out.count} targets · ${out.would_free_human}`, "ok"); poll();
-    } else if (action === "docker_prune_preview") {
-      out.results.forEach((x) => logc(`• ${x.action}: ${x.removed} (${x.detail})`, "ok"));
+    } else if (action.startsWith("docker_prune")) {
+      out.results.forEach((x) => logc(`• ${x.action}: ${x.removed} (${x.detail})`, "ok")); poll();
+    } else if (action.startsWith("set_")) {
+      logc(`✓ ${out.setting} = ${out.value}`, "ok"); poll();
+    } else if (action === "engage") {
+      logc(`✓ ENGAGE complete — full sweep · ${out.freed_human} reclaimed`, "ok"); poll();
     }
-  } catch (e) { logc("✕ " + e.message, "err"); }
+    return out;
+  } catch (e) { logc("✕ " + e.message, "err"); return { ok: false, error: e.message }; }
 }
-$$("button.cmd").forEach((btn) => btn.addEventListener("click", async () => {
+
+// Plain pushbuttons fire immediately; guarded ones go through the cover gesture.
+$$("button.cmd:not([data-guarded])").forEach((btn) => btn.addEventListener("click", async () => {
   btn.disabled = true; try { await runAction(btn.dataset.action); } finally { btn.disabled = false; }
 }));
+
+// Guarded controls (toggle / danger buttons / engage lever): first activation
+// lifts the guard (arms), the second fires with confirm:true. Auto-disarms.
+$$("[data-guarded]").forEach((el) => {
+  let timer = null;
+  const disarm = () => { el.classList.remove("guard-open"); clearTimeout(timer); };
+  el.addEventListener("click", async () => {
+    const action = el.dataset.action;
+    if (!el.classList.contains("guard-open")) {
+      el.classList.add("guard-open");
+      logc("⚠ guard lifted — " + action.replace(/_/g, " ") + " · activate again to confirm", "warn");
+      clearTimeout(timer); timer = setTimeout(disarm, 4500);
+      return;
+    }
+    disarm();
+    const params = { confirm: true };
+    if (action === "set_autopilot") params.armed = !el.classList.contains("on");
+    const out = await runAction(action, params);
+    if (action === "set_autopilot" && out && out.ok) setAutopilotUI(!!params.armed);
+  });
+});
+
+// Rocker switches → set_dry_run / set_notify (flip on success).
+$$(".rocker").forEach((r) => r.addEventListener("click", async () => {
+  const next = r.getAttribute("aria-checked") !== "true";
+  const out = await runAction(r.dataset.action, { enabled: next });
+  if (out && out.ok) setRocker(r, next);
+}));
+
+// Throttle lever (dormancy days) + rotary knob (idle threshold): live readout
+// while dragging, commit on release.
+const throttleEl = $(".throttle");
+if (throttleEl) {
+  throttleEl.addEventListener("input", () => { $("#throttle-val").textContent = throttleEl.value; });
+  throttleEl.addEventListener("change", () => runAction("set_dormancy_days", { days: +throttleEl.value }));
+}
+const rotaryEl = $(".rotary");
+if (rotaryEl) {
+  rotaryEl.addEventListener("input", () => { $("#rotary-val").textContent = rotaryEl.value; });
+  rotaryEl.addEventListener("change", () => runAction("set_idle_threshold", { percent: +rotaryEl.value }));
+}
 
 // mode switch — monitoring view vs control view
 function setMode(mode) {
@@ -1102,6 +1303,10 @@ const PALETTE_CMDS = [
   { ic: "⚲", label: "Tidy preview (dry-run)", hint: "SAFE", run: () => runAction("tidy_preview") },
   { ic: "⚡", label: "Execute tidy (delete)", hint: "DESTRUCTIVE", run: () => runAction("tidy_execute") },
   { ic: "⌦", label: "Docker prune scan", hint: "SAFE", run: () => runAction("docker_prune_preview") },
+  { ic: "⌫", label: "Docker prune (execute)", hint: "DESTRUCTIVE", run: () => runAction("docker_prune_execute") },
+  { ic: "⚏", label: "Deep clean scan (dry-run)", hint: "SAFE", run: () => runAction("deep_clean_preview") },
+  { ic: "☢", label: "Deep clean (delete bloat)", hint: "DESTRUCTIVE", run: () => runAction("deep_clean_execute") },
+  { ic: "⫸", label: "ENGAGE — full optimisation sweep", hint: "DESTRUCTIVE", run: () => runAction("engage") },
   { ic: "▦", label: "Monitoring view", hint: "MODE", run: () => setMode("monitor") },
   { ic: "⚙", label: "Control view", hint: "MODE", run: () => setMode("control") },
   { ic: "▢", label: "Toggle transparent mode", hint: "VIEW", run: () => $("#toggle-void").click() },

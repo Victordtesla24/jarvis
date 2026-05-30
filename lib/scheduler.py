@@ -229,6 +229,16 @@ def autopilot_job():
     safety = config.safety
 
     try:
+        if not safety.get("autopilot_armed", True):
+            logger.info("JARVIS: Autopilot DISARMED from cockpit — reclamation held")
+            log_action(
+                machine="mac",
+                action_type="autopilot",
+                outcome="deferred",
+                description="Autopilot disarmed from cockpit — reclamation held",
+            )
+            return
+
         info = get_system_info()
         home = str(Path.home())
 

@@ -197,3 +197,94 @@ class Config:
 def get_config() -> Config:
     """Get singleton config instance."""
     return Config()
+
+
+# Runtime-tunable settings the cockpit control panel may persist. Keys are
+# ``section.leaf`` paths; values are restricted to these types. Anything not
+# listed here is off-limits — the writer can never reach credentials or the
+# machine/SSH blocks.
+RUNTIME_SETTABLE: dict[str, type] = {
+    "safety.dry_run": bool,
+    "safety.autopilot_armed": bool,
+    "safety.bloat_min_age_days": (int, float),  # type: ignore[dict-item]
+    "safety.idle_cpu_threshold": (int, float),  # type: ignore[dict-item]
+    "notifications.enabled": bool,
+}
+
+
+def _format_scalar(value: Any) -> str:
+    """Render a Python scalar as the YAML token to write back."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def _set_yaml_scalar(text: str, section: str, leaf: str, value: Any) -> str:
+    """Surgically set ``section.leaf`` in a YAML document, preserving every
+    other line — comments, blank lines, ordering, and any inline comment on the
+    edited line. Credentials (other lines) are never touched (R16)."""
+    lines = text.splitlines()
+    token = _format_scalar(value)
+    sec_re = re.compile(rf"^{re.escape(section)}:\s*(#.*)?$")
+    leaf_re = re.compile(rf"^(\s+)({re.escape(leaf)}:\s*)([^#\n]*?)(\s*(?:#.*)?)$")
+
+    in_section = False
+    indent = "  "
+    for i, line in enumerate(lines):
+        if sec_re.match(line):
+            in_section = True
+            continue
+        if in_section:
+            if line and not line[0].isspace() and not line.lstrip().startswith("#"):
+                break  # next top-level block — leaf wasn't present
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                indent = line[: len(line) - len(line.lstrip())]
+            m = leaf_re.match(line)
+            if m:
+                lines[i] = f"{m.group(1)}{m.group(2)}{token}{m.group(4)}"
+                return "\n".join(lines) + "\n"
+
+    # Leaf absent: add it (creating the section if needed).
+    if in_section:
+        for i, line in enumerate(lines):
+            if sec_re.match(line):
+                lines.insert(i + 1, f"{indent}{leaf}: {token}")
+                break
+    else:
+        lines.append(f"{section}:")
+        lines.append(f"  {leaf}: {token}")
+    return "\n".join(lines) + "\n"
+
+
+def update_config(updates: dict[str, Any], path: Path | None = None) -> dict[str, Any]:
+    """Persist an allow-listed set of runtime settings to ``config.yaml``.
+
+    Only keys in :data:`RUNTIME_SETTABLE` may be written, and only their own
+    lines are edited — every comment, blank line, and ``${VAR}`` credential
+    placeholder is left untouched, so a secret is never resolved onto disk
+    (R16). The singleton is reloaded so the change takes effect with no daemon
+    restart. Returns the applied ``{key: value}`` map.
+    """
+    if not updates:
+        return {}
+
+    for key, value in updates.items():
+        expected = RUNTIME_SETTABLE.get(key)
+        if expected is None:
+            raise KeyError(f"not a runtime-settable key: {key!r}")
+        if expected is bool:
+            if not isinstance(value, bool):
+                raise TypeError(f"{key} expects a boolean, got {type(value).__name__}")
+        elif isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError(f"{key} expects a number, got {type(value).__name__}")
+
+    target = path or Config.CONFIG_PATH
+    text = target.read_text() if target.exists() else ""
+    for key, value in updates.items():
+        section, _, leaf = key.partition(".")
+        text = _set_yaml_scalar(text, section, leaf, value)
+
+    target.write_text(text)
+    get_config().reload()
+    return dict(updates)
