@@ -20,9 +20,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# ralphy working dirs
+# ralphy working dirs + run state
 .ralphy-worktrees/
 .ralphy-sandboxes/
+.ralphy/
 
 # Electron dashboard app (deps + build output)
 lib/dashboard_app/node_modules/
