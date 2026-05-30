@@ -58,6 +58,36 @@ function MonitorWave() {
   );
 }
 
+function DiagnosticsGraph({ cpu, ram }: { cpu: number; ram: number }) {
+  const cpuHist = React.useRef<number[]>([]);
+  const ramHist = React.useRef<number[]>([]);
+  const [, force] = useState(0);
+  useEffect(() => {
+    const push = (buf: number[], v: number) => { buf.push(v); if (buf.length > 40) buf.shift(); };
+    push(cpuHist.current, cpu); push(ramHist.current, ram);
+    force((n) => n + 1);
+  }, [cpu, ram]);
+  const W = 280, H = 70;
+  const line = (buf: number[]) => {
+    if (buf.length < 2) return '';
+    const step = W / 39;
+    return buf.map((v, i) => `${i === 0 ? 'M' : 'L'}${(i * step).toFixed(1)},${(H - (Math.min(100, Math.max(0, v)) / 100) * H).toFixed(1)}`).join(' ');
+  };
+  return (
+    <div className="glass-panel jh-panel jh-diag">
+      <div className="jh-panel-h">DIAGNOSTICS · CPU / MEM</div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" className="jh-diag-svg">
+        {[0.25, 0.5, 0.75].map((g) => (
+          <line key={g} x1={0} x2={W} y1={H * g} y2={H * g} stroke="rgba(0,242,255,.1)" strokeWidth="1" />
+        ))}
+        <path d={line(ramHist.current)} fill="none" stroke="var(--accent-success)" strokeWidth="1.5" opacity="0.7" />
+        <path d={line(cpuHist.current)} fill="none" stroke="var(--neon-cyan)" strokeWidth="1.8" style={{ filter: 'drop-shadow(0 0 4px var(--neon-cyan-glow))' }} />
+      </svg>
+      <div className="jh-diag-legend"><span style={{ color: 'var(--neon-cyan)' }}>■ CPU {cpu.toFixed(0)}%</span><span style={{ color: 'var(--accent-success)' }}>■ MEM {ram.toFixed(0)}%</span></div>
+    </div>
+  );
+}
+
 function Launcher({ label, onClick }: { label: string; onClick?: () => void }) {
   return (
     <button className="jh-launch" onClick={onClick}>
@@ -147,6 +177,8 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
           <div className="jh-panel-h">MAINTENANCE PIPELINE</div>
           <FlowchartWidget content={PIPELINE} />
         </div>
+
+        <DiagnosticsGraph cpu={cpu} ram={ram} />
 
         <div className="jh-logwrap"><CommandLog logs={logs} /></div>
 

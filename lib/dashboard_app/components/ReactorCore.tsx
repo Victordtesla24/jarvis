@@ -92,9 +92,9 @@ function CoreGlow({ load }: { load: number }) {
     const t = performance.now() / 1000;
     const osc = 0.5 + 0.5 * Math.sin(t * 3.0);
     const scl = THREE.MathUtils.lerp(0.92, 1.1, osc) * (1 + load * 0.25);
-    if (inner.current) inner.current.scale.setScalar(0.09 * scl);
+    if (inner.current) inner.current.scale.setScalar(0.08 * scl);
     if (outer.current) outer.current.scale.setScalar(0.2 * scl);
-    if (innerMat.current) innerMat.current.opacity = 0.55 + 0.2 * osc;
+    if (innerMat.current) innerMat.current.opacity = 0.4 + 0.15 * osc;
     if (light.current) light.current.intensity = THREE.MathUtils.lerp(4, 12, osc) * (0.6 + load);
   });
   return (
@@ -222,7 +222,7 @@ export default function ReactorCore({ load = 0.1 }: { load?: number }) {
       <ambientLight intensity={0.5} />
       <Reactor load={load} />
       <EffectComposer disableNormalPass frameBufferType={THREE.HalfFloatType}>
-        <Bloom mipmapBlur luminanceThreshold={0.28} intensity={1.0} radius={0.7} levels={7} />
+        <Bloom mipmapBlur luminanceThreshold={0.33} intensity={0.85} radius={0.7} levels={7} />
         <ChromaticAberration blendFunction={BlendFunction.NORMAL} offset={caOffset} radialModulation modulationOffset={0.4} />
         <Scanline blendFunction={BlendFunction.OVERLAY} density={1.2} opacity={0.1} />
         <Noise premultiply blendFunction={BlendFunction.SCREEN} opacity={0.025} />
