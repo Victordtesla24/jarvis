@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState, Suspense } from 'react';
+import React, { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import ReactorCore from './components/ReactorCore';
 import HolographicEarth from './components/HolographicEarth';
 import JarvisHUD from './components/JarvisHUD';
 import JarvisIntro from './components/JarvisIntro';
+import VideoFeed from './components/VideoFeed';
 import { useStats, pct01 } from './hooks/useStats';
 import { HandTrackingState, RegionName } from './types';
 
@@ -22,11 +23,17 @@ const App: React.FC = () => {
   const stats = useStats();
   const load = pct01(stats?.system?.cpu_load_pct, 8);
 
-  // HolographicEarth was built for MediaPipe hand control. This build is
-  // CAMERA-FREE: feed it an all-null hand state so gestures stay disabled
-  // (its useFrame guards every hand read) while the globe still renders + spins.
+  // Shared MediaPipe hand-tracking state. <VideoFeed> drives the camera +
+  // GestureRecognizer and writes the latest two-hand state into this ref every
+  // frame; BOTH the reactor and the globe read it in their own useFrame, so the
+  // same gesture semantics stay live across the Reactor↔Globe toggle. Camera is
+  // OPTIONAL: if getUserMedia is denied the ref simply stays all-null and every
+  // consumer falls back to its ambient idle animation (never freezes, no crash).
   const handTrackingRef = useRef<HandTrackingState>({ leftHand: null, rightHand: null });
   const regionRef = useRef<RegionName>(RegionName.AMERICAS);
+  const handleTrackingUpdate = useCallback((s: HandTrackingState) => {
+    handTrackingRef.current = s;
+  }, []);
 
   // Boot Sequence (SILENT — no TTS/audio anywhere). setTimeout IDs are tracked
   // so we can clear them if the component unmounts or boot is re-triggered.
@@ -106,7 +113,14 @@ const App: React.FC = () => {
   // Main HUD
   return (
     <div className="app-substrate relative w-full h-screen bg-black overflow-hidden animate-flash">
-      {/* 3D centerpiece — arc reactor, or holographic globe when toggled */}
+      {/* Camera mirror — dim background layer. Mounted ONCE (camera-driven) and
+          left mounted across the Reactor↔Globe toggle so hand tracking never
+          re-initialises. If the camera is denied this stays a black element and
+          VideoFeed logs once; gestures simply go idle. */}
+      <VideoFeed onTrackingUpdate={handleTrackingUpdate} />
+
+      {/* 3D centerpiece — arc reactor, or holographic globe when toggled. Both
+          views receive the SAME live handTrackingRef. */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         <Canvas
           camera={{ position: [0, 0, 3.5], fov: 55 }}
@@ -116,7 +130,7 @@ const App: React.FC = () => {
           <Suspense fallback={null}>
             {globeMode
               ? <HolographicEarth handTrackingRef={handTrackingRef} setRegion={(r) => { regionRef.current = r; }} />
-              : <ReactorCore load={load} />}
+              : <ReactorCore load={load} handTrackingRef={handTrackingRef} />}
           </Suspense>
         </Canvas>
       </div>

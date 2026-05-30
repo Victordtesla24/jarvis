@@ -17,9 +17,13 @@ body.in-app, body.in-app #root, body.in-app .app-substrate{ background:transpare
   mix-blend-mode:screen;animation:scan 9s linear infinite;opacity:.6}
 
 /* ---- top bar ---- */
+/* Doubles as the window drag region in the Electron overlay (-webkit-app-region:
+   drag). Interactive children opt out with no-drag so clicks still register. */
 .jh-top{position:absolute;top:0;left:0;right:0;height:50px;display:flex;align-items:center;
   padding:0 24px;border-bottom:1px solid var(--glass-border);
-  background:linear-gradient(180deg,rgba(6,18,28,.5),transparent)}
+  background:linear-gradient(180deg,rgba(6,18,28,.5),transparent);
+  -webkit-app-region:drag}
+.jh-top .jh-top-status, .jh-globe-toggle, [data-interactive]{-webkit-app-region:no-drag}
 .jh-title{font-family:'Orbitron',sans-serif;font-weight:800;font-size:18px;letter-spacing:.16em;
   color:#eafdff;text-shadow:0 0 14px var(--neon-cyan-glow)}
 .jh-title span{color:var(--neon-cyan);margin:0 4px}
@@ -31,14 +35,34 @@ body.in-app, body.in-app #root, body.in-app .app-substrate{ background:transpare
 .jh-led.warn{background:var(--accent-warning);box-shadow:0 0 8px var(--accent-warning)}
 
 /* ---- columns ---- */
-.jh-col{position:absolute;top:64px;bottom:54px;width:300px;display:flex;flex-direction:column;gap:14px;overflow:hidden}
+.jh-col{position:absolute;top:64px;bottom:54px;width:300px;display:flex;flex-direction:column;gap:12px;
+  overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;padding-bottom:4px}
+.jh-col::-webkit-scrollbar{width:3px}
 .jh-left{left:18px}
-.jh-right{right:18px;width:320px}
+/* right column starts below the GLOBE toggle (top:60px) so they never overlap */
+.jh-right{right:18px;width:326px;top:92px}
 
 .jh-panel{position:relative;padding:12px 14px}
-.glass-panel{border-radius:4px}
 .jh-panel-h{font-size:10px;font-weight:700;letter-spacing:.22em;color:var(--neon-cyan);
   text-shadow:0 0 8px var(--neon-cyan-glow);margin-bottom:8px;opacity:.92}
+
+/* ---- holographic glass panels --------------------------------------------
+   Translucent low-alpha glass with a glowing thin cyan edge, backdrop blur and
+   a subtle inner glow + corner brackets. Never opaque, so the reactor/desktop
+   shows through. */
+.glass-panel{
+  position:relative;border-radius:4px;
+  background:rgba(10,30,36,0.18);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  border:1px solid rgba(0,242,255,.28);
+  box-shadow:0 0 14px rgba(0,242,255,.10), inset 0 0 18px rgba(0,242,255,.05);
+}
+/* glowing thin top edge */
+.glass-panel::before{content:'';position:absolute;left:8px;right:8px;top:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,242,255,.65),transparent);pointer-events:none}
+/* corner brackets (TL + BR) drawn with a tiny pseudo + box-shadow trick */
+.glass-panel::after{content:'';position:absolute;top:4px;left:4px;width:10px;height:10px;
+  border-left:1px solid rgba(0,242,255,.5);border-top:1px solid rgba(0,242,255,.5);pointer-events:none}
 
 /* orbital (NeuralCircle) */
 .jh-orbital{width:150px;height:150px;margin:0 auto;position:relative}
@@ -103,5 +127,56 @@ body.in-app, body.in-app #root, body.in-app .app-substrate{ background:transpare
 .jh-fr.tr{top:10px;right:10px;border-left:0;border-bottom:0}
 .jh-fr.bl{bottom:10px;left:10px;border-right:0;border-top:0}
 .jh-fr.br{bottom:10px;right:10px;border-left:0;border-top:0}
+
+/* ---- PLANET / NODE-channel ladder (left column) ---- */
+.jh-planets{display:flex;flex-direction:column;gap:5px}
+.jh-planet-row{display:grid;grid-template-columns:74px 1fr;align-items:center;gap:8px;font-size:10px}
+.jh-planet-label{color:var(--text-secondary);letter-spacing:.1em;font-family:'Orbitron',sans-serif}
+.jh-planet-track{position:relative;height:5px;background:rgba(0,242,255,.07);border:1px solid var(--glass-border);border-radius:3px;overflow:hidden}
+.jh-planet-track i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;
+  background:linear-gradient(90deg,var(--neon-cyan-dim),var(--neon-cyan));box-shadow:0 0 6px var(--neon-cyan-glow);
+  transition:width .8s ease}
+
+/* ---- mixer (right column) ---- */
+.jh-mixer{display:flex;justify-content:space-between;gap:8px;height:96px;padding:4px 2px}
+.jh-mix-ch{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.jh-mix-track{position:relative;flex:1;width:6px;background:rgba(0,242,255,.08);border:1px solid var(--glass-border);border-radius:3px;overflow:visible}
+.jh-mix-fill{position:absolute;left:0;right:0;bottom:0;border-radius:3px;
+  background:linear-gradient(180deg,var(--neon-cyan),transparent);transition:height .25s ease}
+.jh-mix-thumb{position:absolute;left:50%;transform:translateX(-50%);width:14px;height:6px;border-radius:2px;
+  background:var(--neon-cyan);box-shadow:0 0 8px var(--neon-cyan);transition:bottom .25s ease}
+.jh-mix-label{font-size:8px;letter-spacing:.1em;color:var(--text-secondary)}
+
+/* ---- right-column top row: mixer + small pipeline side by side ---- */
+.jh-rrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.jh-rrow .jh-flow{max-height:150px}
+.jh-rrow .jh-flow .widget-svg{transform:scale(.46);transform-origin:top left;width:215%}
+
+/* ---- node-wiring bus diagram ---- */
+.jh-wiring-svg{display:block}
+
+/* ---- app launch grid ---- */
+.jh-appgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;pointer-events:auto}
+.jh-appcell{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;cursor:pointer;
+  background:rgba(0,242,255,.05);border:1px solid var(--glass-border);border-radius:4px;color:#d8f7ff;
+  transition:all .2s ease;font-family:'Rajdhani',sans-serif}
+.jh-appcell:hover{background:rgba(0,242,255,.16);box-shadow:0 0 12px rgba(0,242,255,.25)}
+.jh-appcell-ic{font-size:18px;color:var(--neon-cyan);text-shadow:0 0 8px var(--neon-cyan-glow)}
+.jh-appcell-lbl{font-size:9px;letter-spacing:.08em}
+
+/* ---- center-bottom strip: COMPILE + ATTRIBUTES ---- */
+.jh-center-bottom{position:absolute;bottom:54px;left:50%;transform:translateX(-50%);
+  display:flex;gap:14px;align-items:flex-end;pointer-events:none;z-index:21}
+.jh-compile{width:220px;max-height:170px;overflow:hidden}
+.jh-compile .widget-svg{transform:scale(.55);transform-origin:top left;width:182%}
+.jh-attrs{width:200px}
+
+/* ---- data tiles ---- */
+.jh-tiles{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.jh-tile{display:flex;flex-direction:column;padding:6px 8px;background:rgba(0,242,255,.05);
+  border:1px solid var(--glass-border);border-radius:3px}
+.jh-tile b{font-family:'Orbitron',sans-serif;font-size:15px;color:var(--neon-cyan);
+  text-shadow:0 0 8px var(--neon-cyan-glow);font-variant-numeric:tabular-nums}
+.jh-tile span{font-size:8px;letter-spacing:.16em;color:var(--text-secondary);margin-top:2px}
 
 @media (prefers-reduced-motion:reduce){.jh-scan,.jh-led,.jh-wave-bars span{animation:none}}

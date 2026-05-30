@@ -563,7 +563,9 @@
    chip, top-right, above the HUD layer. */
 .jh-globe-toggle {
   position: fixed;
-  top: 12px;
+  /* Sit BELOW the 50px top bar so it never overlaps the TELEMETRY status chip
+     (which lives at the top-right of .jh-top). */
+  top: 60px;
   right: 18px;
   z-index: 60;
   padding: 7px 14px;
