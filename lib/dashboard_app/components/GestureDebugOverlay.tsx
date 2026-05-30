@@ -25,7 +25,10 @@ const GestureDebugOverlay: React.FC<GestureDebugOverlayProps> = ({ handTrackingR
     const tick = () => {
       if (!mounted) return;
       const s = handTrackingRef.current;
-      setSnap({ leftHand: s.leftHand, rightHand: s.rightHand });
+      setSnap((prev) =>
+        prev.leftHand === s.leftHand && prev.rightHand === s.rightHand
+          ? prev
+          : { leftHand: s.leftHand, rightHand: s.rightHand });
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
