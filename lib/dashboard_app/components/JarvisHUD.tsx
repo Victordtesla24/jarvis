@@ -182,7 +182,7 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
 
         <div className="jh-logwrap"><CommandLog logs={logs} /></div>
 
-        <div className="glass-panel jh-panel jh-launchers">
+        <div className="glass-panel jh-panel jh-launchers" data-interactive>
           <div className="jh-panel-h">LAUNCH</div>
           <Launcher label="Notepad" onClick={() => window.open('https://keep.google.com', '_blank')} />
           <Launcher label="Todo List" onClick={() => window.open('https://todoist.com', '_blank')} />

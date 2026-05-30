@@ -670,12 +670,6 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if target is not None:
             self._serve_file(target)
             return
-        # SPA fallback: unknown non-API, non-asset path -> index.html
-        if not path.startswith("/api/") and "." not in path.rsplit("/", 1)[-1]:
-            index = web_root() / "index.html"
-            if index.is_file():
-                self._serve_file(index)
-                return
         self._send_json(404, {"error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802

@@ -1,6 +1,10 @@
 /* JARVIS-3.0 desktop HUD layout — holographic translucent, reactor shows
    through the open centre. Built on NeoCore vars (--neon-cyan etc.). */
 
+/* In the floating .app, preload.js adds body.in-app -> clear the substrate so
+   the desktop shows through the HUD (true transparent overlay). */
+body.in-app, body.in-app #root, body.in-app .app-substrate{ background:transparent !important; background-color:transparent !important; }
+
 .jh-root{
   position:absolute; inset:0; z-index:20; pointer-events:none;
   font-family:'Rajdhani','Orbitron',ui-monospace,monospace;
