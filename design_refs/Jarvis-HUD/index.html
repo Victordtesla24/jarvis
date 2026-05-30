@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>J.A.R.V.I.S. HUD MK-85</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #050505;
+        font-family: 'Rajdhani', sans-serif;
+        color: #06b6d4;
+      }
+      .font-hud {
+        font-family: 'Orbitron', sans-serif;
+      }
+      .font-mono-tech {
+        font-family: 'Share Tech Mono', monospace;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      
+      /* Scanline & CRT Effects */
+      .scanline {
+        background: linear-gradient(
+          to bottom,
+          rgba(255,255,255,0),
+          rgba(255,255,255,0) 50%,
+          rgba(0,0,0,0.2) 50%,
+          rgba(0,0,0,0.2)
+        );
+        background-size: 100% 4px;
+        position: fixed;
+        pointer-events: none;
+        inset: 0;
+        z-index: 50;
+        opacity: 0.6;
+      }
+      .flicker {
+        animation: flicker 0.15s infinite;
+      }
+      @keyframes flicker {
+        0% { opacity: 0.9; }
+        50% { opacity: 1.0; }
+        100% { opacity: 0.9; }
+      }
+
+      /* Cyberpunk Backgrounds */
+      .hex-grid {
+        background-image: 
+          linear-gradient(30deg, #06b6d411 12%, transparent 12.5%, transparent 87%, #06b6d411 87.5%, #06b6d411),
+          linear-gradient(150deg, #06b6d411 12%, transparent 12.5%, transparent 87%, #06b6d411 87.5%, #06b6d411),
+          linear-gradient(30deg, #06b6d411 12%, transparent 12.5%, transparent 87%, #06b6d411 87.5%, #06b6d411),
+          linear-gradient(150deg, #06b6d411 12%, transparent 12.5%, transparent 87%, #06b6d411 87.5%, #06b6d411),
+          linear-gradient(60deg, #06b6d422 25%, transparent 25.5%, transparent 75%, #06b6d422 75%, #06b6d422),
+          linear-gradient(60deg, #06b6d422 25%, transparent 25.5%, transparent 75%, #06b6d422 75%, #06b6d422);
+        background-size: 20px 35px;
+        background-position: 0 0, 0 0, 10px 18px, 10px 18px, 0 0, 10px 18px;
+      }
+      
+      .bg-void {
+        background: radial-gradient(circle at center, #1e1b4b 0%, #020617 70%, #000000 100%);
+      }
+
+      /* Animations */
+      @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      .animate-spin-slow { animation: spin-slow 15s linear infinite; }
+      
+      @keyframes spin-reverse-slow { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+      .animate-spin-reverse-slow { animation: spin-reverse-slow 20s linear infinite; }
+
+      @keyframes glitch {
+        0% { transform: translate(0); }
+        20% { transform: translate(-2px, 2px); }
+        40% { transform: translate(-2px, -2px); }
+        60% { transform: translate(2px, 2px); }
+        80% { transform: translate(2px, -2px); }
+        100% { transform: translate(0); }
+      }
+      .animate-glitch { animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite; }
+
+      /* Custom Shapes */
+      .cyber-panel {
+        clip-path: polygon(
+          0 0, 
+          100% 0, 
+          100% calc(100% - 20px), 
+          calc(100% - 20px) 100%, 
+          0 100%
+        );
+      }
+      .cyber-panel-reverse {
+        clip-path: polygon(
+          20px 0, 
+          100% 0, 
+          100% 100%, 
+          0 100%, 
+          0 20px
+        );
+      }
+      
+      /* 3D Presets */
+      .perspective-1000 {
+        perspective: 1000px;
+      }
+      .preserve-3d {
+        transform-style: preserve-3d;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@mediapipe/tasks-vision": "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/+esm"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
