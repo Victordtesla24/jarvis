@@ -2,7 +2,7 @@ import React, { useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import ReactorCore from './components/ReactorCore';
-import TelemetryHUD from './components/TelemetryHUD';
+import JarvisHUD from './components/JarvisHUD';
 import JarvisIntro from './components/JarvisIntro';
 import { useStats, pct01 } from './hooks/useStats';
 
@@ -100,8 +100,8 @@ const App: React.FC = () => {
         </Canvas>
       </div>
 
-      {/* Holographic telemetry HUD (HTML overlay, real /api/stats) */}
-      <TelemetryHUD stats={stats} />
+      {/* JARVIS-3.0 desktop HUD (NeoCore-based, real /api/stats) */}
+      <JarvisHUD stats={stats} />
     </div>
   );
 };
