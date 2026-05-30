@@ -1,0 +1,326 @@
+/* ==================== DEVICE INTELLIGENCE PANEL ==================== */
+.device-panel {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) translateY(180px);
+    width: 300px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.8s
+}
+
+.device-panel.show { opacity: 1 }
+
+.device-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px
+}
+
+.device-item {
+    padding: 4px 6px;
+    background: rgba(0, 212, 255, 0.04);
+    border: 1px solid rgba(0, 212, 255, 0.08)
+}
+
+.device-item-label { opacity: 0.4; letter-spacing: 1px; margin-bottom: 2px }
+.device-item-val { color: var(--green); word-break: break-all }
+
+/* ==================== CRYPTO TICKER ==================== */
+.crypto-ticker {
+    position: absolute;
+    bottom: 6px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    z-index: 55;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    opacity: 0;
+    transition: opacity 0.8s
+}
+
+.crypto-ticker.show { opacity: 0.7 }
+
+.crypto-item { display: flex; gap: 6px; align-items: center }
+.crypto-name { opacity: 0.5 }
+.crypto-price { color: var(--green) }
+.crypto-change.up { color: var(--green) }
+.crypto-change.down { color: var(--red) }
+
+/* ==================== WORLD CLOCK ==================== */
+.world-clock-panel {
+    position: absolute;
+    bottom: 30px; left: 50%;
+    transform: translateX(-50%) translateX(250px);
+    width: 160px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.8s, transform 0.8s
+}
+
+.world-clock-panel.show { opacity: 1 }
+
+.wclock-row {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.06)
+}
+
+.wclock-city { opacity: 0.5; letter-spacing: 1px }
+.wclock-time { color: #fff }
+
+/* ==================== TIMER DISPLAY ==================== */
+.timer-display {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) translateY(-150px);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 42px;
+    font-weight: 900;
+    text-shadow: 0 0 30px var(--cyan);
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.5s
+}
+
+.timer-display.active { opacity: 1 }
+
+.timer-label {
+    font-size: 10px;
+    text-align: center;
+    letter-spacing: 4px;
+    opacity: 0.5;
+    margin-top: 5px
+}
+
+/* ==================== REMINDER DISPLAY ==================== */
+.reminder-display {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.15), rgba(255, 170, 0, 0.1));
+    border: 2px solid var(--gold);
+    border-radius: 12px;
+    padding: 30px 50px;
+    font-family: 'Orbitron', sans-serif;
+    text-align: center;
+    z-index: 200;
+    pointer-events: none;
+    opacity: 0;
+    transition: all 0.4s ease;
+    box-shadow: 0 0 40px rgba(255, 170, 0, 0.3), inset 0 0 30px rgba(0, 212, 255, 0.1)
+}
+
+.reminder-display.active {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+    animation: reminder-pulse 1s ease-in-out infinite
+}
+
+@keyframes reminder-pulse {
+    0%, 100% { box-shadow: 0 0 40px rgba(255, 170, 0, 0.3), inset 0 0 30px rgba(0, 212, 255, 0.1) }
+    50% { box-shadow: 0 0 60px rgba(255, 170, 0, 0.5), inset 0 0 40px rgba(0, 212, 255, 0.2) }
+}
+
+.reminder-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+    animation: bell-ring 0.5s ease-in-out infinite
+}
+
+@keyframes bell-ring {
+    0%, 100% { transform: rotate(0deg) }
+    25% { transform: rotate(15deg) }
+    75% { transform: rotate(-15deg) }
+}
+
+.reminder-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 0 20px var(--gold);
+    max-width: 400px;
+    line-height: 1.4
+}
+
+.reminder-label {
+    font-size: 10px;
+    text-align: center;
+    letter-spacing: 4px;
+    opacity: 0.6;
+    margin-top: 15px;
+    color: var(--gold)
+}
+
+/* ==================== REMINDER INDICATOR ==================== */
+.reminder-indicator {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid var(--cyan);
+    border-radius: 8px;
+    padding: 8px 15px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    z-index: 90;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease
+}
+
+.reminder-indicator:hover {
+    background: rgba(0, 212, 255, 0.2);
+    border-color: var(--gold)
+}
+
+.reminder-indicator.active {
+    display: flex
+}
+
+.reminder-count {
+    background: var(--gold);
+    color: #000;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: bold;
+    font-size: 12px
+}
+
+.reminder-indicator-label {
+    color: var(--cyan);
+    letter-spacing: 2px
+}
+
+/* ==================== SETTINGS PANEL ==================== */
+.settings-panel {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 360px;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s
+}
+.settings-panel.show { opacity: 1; pointer-events: auto }
+
+.settings-grid { display: flex; flex-direction: column; gap: 12px }
+
+.settings-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px
+}
+
+.settings-label { flex: 1; opacity: 0.8 }
+
+.settings-toggle { position: relative; width: 40px; height: 20px; display: inline-block }
+.settings-toggle input { opacity: 0; width: 0; height: 0 }
+.toggle-slider {
+    position: absolute; cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid var(--cyan-dim);
+    border-radius: 10px;
+    transition: 0.3s
+}
+.toggle-slider::before {
+    content: ''; position: absolute;
+    width: 14px; height: 14px;
+    left: 2px; bottom: 2px;
+    background: var(--cyan-dim);
+    border-radius: 50%;
+    transition: 0.3s
+}
+.settings-toggle input:checked + .toggle-slider { background: rgba(0, 212, 255, 0.3); border-color: var(--cyan) }
+.settings-toggle input:checked + .toggle-slider::before { transform: translateX(20px); background: var(--cyan) }
+
+.settings-select {
+    background: rgba(0, 15, 25, 0.9);
+    color: var(--cyan);
+    border: 1px solid var(--cyan-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    padding: 4px 8px;
+    letter-spacing: 1px;
+    cursor: pointer
+}
+.settings-select option { background: #020608; color: var(--cyan) }
+
+.settings-slider {
+    -webkit-appearance: none;
+    width: 100px;
+    height: 4px;
+    background: var(--cyan-dim);
+    border-radius: 2px;
+    outline: none
+}
+.settings-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    background: var(--cyan);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 6px var(--cyan)
+}
+.settings-val { font-family: 'Share Tech Mono', monospace; font-size: 10px; min-width: 30px; text-align: right }
+
+#settings-close {
+    background: none; border: none; color: var(--cyan);
+    cursor: pointer; font-size: 12px; font-family: 'Share Tech Mono', monospace
+}
+
+/* ==================== NOTIFICATION HISTORY PANEL ==================== */
+.notif-history-panel {
+    position: fixed;
+    top: 50%; right: 30px;
+    transform: translateY(-50%);
+    width: 320px;
+    max-height: 60vh;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s
+}
+.notif-history-panel.show { opacity: 1; pointer-events: auto }
+
+.notif-history-list {
+    max-height: 45vh;
+    overflow-y: auto;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    line-height: 1.8
+}
+
+.notif-history-list::-webkit-scrollbar { width: 3px }
+.notif-history-list::-webkit-scrollbar-thumb { background: var(--cyan-dim) }
+
+.notif-history-item {
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.06)
+}
+
+.notif-history-item .notif-time { opacity: 0.4; margin-right: 6px }
+.notif-history-item.warn { color: var(--gold) }
+.notif-history-item.error { color: var(--red) }
+
+#notif-history-close {
+    background: none; border: none; color: var(--cyan);
+    cursor: pointer; font-size: 12px; font-family: 'Share Tech Mono', monospace
+}

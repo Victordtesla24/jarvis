@@ -1,0 +1,260 @@
+/* ==================== MATRIX RAIN ==================== */
+#matrix-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.06
+}
+
+/* ==================== HUD MOUSE RETICLE ==================== */
+.hud-reticle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 999;
+    mix-blend-mode: screen;
+    display: none
+}
+
+.hud-reticle.active { display: block }
+
+.reticle-ring {
+    position: absolute;
+    border: 1px solid rgba(0, 212, 255, 0.35);
+    border-radius: 50%;
+    transform: translate(-50%, -50%)
+}
+
+.reticle-ring.outer { width: 60px; height: 60px; animation: reticle-spin 4s linear infinite }
+
+.reticle-ring.mid {
+    width: 40px; height: 40px;
+    border-style: dashed;
+    border-color: rgba(0, 212, 255, 0.2);
+    animation: reticle-spin 3s linear infinite reverse
+}
+
+.reticle-ring.inner { width: 20px; height: 20px; border-width: 2px; border-color: rgba(0, 212, 255, 0.5) }
+
+.reticle-cross { position: absolute; transform: translate(-50%, -50%) }
+
+.reticle-cross::before,
+.reticle-cross::after { content: ''; position: absolute; background: rgba(0, 212, 255, 0.25) }
+
+.reticle-cross::before { width: 1px; height: 20px; left: 0; top: -10px }
+.reticle-cross::after { width: 20px; height: 1px; left: -10px; top: 0 }
+
+.reticle-dot {
+    position: absolute;
+    width: 3px; height: 3px;
+    background: var(--cyan);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 6px var(--cyan)
+}
+
+.reticle-coords {
+    position: absolute;
+    top: 22px; left: 22px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    color: rgba(0, 212, 255, 0.35);
+    letter-spacing: 1px;
+    white-space: nowrap
+}
+
+@keyframes reticle-spin {
+    100% { transform: translate(-50%, -50%) rotate(360deg) }
+}
+
+/* ==================== THEME MODES ==================== */
+body.theme-combat {
+    --cyan: #ff003c;
+    --cyan-dim: rgba(255, 0, 60, 0.3);
+    --cyan-glow: rgba(255, 0, 60, 0.6);
+    --green: #ff6600;
+    --gold: #ff4444
+}
+
+body.theme-stealth {
+    --cyan: #00ff66;
+    --cyan-dim: rgba(0, 255, 102, 0.3);
+    --cyan-glow: rgba(0, 255, 102, 0.6);
+    --green: #00ff66;
+    --gold: #228800;
+    --red: #ff4400
+}
+
+body.theme-custom {
+    /* Custom theme inherits CSS variables set inline via JS */
+}
+
+body.theme-combat .scanlines { opacity: 0.7 }
+body.theme-stealth .scanlines { opacity: 0.3 }
+body.theme-stealth #matrix-canvas { opacity: 0.12 }
+body.theme-combat #matrix-canvas { opacity: 0.03 }
+
+/* ==================== 3D GLOBE PANEL ==================== */
+.globe-panel {
+    position: absolute;
+    bottom: 30px;
+    left: 260px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.8s, transform 0.8s;
+    transform: translateY(40px)
+}
+
+.globe-panel.show { opacity: 1; transform: none }
+
+.globe-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    text-align: center;
+    opacity: 0.5;
+    letter-spacing: 2px;
+    margin-top: 4px
+}
+
+/* ==================== SCREEN SHAKE ==================== */
+@keyframes screen-shake {
+    0%, 100% { transform: translate(0) }
+    10% { transform: translate(-4px, 2px) }
+    20% { transform: translate(4px, -2px) }
+    30% { transform: translate(-3px, -3px) }
+    40% { transform: translate(3px, 3px) }
+    50% { transform: translate(-2px, 1px) }
+    60% { transform: translate(2px, -1px) }
+    70% { transform: translate(-1px, 2px) }
+    80% { transform: translate(1px, -1px) }
+    90% { transform: translate(-1px, 0) }
+}
+
+body.shaking { animation: screen-shake 0.4s ease }
+
+/* ==================== POWER SURGE ==================== */
+@keyframes power-surge {
+    0% { opacity: 0 }
+    50% { opacity: 0.12 }
+    100% { opacity: 0 }
+}
+
+.power-surge-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: var(--cyan);
+    z-index: 995;
+    pointer-events: none;
+    opacity: 0
+}
+
+.power-surge-overlay.active { animation: power-surge 0.3s ease }
+
+/* ==================== FLOATING DATA STREAMS ==================== */
+.data-stream-container {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden
+}
+
+.data-stream {
+    position: absolute;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    color: rgba(0, 212, 255, 0.1);
+    writing-mode: vertical-rl;
+    animation: stream-float linear infinite;
+    white-space: nowrap
+}
+
+@keyframes stream-float {
+    0% { transform: translateY(100vh); opacity: 0 }
+    10% { opacity: 1 }
+    90% { opacity: 1 }
+    100% { transform: translateY(-100%); opacity: 0 }
+}
+
+/* ==================== THEME INDICATOR ==================== */
+.theme-indicator {
+    position: absolute;
+    top: 42px; right: 20px;
+    font-size: 8px;
+    letter-spacing: 3px;
+    opacity: 0;
+    z-index: 55;
+    font-family: 'Share Tech Mono', monospace;
+    transition: opacity 0.5s;
+    color: var(--cyan)
+}
+
+.theme-indicator.show { opacity: 1 }
+
+/* ==================== HOLOGRAPHIC GRID FLOOR ==================== */
+.holo-grid {
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 100%; height: 200px;
+    background:
+        linear-gradient(to top, rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+    background-size: 40px 20px;
+    transform: perspective(600px) rotateX(60deg);
+    transform-origin: bottom;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.4
+}
+
+/* ==================== TARGET LOCK ==================== */
+.target-lock {
+    position: fixed;
+    pointer-events: none;
+    z-index: 998;
+    opacity: 0;
+    transition: opacity 0.2s
+}
+
+.target-lock.active { opacity: 1 }
+
+.target-lock-ring {
+    width: 70px; height: 70px;
+    border: 2px solid var(--red);
+    border-radius: 50%;
+    position: absolute;
+    transform: translate(-50%, -50%);
+    animation: lock-pulse 0.5s ease infinite alternate
+}
+
+.target-lock-inner {
+    width: 40px; height: 40px;
+    border: 1px solid var(--red);
+    position: absolute;
+    transform: translate(-50%, -50%) rotate(45deg);
+    animation: lock-rotate 2s linear infinite
+}
+
+@keyframes lock-pulse {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1 }
+    100% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.4 }
+}
+
+@keyframes lock-rotate {
+    100% { transform: translate(-50%, -50%) rotate(405deg) }
+}
+
+.target-lock-label {
+    position: absolute;
+    top: 42px; left: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    color: var(--red);
+    letter-spacing: 2px;
+    white-space: nowrap
+}

@@ -1,0 +1,138 @@
+/* ==================== AI ENGINE — SUGGESTION CHIPS ==================== */
+.jarvis-suggestion-chip {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 6px 16px;
+    background: rgba(0, 170, 255, 0.1);
+    border: 1px solid rgba(0, 170, 255, 0.35);
+    color: var(--cyan, #00aaff);
+    font-family: "Share Tech Mono", monospace;
+    font-size: 11px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    animation: chipIn 0.4s ease;
+}
+
+.jarvis-suggestion-chip:hover {
+    background: rgba(0, 170, 255, 0.22);
+    border-color: rgba(0, 170, 255, 0.7);
+    box-shadow: 0 0 12px rgba(0, 170, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+@keyframes chipIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ==================== SYSTEM REPORT PANEL ==================== */
+.system-report-panel {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.88);
+    z-index: 9999;
+    overflow-y: auto;
+    padding: 40px 20px 20px;
+    animation: panelFadeIn 0.3s ease;
+}
+.system-report-panel.active { display: block; }
+
+@keyframes panelFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.system-report-panel h2 {
+    text-align: center;
+    color: var(--cyan, #00aaff);
+    font-family: "Share Tech Mono", monospace;
+    font-size: 16px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+}
+
+#system-report-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.sys-report-item {
+    background: rgba(0, 20, 40, 0.7);
+    border: 1px solid rgba(0, 170, 255, 0.2);
+    border-radius: 4px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: "Share Tech Mono", monospace;
+    font-size: 12px;
+    transition: border-color 0.2s;
+}
+
+.sys-report-item:hover { border-color: rgba(0, 170, 255, 0.5); }
+
+.sys-report-status {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.sys-ok .sys-report-status   { background: #00ff88; box-shadow: 0 0 6px #00ff88; }
+.sys-warn .sys-report-status { background: #ffaa00; box-shadow: 0 0 6px #ffaa00; }
+.sys-crit .sys-report-status { background: #ff3355; box-shadow: 0 0 6px #ff3355; }
+.sys-unknown .sys-report-status { background: #666; box-shadow: 0 0 6px #666; }
+
+.sys-report-name {
+    color: #ccc;
+    flex: 1;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.sys-report-detail {
+    color: #888;
+    font-size: 11px;
+    text-align: right;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#system-report-summary {
+    text-align: center;
+    margin: 20px auto 0;
+    max-width: 900px;
+    color: var(--cyan, #00aaff);
+    font-family: "Share Tech Mono", monospace;
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+
+#system-report-close {
+    position: absolute;
+    top: 12px; right: 20px;
+    background: none;
+    border: 1px solid rgba(255, 51, 85, 0.4);
+    color: #ff3355;
+    font-family: "Share Tech Mono", monospace;
+    font-size: 12px;
+    padding: 4px 14px;
+    cursor: pointer;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+}
+#system-report-close:hover {
+    background: rgba(255, 51, 85, 0.15);
+    border-color: #ff3355;
+}

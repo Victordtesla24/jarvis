@@ -1,0 +1,272 @@
+/* ==================== DIAGNOSTIC OVERLAY ==================== */
+.diag-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 900;
+    background: rgba(0, 5, 10, 0.92);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px)
+}
+.diag-overlay.active { display: flex }
+
+.diag-title {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 6px;
+    margin-bottom: 30px;
+    text-shadow: 0 0 20px var(--cyan)
+}
+
+.diag-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 200px);
+    gap: 12px;
+    margin-bottom: 30px
+}
+
+.diag-cell {
+    background: rgba(0, 20, 35, 0.8);
+    border: 1px solid rgba(0, 212, 255, 0.15);
+    padding: 12px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s
+}
+.diag-cell.scanning { border-color: var(--gold); animation: diag-scan-pulse 0.8s infinite alternate }
+.diag-cell.pass { border-color: var(--green) }
+.diag-cell.fail { border-color: var(--red) }
+.diag-cell.warn { border-color: var(--gold) }
+
+@keyframes diag-scan-pulse {
+    0% { box-shadow: inset 0 0 10px rgba(255, 170, 0, 0.1) }
+    100% { box-shadow: inset 0 0 20px rgba(255, 170, 0, 0.3) }
+}
+
+.diag-cell-label { font-size: 9px; letter-spacing: 2px; margin-bottom: 6px; opacity: 0.6 }
+.diag-cell-value { font-family: 'Share Tech Mono', monospace; font-size: 13px; font-weight: 700 }
+.diag-cell-icon { font-size: 18px; margin-bottom: 8px }
+
+.diag-cell .scan-bar {
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2px; width: 0;
+    background: var(--cyan);
+    transition: width 0.5s
+}
+.diag-cell.scanning .scan-bar { animation: scan-fill 1.5s ease forwards }
+
+@keyframes scan-fill {
+    0% { width: 0 }
+    100% { width: 100% }
+}
+
+.diag-progress-text {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    margin-top: 15px;
+    opacity: 0.8
+}
+
+.diag-close {
+    margin-top: 20px;
+    padding: 10px 30px;
+    background: transparent;
+    border: 1px solid var(--cyan-dim);
+    cursor: pointer;
+    font-size: 10px;
+    letter-spacing: 3px;
+    transition: 0.3s
+}
+.diag-close:hover { border-color: var(--cyan); box-shadow: 0 0 15px var(--cyan-dim) }
+
+/* ==================== HEALTH MATRIX ==================== */
+.health-matrix {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    margin-top: 8px
+}
+
+.health-cell {
+    height: 20px;
+    background: rgba(0, 212, 255, 0.08);
+    border: 1px solid rgba(0, 212, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 7px;
+    letter-spacing: 1px;
+    font-family: 'Share Tech Mono', monospace;
+    transition: 0.5s;
+    position: relative;
+    overflow: hidden
+}
+
+.health-cell.ok { background: rgba(0, 255, 204, 0.15); border-color: rgba(0, 255, 204, 0.3); color: var(--green) }
+.health-cell.warn { background: rgba(255, 170, 0, 0.15); border-color: rgba(255, 170, 0, 0.3); color: var(--gold) }
+.health-cell.crit { background: rgba(255, 0, 60, 0.15); border-color: rgba(255, 0, 60, 0.3); color: var(--red) }
+
+.health-cell.scanning-cell::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3), transparent);
+    animation: cell-scan 1.5s ease infinite
+}
+
+@keyframes cell-scan {
+    0% { left: -100% }
+    100% { left: 100% }
+}
+
+/* ==================== NETWORK INTEL PANEL ==================== */
+.mid-left-panel {
+    top: 50%; left: 30px;
+    width: 220px;
+    transform: translateX(-40px) translateY(-50%)
+}
+
+/* Panel Collapse */
+.panel-collapse-btn {
+    background: none; border: 1px solid var(--cyan-dim); color: var(--cyan);
+    font-size: 8px; cursor: pointer; padding: 1px 5px; margin-left: auto;
+    font-family: 'Share Tech Mono', monospace; letter-spacing: 1px;
+    transition: 0.3s; opacity: 0.6; line-height: 1;
+}
+.panel-collapse-btn:hover { opacity: 1; border-color: var(--cyan); box-shadow: 0 0 8px var(--cyan-dim) }
+.panel-collapse-btn.collapsed { transform: rotate(-90deg) }
+.panel-title { display: flex; align-items: center; gap: 6px }
+.panel-collapsible { transition: max-height 0.4s ease, opacity 0.3s ease; max-height: 800px; opacity: 1; overflow: hidden }
+.panel-collapsible.collapsed { max-height: 0; opacity: 0; margin: 0; padding: 0 }
+
+.net-intel-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.06);
+    font-family: 'Share Tech Mono', monospace
+}
+
+.net-intel-label { opacity: 0.5; letter-spacing: 1px }
+.net-intel-val { text-align: right }
+
+/* Sparkline */
+.sparkline-wrap { margin-top: 8px }
+.sparkline-label { font-size: 8px; letter-spacing: 1px; opacity: 0.4; margin-bottom: 3px }
+.sparkline-canvas { display: block; width: 100%; height: 30px }
+
+/* ==================== PROCESS MONITOR ==================== */
+.mid-right-panel {
+    top: 50%; right: 30px;
+    width: 220px;
+    transform: translateX(40px) translateY(-50%)
+}
+
+.proc-list {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    line-height: 1.6
+}
+
+.proc-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(0, 212, 255, 0.05)
+}
+
+.proc-name { opacity: 0.8; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.proc-cpu { color: var(--green); width: 35px; text-align: right }
+.proc-mem { width: 40px; text-align: right; opacity: 0.6 }
+
+/* ==================== CIRCULAR GAUGE ==================== */
+.gauge-row { display: flex; gap: 12px; justify-content: center; margin-top: 10px }
+.gauge-wrap { text-align: center }
+.gauge-canvas { display: block }
+.gauge-label { font-size: 7px; letter-spacing: 1px; opacity: 0.5; margin-top: 3px }
+
+/* ==================== SECURITY SCANNER ==================== */
+.security-panel {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(0, 212, 255, 0.1)
+}
+
+.sec-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px;
+    padding: 3px 0;
+    font-family: 'Share Tech Mono', monospace
+}
+
+.sec-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0
+}
+.sec-dot.ok { background: var(--green); box-shadow: 0 0 4px var(--green) }
+.sec-dot.warn { background: var(--gold); box-shadow: 0 0 4px var(--gold) }
+.sec-dot.fail { background: var(--red); box-shadow: 0 0 4px var(--red) }
+.sec-dot.scanning { background: var(--cyan); animation: blink 0.5s infinite alternate }
+
+/* ==================== UPTIME & SYSTEM COUNTERS ==================== */
+.uptime-bar {
+    display: flex;
+    gap: 15px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    justify-content: center;
+    margin-top: 6px
+}
+.uptime-segment { text-align: center }
+.uptime-num { font-size: 16px; font-weight: 700; color: #fff; text-shadow: 0 0 8px var(--cyan) }
+.uptime-label { font-size: 7px; letter-spacing: 1px; opacity: 0.4; margin-top: 2px }
+
+/* ==================== AUTO-SCAN INDICATOR ==================== */
+.auto-scan-indicator {
+    position: absolute;
+    top: 42px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 8px;
+    letter-spacing: 3px;
+    opacity: 0;
+    z-index: 55;
+    font-family: 'Share Tech Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.3s
+}
+.auto-scan-indicator.active { opacity: 1 }
+
+.scan-spinner {
+    width: 8px; height: 8px;
+    border: 1px solid var(--cyan);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin-fast 0.6s linear infinite
+}
+
+@keyframes spin-fast {
+    100% { transform: rotate(360deg) }
+}
+
+/* Integrity hash display */
+.integrity-hash {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    opacity: 0.3;
+    margin-top: 6px;
+    word-break: break-all;
+    letter-spacing: 0.5px
+}

@@ -1,0 +1,96 @@
+/* ==================== BASE / VARIABLES / BACKGROUND ==================== */
+:root {
+    --cyan: #00d4ff;
+    --cyan-dim: rgba(0, 212, 255, 0.3);
+    --cyan-glow: rgba(0, 212, 255, 0.6);
+    --gold: #ffaa00;
+    --red: #ff003c;
+    --green: #00ffcc;
+    --bg: #020608;
+    --panel-bg: rgba(0, 15, 25, 0.7);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Orbitron', sans-serif;
+    color: var(--cyan);
+    user-select: none
+}
+
+body {
+    background: var(--bg);
+    height: 100vh;
+    overflow: hidden;
+    position: relative
+}
+
+/* PARTICLE CANVAS */
+#particle-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none
+}
+
+/* HEX GRID */
+.hex-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='52'%3E%3Cpolygon points='30,2 58,15 58,37 30,50 2,37 2,15' fill='none' stroke='rgba(0,212,255,0.04)' stroke-width='0.5'/%3E%3C/svg%3E");
+    z-index: 0;
+    pointer-events: none
+}
+
+/* SCANLINES + VIGNETTE */
+.scanlines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(18, 16, 16, 0)50%, rgba(0, 0, 0, 0.15)50%), linear-gradient(90deg, rgba(255, 0, 0, 0.04), rgba(0, 255, 0, 0.015), rgba(0, 0, 255, 0.04));
+    background-size: 100% 3px, 3px 100%;
+    z-index: 998;
+    pointer-events: none;
+    opacity: 0.5
+}
+
+.vignette {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.7)100%);
+    z-index: 997;
+    pointer-events: none
+}
+
+/* SCAN LINE SWEEP */
+.scan-sweep {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: linear-gradient(to bottom, transparent, var(--cyan-glow), transparent);
+    z-index: 996;
+    pointer-events: none;
+    opacity: 0;
+    animation: scan-down 8s linear infinite 5s
+}
+
+@keyframes scan-down {
+    0% { top: 0; opacity: 0 }
+    5% { opacity: 0.6 }
+    95% { opacity: 0.6 }
+    100% { top: 100%; opacity: 0 }
+}

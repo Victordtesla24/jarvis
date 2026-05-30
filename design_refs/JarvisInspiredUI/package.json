@@ -1,0 +1,38 @@
+{
+  "name": "jarvis",
+  "version": "1.0.0",
+  "description": "J.A.R.V.I.S. MARK VII HUD",
+  "main": "jarvis-main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable"
+  },
+  "build": {
+    "appId": "com.stark.jarvis",
+    "productName": "J.A.R.V.I.S.",
+    "artifactName": "JARVIS-${version}.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "jarvis-main.js",
+      "preload.js",
+      "css/**/*",
+      "js/**/*",
+      "icons/**/*",
+      "manifest.json",
+      "sw.js"
+    ],
+    "win": {
+      "target": "portable",
+      "icon": "icons/icon-256.png"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "png-to-ico": "^3.0.1",
+    "sharp": "^0.34.5"
+  }
+}
