@@ -20,6 +20,7 @@ type Props = {
 }
 
 export default function FlowchartWidget({ content }: Props) {
+  const markerId = `arrowhead-${React.useId()}`
   let data: FlowchartData | null = null
   try {
     const parsed = JSON.parse(content)
@@ -88,7 +89,7 @@ export default function FlowchartWidget({ content }: Props) {
         stroke="var(--neon-cyan)"
         strokeWidth={2}
         fill="none"
-        markerEnd="url(#arrowhead)"
+        markerEnd={`url(#${markerId})`}
         opacity={0.8}
       />
     )
@@ -100,7 +101,7 @@ export default function FlowchartWidget({ content }: Props) {
     <svg width="100%" height={viewHeight} className="widget-svg">
       <defs>
         <marker
-          id="arrowhead"
+          id={markerId}
           markerWidth={8}
           markerHeight={8}
           refX={6}

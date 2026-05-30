@@ -8,7 +8,7 @@ import { HandTrackingState, RegionName } from '../types';
 
 interface HolographicEarthProps {
   handTrackingRef: React.MutableRefObject<HandTrackingState>;
-  setRegion: (region: RegionName) => void;
+  setRegion?: (region: RegionName) => void;
 }
 
 // --- Tactical Terrain Component (Iron Man HUD Style) ---
@@ -418,11 +418,11 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
         const normalizedRotation = rotationY < 0 ? rotationY + Math.PI * 2 : rotationY;
         const degrees = (normalizedRotation * 180) / Math.PI;
         
-        if (degrees > 30 && degrees < 100) setRegion(RegionName.AMERICAS);
-        else if (degrees >= 100 && degrees < 190) setRegion(RegionName.PACIFIC);
-        else if (degrees >= 190 && degrees < 280) setRegion(RegionName.ASIA);
-        else if (degrees >= 280 && degrees < 330) setRegion(RegionName.AFRICA);
-        else setRegion(RegionName.EUROPE);
+        if (degrees > 30 && degrees < 100) setRegion?.(RegionName.AMERICAS);
+        else if (degrees >= 100 && degrees < 190) setRegion?.(RegionName.PACIFIC);
+        else if (degrees >= 190 && degrees < 280) setRegion?.(RegionName.ASIA);
+        else if (degrees >= 280 && degrees < 330) setRegion?.(RegionName.AFRICA);
+        else setRegion?.(RegionName.EUROPE);
     }
   });
 

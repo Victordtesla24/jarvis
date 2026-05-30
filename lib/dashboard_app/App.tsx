@@ -7,7 +7,7 @@ import JarvisHUD from './components/JarvisHUD';
 import JarvisIntro from './components/JarvisIntro';
 import VideoFeed from './components/VideoFeed';
 import { useStats, pct01 } from './hooks/useStats';
-import { HandTrackingState, RegionName } from './types';
+import { HandTrackingState } from './types';
 
 const App: React.FC = () => {
   const [booted, setBooted] = useState(() => {
@@ -30,7 +30,6 @@ const App: React.FC = () => {
   // OPTIONAL: if getUserMedia is denied the ref simply stays all-null and every
   // consumer falls back to its ambient idle animation (never freezes, no crash).
   const handTrackingRef = useRef<HandTrackingState>({ leftHand: null, rightHand: null });
-  const regionRef = useRef<RegionName>(RegionName.AMERICAS);
   const handleTrackingUpdate = useCallback((s: HandTrackingState) => {
     handTrackingRef.current = s;
   }, []);
@@ -129,7 +128,7 @@ const App: React.FC = () => {
         >
           <Suspense fallback={null}>
             {globeMode
-              ? <HolographicEarth handTrackingRef={handTrackingRef} setRegion={(r) => { regionRef.current = r; }} />
+              ? <HolographicEarth handTrackingRef={handTrackingRef} />
               : <ReactorCore load={load} handTrackingRef={handTrackingRef} />}
           </Suspense>
         </Canvas>
