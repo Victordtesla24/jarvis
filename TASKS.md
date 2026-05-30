@@ -48,7 +48,9 @@ behavior confirmed). Commit refs in `()`.
 - [x] Click-through `setIgnoreMouseEvents(true,{forward:true})` — only `[data-interactive]` regions capture mouse (`preload.js`)
 - [x] three.js `alpha:true` + `setClearColor(0x000000,0)`; `body.transparent` auto-enabled in-app
 - [x] `jarvis dashboard` launches the window (no browser; `--browser` is the web fallback); `npm run dist` packages the `.app`
-  - ⏳ Live GUI confirmation pending a desktop session (headless dev box); notarization = SC8 (needs Apple Developer ID)
+  - Packaging + notarization wired (SC8): hardened runtime + `build/entitlements.mac.plist`; `dmg` target; `afterSign` hook (`build/notarize.js`) notarizes when an Apple Developer ID is in the env and skips gracefully (local-unsigned) otherwise; `@electron/notarize` dep
+  - `jarvis dashboard` now prefers the packaged `.app` (`dist/mac*` or `/Applications`) over dev Electron; the CLI launches with the packaged app alone (no dev install needed)
+  - ⏳ Live GUI confirmation + a live notarized build pending a desktop session with an Apple Developer ID (headless dev box)
 
 ### P1 — Marvel FUI visuals (PRD R13, SC6) ✅
 - [x] Selective UnrealBloom on glowing lines (two-composer bloom layer + mix pass)

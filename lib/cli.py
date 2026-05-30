@@ -266,12 +266,12 @@ def dashboard_command(args):
             console.print(f"[red]Could not start dashboard: {e}[/red]")
         return
 
-    if not dashboard.find_electron():
+    if not (dashboard.find_packaged_app() or dashboard.find_electron()):
         console.print(
             Panel(
-                "[bold yellow]Electron shell not installed[/bold yellow]\n"
-                "The floating dashboard app needs Electron. Install it once:\n"
-                "  [cyan]cd lib/dashboard_app && npm install[/cyan]\n"
+                "[bold yellow]Dashboard app not available[/bold yellow]\n"
+                "Build the packaged .app: [cyan]cd lib/dashboard_app && npm install && npm run dist[/cyan]\n"
+                "Or run it under dev Electron: [cyan]cd lib/dashboard_app && npm install[/cyan]\n"
                 "Or view the HUD in a browser: [cyan]jarvis dashboard --browser[/cyan]",
                 border_style="yellow",
             )
