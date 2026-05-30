@@ -2,3 +2,6 @@ node_modules/
 dist/
 *.task
 .DS_Store
+
+# Transient verification screenshots written by _verify.mjs
+_verify_*.png

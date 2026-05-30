@@ -93,7 +93,7 @@ body.in-app, body.in-app #root, body.in-app .app-substrate{ background:transpare
 .jh-wave-bars{display:flex;align-items:center;justify-content:center;gap:3px;height:38px}
 .jh-wave-bars span{width:3px;height:100%;transform-origin:center;border-radius:2px;
   background:linear-gradient(180deg,var(--neon-cyan),transparent);
-  animation:pulse-listening 1.1s ease-in-out infinite;transform:scaleY(var(--h,.5))}
+  transition:transform .15s linear;transform:scaleY(var(--h,.5))}
 
 /* flowchart panel — scale NeoCore's tall SVG to fit */
 .jh-flow{max-height:215px;overflow:hidden}

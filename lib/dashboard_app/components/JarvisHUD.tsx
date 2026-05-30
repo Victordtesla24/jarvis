@@ -86,6 +86,7 @@ function MonitorWave() {
   // not telemetry). Heights regenerate every 150ms so the bars animate live.
   const [heights, setHeights] = useState<number[]>(() => [...Array(28)].map(() => 0.3 + Math.random() * 0.7));
   useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
     const id = window.setInterval(() => {
       setHeights([...Array(28)].map(() => 0.3 + Math.random() * 0.7));
     }, 150);
