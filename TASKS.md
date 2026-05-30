@@ -3,7 +3,7 @@
 Tracks work against [PRD.md](PRD.md). Checked = done & verified (tests green +
 behavior confirmed). Commit refs in `()`.
 
-- **HEAD:** `d2987cd` · **Tests:** 124 passing · **Daemon:** launchd `com.jarvis.daemon` (running)
+- **HEAD:** `d2987cd` · **Tests:** 166 passing · **Daemon:** launchd `com.jarvis.daemon` (running)
 - **Updated:** 2026-05-30
 
 ---
@@ -67,16 +67,19 @@ behavior confirmed). Commit refs in `()`.
 - [x] Redundant status encoding (colour + shape ●▲■); ≥4.5:1 text contrast; 6 cards above fold
 - [x] Tiered motion timings + `prefers-reduced-motion`
 
-### P3 — Cockpit control panel (PRD R15, SC7)
-- [ ] Guarded toggle (flip cover) → Autopilot ARM/DISARM
-- [ ] Throttle lever (detents) → `safety.bloat_min_age_days`
-- [ ] Rotary knob → `safety.idle_cpu_threshold`
-- [ ] Illuminated pushbuttons → tidy / docker-prune / deep-clean / refresh
-- [ ] Rocker switches → `safety.dry_run`, notify
-- [ ] Annunciator lamps → Mac/VPS health (green/amber/red; blink only on CRITICAL)
-- [ ] Master ENGAGE lever → boot/wake HUD
-- [ ] Switch/cover/lever/knob/button/needle animations (GSAP + spring); Web-Audio click/bleep
-- [ ] Guarded switches / lever-throws = confirm gesture for destructive actions (consequence shown on annunciator)
+### P3 — Cockpit control panel (PRD R15, SC7)  *(implemented; live-desktop confirm pending)*
+- [x] Guarded toggle (flip cover) → Autopilot ARM/DISARM (`set_autopilot`, confirm-gated; scheduler honours `safety.autopilot_armed`)
+- [x] Throttle lever → `safety.bloat_min_age_days` (`set_dormancy_days`, range-validated)
+- [x] Rotary knob → `safety.idle_cpu_threshold` (`set_idle_threshold`, range-validated)
+- [x] Illuminated pushbuttons → tidy / docker-prune / deep-clean / refresh (preview + execute)
+- [x] Rocker switches → `safety.dry_run`, `notifications.enabled`
+- [x] Annunciator lamps → Mac/VPS health (green/amber/red; blink only on CRITICAL)
+- [x] Master ENGAGE lever → full optimisation sweep (`engage`: tidy+prune+deep-clean execute)
+- [x] Cover/lever guard animations (CSS flip covers, armed blink); annunciators reflect live `/api/stats`
+- [x] Guarded switches / lever-throws = confirm gesture for destructive actions (backend rejects without `confirm`)
+- [x] Credential-safe runtime config writer (`config.update_config`) — surgical, comment-preserving, never resolves `${VAR}`
+- [x] Backend allow-list extended + centrally confirm-gated; `tests/test_cockpit.py` (42 tests: backend + static HUD asserts)
+  - ⏳ Skeuomorphic motion polish (GSAP springs, Web-Audio clicks) and live click-through confirm pending a desktop GPU session
 
 ---
 
