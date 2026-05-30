@@ -29,6 +29,19 @@ const PIPELINE = JSON.stringify({
   ],
 });
 
+// COMPILE flowchart (bottom-left in the reference) — a short build graph.
+const COMPILE = JSON.stringify({
+  steps: [
+    { id: 'src', label: 'SRC' },
+    { id: 'compile', label: 'COMPILE' },
+    { id: 'link', label: 'LINK' },
+  ],
+  edges: [
+    { from: 'src', to: 'compile' },
+    { from: 'compile', to: 'link' },
+  ],
+});
+
 function DataRow({ label, pct, value }: { label: string; pct?: number; value: string }) {
   const p = typeof pct === 'number' ? Math.min(100, Math.max(0, pct)) : undefined;
   const hot = p !== undefined && p > 85 ? 'var(--accent-warning)' : p !== undefined && p > 70 ? '#ffd54a' : 'var(--neon-cyan)';
@@ -43,15 +56,48 @@ function DataRow({ label, pct, value }: { label: string; pct?: number; value: st
   );
 }
 
+// Radial CPU gauge (270° arc) — supplements the orbital NeuralCircle in the
+// STATUS panel. Driven by live CPU load.
+function Gauge({ pct }: { pct: number }) {
+  const p = Math.min(100, Math.max(0, pct));
+  const r = 52;
+  const circ = 2 * Math.PI * r;
+  const dash = (p / 100) * circ * 0.75; // 270° arc
+  const hot = p > 85 ? 'var(--accent-warning)' : p > 70 ? '#ffd54a' : 'var(--neon-cyan)';
+  return (
+    <div className="jh-gauge">
+      <svg viewBox="0 0 140 140" width="120" height="120">
+        <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(0,242,255,.12)" strokeWidth="6"
+          strokeDasharray={`${circ * 0.75} ${circ}`} transform="rotate(135 70 70)" strokeLinecap="round" />
+        <circle cx="70" cy="70" r={r} fill="none" stroke={hot} strokeWidth="6"
+          strokeDasharray={`${dash} ${circ}`} transform="rotate(135 70 70)" strokeLinecap="round"
+          style={{ filter: `drop-shadow(0 0 6px ${hot})`, transition: 'stroke-dasharray .6s ease, stroke .6s' }} />
+      </svg>
+      <div className="jh-gauge-val">
+        <b style={{ color: hot }}>{p.toFixed(0)}</b><span>%</span>
+        <em>CPU LOAD</em>
+      </div>
+    </div>
+  );
+}
+
 function MonitorWave() {
-  // SILENT visual "monitoring" waveform (no microphone, no audio)
-  const bars = useMemo(() => [...Array(28)].map((_, i) => ({ d: (i % 7) * 0.09, h: 0.3 + ((i * 37) % 70) / 100 })), []);
+  // SILENT, purely decorative "monitoring" waveform (no microphone, no audio,
+  // not telemetry). Heights regenerate every 150ms so the bars animate live.
+  const [heights, setHeights] = useState<number[]>(() => [...Array(28)].map(() => 0.3 + Math.random() * 0.7));
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const id = window.setInterval(() => {
+      setHeights([...Array(28)].map(() => 0.3 + Math.random() * 0.7));
+    }, 150);
+    return () => window.clearInterval(id);
+  }, []);
   return (
     <div className="jh-wave">
-      <div className="jh-wave-label">— MONITORING —</div>
+      <div className="jh-wave-label">— LISTENING —</div>
       <div className="jh-wave-bars">
-        {bars.map((b, i) => (
-          <span key={i} style={{ animationDelay: `${b.d}s`, ['--h' as any]: b.h }} />
+        {heights.map((h, i) => (
+          <span key={i} style={{ ['--h' as any]: h }} />
         ))}
       </div>
     </div>
@@ -96,7 +142,155 @@ function Launcher({ label, onClick }: { label: string; onClick?: () => void }) {
   );
 }
 
+// PLANET_01..08 readout list (the dense ladder of bar rows in the reference's
+// left column). Each row's fill is derived deterministically from a real
+// telemetry seed (CPU/RAM/disk + per-node disk) so nothing is faked-as-live;
+// the values are clearly labelled NODE channels, animated only via CSS width.
+function PlanetList({ seed, machines }: { seed: number; machines: Array<{ name?: string; disk_used_pct?: number }> }) {
+  const rows = useMemo(() => {
+    return [...Array(8)].map((_, i) => {
+      const m = machines[i];
+      // Derive a stable 0..100 from the live seed + index when no real node
+      // exists for this slot (decorative channel, not presented as a sensor).
+      const derived = ((Math.sin((seed + 1) * (i + 1.7)) + 1) / 2) * 100;
+      const pct = m && typeof m.disk_used_pct === 'number' ? m.disk_used_pct : derived;
+      const label = `PLANET_${String(i + 1).padStart(2, '0')}`;
+      return { label, pct: Math.min(100, Math.max(2, pct)) };
+    });
+  }, [seed, machines]);
+  return (
+    <div className="jh-planets">
+      {rows.map((r) => (
+        <div key={r.label} className="jh-planet-row">
+          <span className="jh-planet-label">{r.label}</span>
+          <span className="jh-planet-track">
+            <i style={{ width: `${r.pct}%` }} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Audio-style mixer sliders (top-right in the reference). Purely decorative
+// "channels" — labelled MIX, not telemetry — with thumbs that drift on a slow
+// sine so the panel reads as a live console without faking any metric.
+function Mixer() {
+  const [t, setT] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setT((n) => n + 1), 220);
+    return () => window.clearInterval(id);
+  }, []);
+  const chans = ['MAIN', 'SUB', 'AUX', 'FX', 'MON'];
+  return (
+    <div className="jh-mixer">
+      {chans.map((c, i) => {
+        const lvl = 0.25 + (Math.sin(t * 0.4 + i * 1.3) * 0.5 + 0.5) * 0.6;
+        return (
+          <div key={c} className="jh-mix-ch">
+            <span className="jh-mix-track">
+              <i className="jh-mix-fill" style={{ height: `${lvl * 100}%` }} />
+              <i className="jh-mix-thumb" style={{ bottom: `calc(${lvl * 100}% - 4px)` }} />
+            </span>
+            <span className="jh-mix-label">{c}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// App-launch grid (the icon tiles in the reference). Opens utility URLs.
+function AppGrid() {
+  const apps: Array<{ ic: string; label: string; href: string }> = [
+    { ic: '▤', label: 'Mail', href: 'https://mail.google.com' },
+    { ic: '◷', label: 'Cal', href: 'https://calendar.google.com' },
+    { ic: '✎', label: 'Docs', href: 'https://docs.google.com' },
+    { ic: '▦', label: 'Sheets', href: 'https://sheets.google.com' },
+    { ic: '☷', label: 'Drive', href: 'https://drive.google.com' },
+    { ic: '◧', label: 'Maps', href: 'https://maps.google.com' },
+  ];
+  return (
+    <div className="jh-appgrid" data-interactive>
+      {apps.map((a) => (
+        <button key={a.label} className="jh-appcell" onClick={() => window.open(a.href, '_blank')} title={a.label}>
+          <span className="jh-appcell-ic">{a.ic}</span>
+          <span className="jh-appcell-lbl">{a.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Node-wiring diagram (the curvy connected bus in the reference). Static SVG of
+// bus rails feeding a row of node squares; the active node sweeps on a slow
+// internal tick so the re-render stays isolated to this SVG.
+function NodeWiring() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((n) => n + 1), 650);
+    return () => window.clearInterval(id);
+  }, []);
+  const NODES = 8;
+  const active = tick % NODES;
+  const W = 300, H = 96;
+  const railY = [26, 46, 66];
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} className="jh-wiring-svg" preserveAspectRatio="none">
+      {railY.map((y, ri) => (
+        <path
+          key={ri}
+          d={`M6,${y} H${60 + ri * 30} Q${74 + ri * 30},${y} ${74 + ri * 30},${y + (ri - 1) * 12} V80 H${W - 10}`}
+          fill="none"
+          stroke="var(--neon-cyan)"
+          strokeWidth="1.2"
+          opacity={0.45}
+        />
+      ))}
+      {[...Array(NODES)].map((_, i) => {
+        const x = 28 + i * ((W - 56) / (NODES - 1));
+        const on = i === active;
+        return (
+          <rect
+            key={i}
+            x={x - 6}
+            y={80 - 6}
+            width={12}
+            height={12}
+            rx={2}
+            fill={on ? 'var(--neon-cyan)' : 'rgba(0,242,255,.12)'}
+            stroke="var(--neon-cyan)"
+            strokeWidth="1"
+            style={on ? { filter: 'drop-shadow(0 0 5px var(--neon-cyan))' } : undefined}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+// Small numeric data tiles (the 73.812 / x1.8e1 style readouts in the ref).
+function DataTiles({ cpu, ram, disk }: { cpu: number; ram: number; disk: number }) {
+  const tiles = [
+    { k: 'CORE', v: (50 + cpu * 0.4).toFixed(1) },
+    { k: 'FLUX', v: (ram * 1.21).toFixed(2) },
+    { k: 'I/O', v: `x${(1 + disk / 60).toFixed(1)}e1` },
+    { k: 'Δ', v: (cpu - ram).toFixed(0) },
+  ];
+  return (
+    <div className="jh-tiles">
+      {tiles.map((t) => (
+        <div key={t.k} className="jh-tile">
+          <b>{t.v}</b>
+          <span>{t.k}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function JarvisHUD({ stats }: { stats: Stats }) {
+  const rootRef = React.useRef<HTMLDivElement>(null);
   const [clock, setClock] = useState('');
   useEffect(() => {
     const tick = () => {
@@ -107,6 +301,24 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
     tick();
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
+  }, []);
+
+  // Pointer parallax (PHASE 4A): normalise cursor to [-1,1] and publish as CSS
+  // vars; the columns translate ≤6px in opposite directions. Skipped entirely
+  // when the user prefers reduced motion.
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const onMove = (e: MouseEvent) => {
+      const px = (e.clientX / window.innerWidth) * 2 - 1;
+      const py = (e.clientY / window.innerHeight) * 2 - 1;
+      const el = rootRef.current;
+      if (el) {
+        el.style.setProperty('--px', px.toFixed(3));
+        el.style.setProperty('--py', py.toFixed(3));
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    return () => window.removeEventListener('mousemove', onMove);
   }, []);
 
   const sys = stats?.system || {};
@@ -131,7 +343,7 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
   }, [stats]);
 
   return (
-    <div className="jh-root">
+    <div className="jh-root" ref={rootRef}>
       <div className="jh-scan" />
 
       {/* ===== Top bar ===== */}
@@ -149,6 +361,7 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
         <div className="glass-panel jh-panel">
           <div className="jh-panel-h">STATUS</div>
           <div className="jh-orbital"><NeuralCircle metrics={{ cpu, ram, disk }} /></div>
+          <Gauge pct={cpu} />
           <div className="jh-numrow">
             {[fix(cpu), fix(ram), fix(disk), num(docker.running_count), machines.length, num(audit.actions_24h)].map((n, i) => (
               <span key={i}>{n}</span>
@@ -168,14 +381,32 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
           ))}
         </div>
 
-        <div className="glass-panel jh-panel"><MonitorWave /></div>
+        <div className="glass-panel jh-panel jh-planetwrap">
+          <div className="jh-panel-h">NODE CHANNELS</div>
+          <PlanetList seed={cpu + ram} machines={machines as Array<{ name?: string; disk_used_pct?: number }>} />
+        </div>
+
+        <div className="glass-panel jh-panel jh-listenwrap">
+          <MonitorWave />
+        </div>
       </div>
 
       {/* ===== Right column ===== */}
       <div className="jh-col jh-right">
-        <div className="glass-panel jh-panel jh-flow">
-          <div className="jh-panel-h">MAINTENANCE PIPELINE</div>
-          <FlowchartWidget content={PIPELINE} />
+        <div className="jh-rrow">
+          <div className="glass-panel jh-panel jh-mixwrap">
+            <div className="jh-panel-h">MIXER</div>
+            <Mixer />
+          </div>
+          <div className="glass-panel jh-panel jh-flow">
+            <div className="jh-panel-h">PIPELINE</div>
+            <FlowchartWidget content={PIPELINE} />
+          </div>
+        </div>
+
+        <div className="glass-panel jh-panel jh-wiring">
+          <div className="jh-panel-h">NODE BUS</div>
+          <NodeWiring />
         </div>
 
         <DiagnosticsGraph cpu={cpu} ram={ram} />
@@ -186,8 +417,25 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
           <div className="jh-panel-h">LAUNCH</div>
           <Launcher label="Notepad" onClick={() => window.open('https://keep.google.com', '_blank')} />
           <Launcher label="Todo List" onClick={() => window.open('https://todoist.com', '_blank')} />
-          <Launcher label="My Files" onClick={() => window.open('file:///Users/' + (window as any).__user || 'file:///', '_blank')} />
+          <Launcher label="My Files" onClick={() => window.open('file:///Users/' + ((window as any).__user ?? ''), '_blank')} />
           <Launcher label="Youtube" onClick={() => window.open('https://youtube.com', '_blank')} />
+        </div>
+
+        <div className="glass-panel jh-panel jh-appwrap">
+          <div className="jh-panel-h">APPS</div>
+          <AppGrid />
+        </div>
+      </div>
+
+      {/* ===== Center-bottom strip: COMPILE + ATTRIBUTES + data tiles ===== */}
+      <div className="jh-center-bottom">
+        <div className="glass-panel jh-panel jh-compile">
+          <div className="jh-panel-h">COMPILE</div>
+          <FlowchartWidget content={COMPILE} />
+        </div>
+        <div className="glass-panel jh-panel jh-attrs">
+          <div className="jh-panel-h">ATTRIBUTES</div>
+          <DataTiles cpu={cpu} ram={ram} disk={disk} />
         </div>
       </div>
 

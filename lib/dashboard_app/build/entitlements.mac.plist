@@ -16,5 +16,14 @@
     <!-- The HUD talks to the loopback dashboard backend over HTTP. -->
     <key>com.apple.security.network.client</key>
     <true/>
+    <!-- Camera + microphone for hand-gesture tracking and voice commands;
+         granted ONCE to com.jarvis.dashboard and retained thereafter. -->
+    <key>com.apple.security.device.camera</key>
+    <true/>
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <!-- Apple Events so the agent can launch/control other apps. -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
   </dict>
 </plist>

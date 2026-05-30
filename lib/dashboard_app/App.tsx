@@ -1,10 +1,14 @@
-import React, { useState, Suspense } from 'react';
+import React, { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import ReactorCore from './components/ReactorCore';
+import HolographicEarth from './components/HolographicEarth';
 import JarvisHUD from './components/JarvisHUD';
 import JarvisIntro from './components/JarvisIntro';
+import VideoFeed from './components/VideoFeed';
+import GestureDebugOverlay from './components/GestureDebugOverlay';
 import { useStats, pct01 } from './hooks/useStats';
+import { HandTrackingState } from './types';
 
 const App: React.FC = () => {
   const [booted, setBooted] = useState(() => {
@@ -12,24 +16,46 @@ const App: React.FC = () => {
   });
   const [introActive, setIntroActive] = useState(false);
   const [bootStep, setBootStep] = useState(0);
+  // Reactor ↔ holographic-globe centerpiece toggle (top-right control).
+  const [globeMode, setGlobeMode] = useState(false);
 
   // Live JARVIS telemetry (lib/dashboard.py :7327). Polls unconditionally,
   // even during boot, so the reactor is already breathing on reveal.
   const stats = useStats();
   const load = pct01(stats?.system?.cpu_load_pct, 8);
 
-  // Boot Sequence (SILENT — no TTS/audio anywhere).
+  // Shared MediaPipe hand-tracking state. <VideoFeed> drives the camera +
+  // GestureRecognizer and writes the latest two-hand state into this ref every
+  // frame; BOTH the reactor and the globe read it in their own useFrame, so the
+  // same gesture semantics stay live across the Reactor↔Globe toggle. Camera is
+  // OPTIONAL: if getUserMedia is denied the ref simply stays all-null and every
+  // consumer falls back to its ambient idle animation (never freezes, no crash).
+  const handTrackingRef = useRef<HandTrackingState>({ leftHand: null, rightHand: null });
+  const handleTrackingUpdate = useCallback((s: HandTrackingState) => {
+    handTrackingRef.current = s;
+  }, []);
+
+  // Boot Sequence (SILENT — no TTS/audio anywhere). setTimeout IDs are tracked
+  // so we can clear them if the component unmounts or boot is re-triggered.
+  const bootTimersRef = useRef<number[]>([]);
+  const clearBootTimers = () => {
+    bootTimersRef.current.forEach((id) => window.clearTimeout(id));
+    bootTimersRef.current = [];
+  };
+  useEffect(() => clearBootTimers, []);
+
   const startSystem = () => {
+    clearBootTimers();
     setBootStep(1);
-    setTimeout(() => setBootStep(2), 800);
-    setTimeout(() => setBootStep(3), 1800);
-    setTimeout(() => {
+    bootTimersRef.current.push(window.setTimeout(() => setBootStep(2), 800));
+    bootTimersRef.current.push(window.setTimeout(() => setBootStep(3), 1800));
+    bootTimersRef.current.push(window.setTimeout(() => {
       setIntroActive(true);
-      setTimeout(() => {
+      bootTimersRef.current.push(window.setTimeout(() => {
         setIntroActive(false);
         setBooted(true);
-      }, 2800);
-    }, 2500);
+      }, 2800));
+    }, 2500));
   };
 
   // Boot Screen
@@ -52,7 +78,7 @@ const App: React.FC = () => {
 
         {bootStep >= 1 && (
           <div className="z-10 flex flex-col items-center gap-4 w-96">
-            <div className="text-2xl font-display font-bold animate-pulse">
+            <div className="text-2xl font-display font-bold jh-holo-flicker">
               {bootStep === 1 && 'Reactor spin-up...'}
               {bootStep === 2 && 'Loading telemetry bus...'}
               {bootStep === 3 && 'Authenticating...'}
@@ -87,7 +113,14 @@ const App: React.FC = () => {
   // Main HUD
   return (
     <div className="app-substrate relative w-full h-screen bg-black overflow-hidden animate-flash">
-      {/* 3D arc-reactor centerpiece */}
+      {/* Camera mirror — dim background layer. Mounted ONCE (camera-driven) and
+          left mounted across the Reactor↔Globe toggle so hand tracking never
+          re-initialises. If the camera is denied this stays a black element and
+          VideoFeed logs once; gestures simply go idle. */}
+      <VideoFeed onTrackingUpdate={handleTrackingUpdate} />
+
+      {/* 3D centerpiece — arc reactor, or holographic globe when toggled. Both
+          views receive the SAME live handTrackingRef. */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         <Canvas
           camera={{ position: [0, 0, 3.5], fov: 55 }}
@@ -95,13 +128,29 @@ const App: React.FC = () => {
           dpr={[1, 1.25]}
         >
           <Suspense fallback={null}>
-            <ReactorCore load={load} />
+            {globeMode
+              ? <HolographicEarth handTrackingRef={handTrackingRef} />
+              : <ReactorCore load={load} handTrackingRef={handTrackingRef} />}
           </Suspense>
         </Canvas>
       </div>
 
+      {/* Centerpiece toggle (top-right) — Reactor ↔ Holographic globe */}
+      <button
+        type="button"
+        onClick={() => setGlobeMode((g) => !g)}
+        className="jh-globe-toggle"
+        aria-pressed={globeMode}
+      >
+        {globeMode ? '◉ REACTOR' : '🜨 GLOBE'}
+      </button>
+
       {/* JARVIS-3.0 desktop HUD (NeoCore-based, real /api/stats) */}
       <JarvisHUD stats={stats} />
+
+      {/* Live gesture-pipeline proof — reads the SAME handTrackingRef both 3D
+          views consume. Hidden unless ?debug or the corner toggle is active. */}
+      <GestureDebugOverlay handTrackingRef={handTrackingRef} />
     </div>
   );
 };

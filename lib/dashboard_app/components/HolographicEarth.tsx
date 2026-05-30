@@ -5,11 +5,10 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { Points, PointMaterial, Text } from '@react-three/drei';
 import * as random from 'maath/random/dist/maath-random.esm';
 import { HandTrackingState, RegionName } from '../types';
-import { SoundService } from '../services/soundService';
 
 interface HolographicEarthProps {
   handTrackingRef: React.MutableRefObject<HandTrackingState>;
-  setRegion: (region: RegionName) => void;
+  setRegion?: (region: RegionName) => void;
 }
 
 // --- Tactical Terrain Component (Iron Man HUD Style) ---
@@ -350,10 +349,6 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
     if (leftHand) {
       targetExpansion = leftHand.expansionFactor;
 
-      const movementDelta = Math.abs(targetExpansion - smoothExpansionRef.current);
-      if (movementDelta > 0.002) {
-          // SoundService.playServo(movementDelta);
-      }
     }
 
     smoothExpansionRef.current += (targetExpansion - smoothExpansionRef.current) * 0.08;
@@ -382,7 +377,6 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
     // CHANGED: Adjusted sound trigger to match new 50% threshold
     if (exp > 0.55) {
         if (!wasTerrainModeRef.current) {
-            // SoundService.playMapSwitch();
             wasTerrainModeRef.current = true;
         }
     } else {
@@ -424,11 +418,11 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
         const normalizedRotation = rotationY < 0 ? rotationY + Math.PI * 2 : rotationY;
         const degrees = (normalizedRotation * 180) / Math.PI;
         
-        if (degrees > 30 && degrees < 100) setRegion(RegionName.AMERICAS);
-        else if (degrees >= 100 && degrees < 190) setRegion(RegionName.PACIFIC);
-        else if (degrees >= 190 && degrees < 280) setRegion(RegionName.ASIA);
-        else if (degrees >= 280 && degrees < 330) setRegion(RegionName.AFRICA);
-        else setRegion(RegionName.EUROPE);
+        if (degrees > 30 && degrees < 100) setRegion?.(RegionName.AMERICAS);
+        else if (degrees >= 100 && degrees < 190) setRegion?.(RegionName.PACIFIC);
+        else if (degrees >= 190 && degrees < 280) setRegion?.(RegionName.ASIA);
+        else if (degrees >= 280 && degrees < 330) setRegion?.(RegionName.AFRICA);
+        else setRegion?.(RegionName.EUROPE);
     }
   });
 
