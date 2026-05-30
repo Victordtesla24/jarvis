@@ -223,8 +223,14 @@ function AppGrid() {
 }
 
 // Node-wiring diagram (the curvy connected bus in the reference). Static SVG of
-// bus rails feeding a row of node squares; the active node sweeps with `tick`.
-function NodeWiring({ tick }: { tick: number }) {
+// bus rails feeding a row of node squares; the active node sweeps on a slow
+// internal tick so the re-render stays isolated to this SVG.
+function NodeWiring() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTick((n) => n + 1), 650);
+    return () => window.clearInterval(id);
+  }, []);
   const NODES = 8;
   const active = tick % NODES;
   const W = 300, H = 96;
@@ -294,13 +300,6 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
     };
     tick();
     const id = window.setInterval(tick, 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  // Slow bus sweep tick for the node-wiring diagram (decorative).
-  const [wireTick, setWireTick] = useState(0);
-  useEffect(() => {
-    const id = window.setInterval(() => setWireTick((n) => n + 1), 650);
     return () => window.clearInterval(id);
   }, []);
 
@@ -407,7 +406,7 @@ export default function JarvisHUD({ stats }: { stats: Stats }) {
 
         <div className="glass-panel jh-panel jh-wiring">
           <div className="jh-panel-h">NODE BUS</div>
-          <NodeWiring tick={wireTick} />
+          <NodeWiring />
         </div>
 
         <DiagnosticsGraph cpu={cpu} ram={ram} />

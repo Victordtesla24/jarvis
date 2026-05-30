@@ -10,6 +10,7 @@ const VideoFeed: React.FC<VideoFeedProps> = ({ onTrackingUpdate }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const requestRef = useRef<number | null>(null);
   const lastVideoTimeRef = useRef<number>(-1);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -23,6 +24,15 @@ const VideoFeed: React.FC<VideoFeedProps> = ({ onTrackingUpdate }) => {
             facingMode: "user"
           }
         });
+
+        streamRef.current = stream;
+
+        // If we unmounted while awaiting getUserMedia, release the stream immediately.
+        if (!isMounted) {
+          stream.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+          return;
+        }
 
         if (videoRef.current && isMounted) {
           videoRef.current.srcObject = stream;
@@ -140,9 +150,9 @@ const VideoFeed: React.FC<VideoFeedProps> = ({ onTrackingUpdate }) => {
     return () => {
       isMounted = false;
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
       }
     };
   }, [onTrackingUpdate]);
