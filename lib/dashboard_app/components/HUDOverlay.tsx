@@ -338,7 +338,7 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
       {/* Top Left: System Status */}
       <div className="absolute top-8 left-8 z-30 flex flex-col gap-2 animate-pulse-fast">
         <div className="border-l-4 border-holo-cyan pl-4 bg-black/40 p-2 backdrop-blur-sm rounded-r-lg shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-          <h2 className="text-xl font-display font-bold text-white tracking-widest">STARK INDUSTRIES</h2>
+          <h2 className="text-xl font-display font-bold text-white tracking-widest">J.A.R.V.I.S. SYSTEMS</h2>
           <div className="h-[1px] w-32 bg-holo-cyan my-1"></div>
           <div className="text-xs text-holo-blue font-mono opacity-80">MARK VII HUD FIRMWARE V8.0.3</div>
         </div>

@@ -1,7 +1,7 @@
 """JARVIS holographic dashboard & command centre.
 
 A local-only (loopback) HTTP server that exposes JARVIS's live telemetry as
-JSON and serves a Three.js heads-up display styled after the Stark / Iron Man
+JSON and serves a Three.js heads-up display styled after an Iron-Man-style
 command consoles. It runs entirely on the Python standard library — no extra
 runtime dependencies — and the control surface is a tight allow-list so the
 browser can never ask JARVIS to do anything destructive without explicit
@@ -591,22 +591,49 @@ def interpret_command(text: str) -> dict:
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
     ".js": "text/javascript; charset=utf-8",
+    ".mjs": "text/javascript; charset=utf-8",
     ".css": "text/css; charset=utf-8",
     ".json": "application/json; charset=utf-8",
     ".svg": "image/svg+xml",
+    ".mp4": "video/mp4",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".ico": "image/x-icon",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".ttf": "font/ttf",
+    ".map": "application/json",
+    ".wasm": "application/wasm",
 }
 
 
 def _content_type(name: str) -> str:
-    return _CONTENT_TYPES.get(Path(name).suffix, "application/octet-stream")
+    return _CONTENT_TYPES.get(Path(name).suffix.lower(), "application/octet-stream")
 
 
-def _safe_asset_name(path: str) -> str | None:
-    """Map a URL path to a flat filename inside WEB_DIR, blocking traversal."""
-    name = path.lstrip("/")
-    if not name or "/" in name or ".." in name:
+def web_root() -> Path:
+    """Serve the built React app (``dashboard_app/dist``) when present, else the
+    legacy single-file HUD (``dashboard_web``). Lets ``jarvis dashboard`` pick up
+    the SOTA holographic build the moment it has been compiled."""
+    dist = APP_DIR / "dist"
+    return dist if (dist / "index.html").is_file() else WEB_DIR
+
+
+def _resolve_static(path: str) -> Path | None:
+    """Map a URL path to a real file under the web root, blocking traversal.
+    Supports nested asset paths (e.g. ``/assets/index-abc.js``)."""
+    root = web_root().resolve()
+    rel = path.lstrip("/") or "index.html"
+    try:
+        target = (root / rel).resolve()
+    except (OSError, ValueError):
         return None
-    return name
+    if root != target and root not in target.parents:
+        return None  # path traversal attempt
+    return target if target.is_file() else None
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
@@ -626,26 +653,30 @@ class DashboardHandler(BaseHTTPRequestHandler):
     def _send_json(self, status: int, obj) -> None:
         self._send(status, json.dumps(obj), "application/json; charset=utf-8")
 
-    def _serve_asset(self, name: str) -> None:
+    def _serve_file(self, file: Path) -> None:
         try:
-            data = (WEB_DIR / name).read_bytes()
+            data = file.read_bytes()
         except OSError:
             self._send_json(404, {"error": "not found"})
             return
-        self._send(200, data, _content_type(name))
+        self._send(200, data, _content_type(file.name))
 
     def do_GET(self) -> None:  # noqa: N802 (stdlib naming)
         path = self.path.split("?", 1)[0]
-        if path in ("/", "/index.html"):
-            self._serve_asset("index.html")
-        elif path == "/api/stats":
+        if path == "/api/stats":
             self._send_json(200, collect_stats())
-        else:
-            name = _safe_asset_name(path)
-            if name and (WEB_DIR / name).is_file():
-                self._serve_asset(name)
-            else:
-                self._send_json(404, {"error": "not found"})
+            return
+        target = _resolve_static(path)
+        if target is not None:
+            self._serve_file(target)
+            return
+        # SPA fallback: unknown non-API, non-asset path -> index.html
+        if not path.startswith("/api/") and "." not in path.rsplit("/", 1)[-1]:
+            index = web_root() / "index.html"
+            if index.is_file():
+                self._serve_file(index)
+                return
+        self._send_json(404, {"error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?", 1)[0]
@@ -731,7 +762,12 @@ def find_packaged_app() -> str | None:
     environment (``open`` can't forward env vars). ``None`` if no build exists.
     """
     app = f"{APP_PRODUCT_NAME}.app"
-    roots = list((APP_DIR / "dist").glob("mac*")) + list(_INSTALLED_APP_ROOTS)
+    # vite owns dist/, so electron-builder emits the bundle to dist-app/mac*
+    roots = (
+        list((APP_DIR / "dist-app").glob("mac*"))
+        + list((APP_DIR / "dist").glob("mac*"))
+        + list(_INSTALLED_APP_ROOTS)
+    )
     for root in roots:
         exe = root / app / "Contents" / "MacOS" / APP_PRODUCT_NAME
         if exe.exists():

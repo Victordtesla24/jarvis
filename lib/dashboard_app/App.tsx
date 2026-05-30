@@ -35,7 +35,7 @@ const App: React.FC = () => {
   // Boot Screen
   if (!booted && !introActive) {
     return (
-      <div className="relative w-full h-screen bg-black text-holo-cyan font-mono flex flex-col items-center justify-center overflow-hidden">
+      <div className="app-substrate relative w-full h-screen bg-black text-holo-cyan font-mono flex flex-col items-center justify-center overflow-hidden">
         <div className="scanlines opacity-20"></div>
         <div className="absolute w-[600px] h-[600px] border border-gray-800 rounded-full animate-spin-slow opacity-30"></div>
         <div className="absolute w-[400px] h-[400px] border border-dashed border-klein-blue rounded-full animate-spin-reverse-slow opacity-30"></div>
@@ -74,7 +74,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <div className="absolute bottom-8 text-[10px] text-gray-600">Stark Industries Proprietary Technology</div>
+        <div className="absolute bottom-8 text-[10px] text-gray-600">J.A.R.V.I.S. · PROPRIETARY TECHNOLOGY</div>
       </div>
     );
   }
@@ -86,7 +86,7 @@ const App: React.FC = () => {
 
   // Main HUD
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden animate-flash">
+    <div className="app-substrate relative w-full h-screen bg-black overflow-hidden animate-flash">
       {/* 3D arc-reactor centerpiece */}
       <div className="absolute inset-0 z-10 pointer-events-none">
         <Canvas
