@@ -9,14 +9,17 @@
     "dist": "electron-builder --mac"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.3.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.0.0"
   },
   "build": {
     "appId": "com.jarvis.dashboard",
     "productName": "JARVIS",
+    "afterSign": "build/notarize.js",
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "files": [
       "main.js",
@@ -25,8 +28,13 @@
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
+        "dmg",
         "dir"
-      ]
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     }
   }
 }

@@ -46,6 +46,11 @@ APP_DIR = Path(__file__).resolve().parent / "dashboard_app"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 7327  # J-A-R-V on the dialpad
 
+# Bundle name electron-builder emits (must match package.json build.productName).
+APP_PRODUCT_NAME = "JARVIS"
+# Where a packaged .app may be installed system-wide (vs. freshly built in dist/).
+_INSTALLED_APP_ROOTS = (Path("/Applications"),)
+
 MAX_TIDY_TARGETS = 50
 RECENT_LOG_LIMIT = 15
 MAX_BODY_BYTES = 64 * 1024
@@ -375,6 +380,23 @@ def find_electron() -> str | None:
     return shutil.which("electron")
 
 
+def find_packaged_app() -> str | None:
+    """Locate a packaged ``.app``'s executable, if one has been built/installed.
+
+    electron-builder writes the notarized bundle to ``dist/mac*/<name>.app``;
+    a user may also have copied it into ``/Applications``. Returns the inner
+    Mach-O executable so it can be spawned directly with the loopback URL in its
+    environment (``open`` can't forward env vars). ``None`` if no build exists.
+    """
+    app = f"{APP_PRODUCT_NAME}.app"
+    roots = list((APP_DIR / "dist").glob("mac*")) + list(_INSTALLED_APP_ROOTS)
+    for root in roots:
+        exe = root / app / "Contents" / "MacOS" / APP_PRODUCT_NAME
+        if exe.exists():
+            return str(exe)
+    return None
+
+
 def launch_app(
     host: str = DEFAULT_HOST,
     port: int = DEFAULT_PORT,
@@ -382,18 +404,26 @@ def launch_app(
     electron: str | None = None,
     spawn=subprocess.Popen,
 ):
-    """Spawn the Electron HUD shell pointed at the loopback backend.
+    """Spawn the HUD window pointed at the loopback backend.
 
-    The window discovers the backend through ``JARVIS_DASHBOARD_URL`` so no
-    browser is ever opened. Raises ``RuntimeError`` if Electron is unavailable.
+    Prefers the packaged (notarized) ``.app`` when it has been built or
+    installed; otherwise runs the shell directory under a dev Electron. The
+    window discovers the backend through ``JARVIS_DASHBOARD_URL`` so no browser
+    is ever opened. Raises ``RuntimeError`` if neither is available.
     """
+    env = dict(os.environ, JARVIS_DASHBOARD_URL=f"http://{host}:{port}")
+
+    if electron is None:
+        packaged = find_packaged_app()
+        if packaged:
+            return spawn([packaged], env=env)
+
     electron = electron or find_electron()
     if not electron:
         raise RuntimeError(
             "Electron not found. Install the app shell with "
             "`cd lib/dashboard_app && npm install`, or run `jarvis dashboard --browser`."
         )
-    env = dict(os.environ, JARVIS_DASHBOARD_URL=f"http://{host}:{port}")
     return spawn([electron, str(APP_DIR)], env=env)
 
 
