@@ -402,6 +402,190 @@ def run_command_action(action: str, params: dict | None = None) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Voice / natural-language routing — the HUD "LISTENING" loop.
+#
+# Maps a spoken (or typed) phrase to JARVIS's capabilities and returns a short
+# spoken reply. This surface is *read-only by construction*: it only ever runs
+# telemetry reads and dry-run previews, and it NEVER executes a destructive
+# action. A voice request to clean/optimise maps to the safe preview and JARVIS
+# asks the operator to throw the guarded cockpit control — the guard gesture
+# stays the sole confirmation for any deletion (R15/R18). Routing only targets
+# actions already in :data:`ALLOWED_ACTIONS`; it adds no new command surface
+# (R19).
+# --------------------------------------------------------------------------- #
+def _num(value, default: float = 0.0) -> float:
+    """Coerce telemetry numbers, treating ``bool``/``None`` as the default."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    return value
+
+
+def _voice_health(system: dict) -> str:
+    """Worst-of-three vitals severity, matching the HUD's health word."""
+    def sev(v: float, warn: float, bad: float) -> str:
+        return "critical" if v >= bad else "degraded" if v >= warn else "nominal"
+
+    cpu = _num(system.get("cpu_load_pct"))
+    ram = _num((system.get("ram") or {}).get("used_pct"))
+    disk = _num((system.get("disk") or {}).get("used_pct"))
+    rank = {"nominal": 0, "degraded": 1, "critical": 2}
+    return max(
+        (sev(cpu, 70, 88), sev(ram, 75, 90), sev(disk, 80, 92)),
+        key=lambda s: rank[s],
+    )
+
+
+def _voice_reply(
+    intent: str,
+    speech: str,
+    transcript: str,
+    *,
+    action: str | None = None,
+    requires_guard: bool = False,
+    result: dict | None = None,
+) -> dict:
+    return {
+        "ok": True,
+        "intent": intent,
+        "transcript": transcript,
+        "speech": speech,
+        "action": action,
+        "requires_guard": requires_guard,
+        "result": result,
+    }
+
+
+def _voice_status(transcript: str) -> dict:
+    stats = collect_stats()
+    system = stats.get("system") or {}
+    audit = stats.get("audit") or {}
+    if isinstance(system, dict) and system.get("error"):
+        return _voice_reply(
+            "status",
+            "Telemetry is degraded, sir — a sensor has dropped offline.",
+            transcript, action="refresh", result=stats,
+        )
+    cpu = round(_num(system.get("cpu_load_pct")))
+    ram = round(_num((system.get("ram") or {}).get("used_pct")))
+    disk = round(_num((system.get("disk") or {}).get("used_pct")))
+    head = {
+        "nominal": "All systems nominal",
+        "degraded": "Systems running degraded",
+        "critical": "Warning — systems critical",
+    }[_voice_health(system)]
+    freed = audit.get("total_freed_human") or "0 bytes"
+    speech = (
+        f"{head}, sir. CPU load {cpu} percent, memory {ram} percent, "
+        f"disk {disk} percent. I've reclaimed {freed} to date."
+    )
+    return _voice_reply("status", speech, transcript, action="refresh", result=stats)
+
+
+def _voice_preview_cleanup(transcript: str, *, deep: bool) -> dict:
+    out = _deep_clean(execute=False) if deep else _tidy(execute=False)
+    label = "deep clean" if deep else "tidy"
+    action = "deep_clean_execute" if deep else "tidy_execute"
+    count = out.get("count", 0)
+    human = out.get("would_free_human", "0B")
+    if count:
+        noun = "item" if count == 1 else "items"
+        speech = (
+            f"A {label} would reclaim {human} across {count} {noun}, sir. "
+            f"Throw the {label} control in the cockpit to authorise it — "
+            f"deletion stays guarded."
+        )
+    else:
+        speech = f"Nothing to reclaim from a {label} right now, sir — you're already optimal."
+    return _voice_reply(
+        "deep_clean" if deep else "tidy", speech, transcript,
+        action=action, requires_guard=True, result=out,
+    )
+
+
+def _voice_preview_docker(transcript: str) -> dict:
+    out = _docker_prune(execute=False)
+    total = sum(r.get("removed", 0) for r in out.get("results", []))
+    if total:
+        noun = "object" if total == 1 else "objects"
+        speech = (
+            f"A Docker prune would remove {total} reclaimable {noun}, sir. "
+            f"Throw the prune control to authorise it."
+        )
+    else:
+        speech = "Docker is already lean, sir — nothing to prune."
+    return _voice_reply(
+        "docker_prune", speech, transcript,
+        action="docker_prune_execute", requires_guard=True, result=out,
+    )
+
+
+def interpret_command(text: str) -> dict:
+    """Route a natural-language phrase to a JARVIS capability + spoken reply.
+
+    Never deletes: destructive intents resolve to a read-only preview plus an
+    instruction to throw the guarded cockpit control.
+    """
+    transcript = (text or "").strip()
+    low = transcript.lower()
+    if not low:
+        return _voice_reply(
+            "unknown",
+            "I didn't catch that, sir. Try 'status', 'tidy', or 'deep clean'.",
+            transcript,
+        )
+
+    def has(*words: str) -> bool:
+        return any(w in low for w in words)
+
+    if has("what can you", "what can i", "help", "capabilities", "commands"):
+        return _voice_reply(
+            "help",
+            "I can report status, preview a tidy or a deep clean, scan Docker, or "
+            "arm the full optimisation sweep. The destructive steps need you to "
+            "throw the guarded control, sir.",
+            transcript,
+        )
+
+    if has("status", "report", "how are", "how's", "how is", "vitals", "health",
+           "sit rep", "sitrep", "diagnostic", "everything ok", "everything okay"):
+        return _voice_status(transcript)
+
+    if has("deep clean", "deep-clean", "deep", "bloat"):
+        return _voice_preview_cleanup(transcript, deep=True)
+
+    if has("tidy", "clean", "cleanup", "cache", "free up", "free space", "reclaim"):
+        return _voice_preview_cleanup(transcript, deep=False)
+
+    if has("docker", "prune", "container"):
+        return _voice_preview_docker(transcript)
+
+    if has("autopilot", "auto pilot", "auto-pilot"):
+        disarm = has("disarm", "disable", "turn off", "stand down", "stop", " off")
+        verb = "disarm" if disarm else "arm"
+        return _voice_reply(
+            "set_autopilot",
+            f"Toggling autopilot is guarded, sir. To {verb} it, lift the cover on the "
+            f"autopilot toggle in the cockpit and flip it.",
+            transcript, action="set_autopilot", requires_guard=True,
+        )
+
+    if has("engage", "optimi", "full sweep", "sweep", "everything", "go full"):
+        return _voice_reply(
+            "engage",
+            "The master optimisation sweep is a guarded action, sir. Lift the ENGAGE "
+            "cover and throw the lever to authorise the full sweep.",
+            transcript, action="engage", requires_guard=True,
+        )
+
+    return _voice_reply(
+        "unknown",
+        "I didn't catch a command, sir. Try 'status', 'tidy', 'deep clean', or "
+        "'docker prune'.",
+        transcript,
+    )
+
+
+# --------------------------------------------------------------------------- #
 # HTTP layer
 # --------------------------------------------------------------------------- #
 _CONTENT_TYPES = {
@@ -464,7 +648,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 self._send_json(404, {"error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path.split("?", 1)[0] != "/api/command":
+        path = self.path.split("?", 1)[0]
+        if path not in ("/api/command", "/api/voice"):
             self._send_json(404, {"error": "not found"})
             return
 
@@ -484,7 +669,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._send_json(400, {"error": "expected a JSON object"})
             return
 
-        result = run_command_action(payload.get("action"), payload.get("params"))
+        if path == "/api/voice":
+            text = payload.get("text")
+            if not isinstance(text, str):
+                self._send_json(400, {"error": "voice request needs a string 'text'"})
+                return
+            result = interpret_command(text)
+        else:
+            result = run_command_action(payload.get("action"), payload.get("params"))
         self._send_json(200 if result.get("ok") else 400, result)
 
     def log_message(self, *args) -> None:  # silence default stderr access log

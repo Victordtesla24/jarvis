@@ -193,6 +193,44 @@
   .row .meta{color:var(--txt-dim);font-size:10px}
   .muted{color:var(--txt-dim);font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;padding:6px 0}
 
+  /* ---- voice interface: the "- LISTENING -" loop (speak or type to JARVIS) ---- */
+  .voice-head{display:flex;align-items:center;gap:12px;margin-bottom:9px}
+  .mic{position:relative;width:42px;height:42px;flex:0 0 auto;border-radius:50%;
+    border:1px solid var(--line-strong);background:rgba(139,211,251,.06);cursor:pointer;
+    display:grid;place-items:center;transition:.18s}
+  .mic:hover{background:rgba(139,211,251,.16);box-shadow:0 0 16px rgba(139,211,251,.4)}
+  .mic .mic-dot{width:12px;height:12px;border-radius:50%;background:var(--cyan);
+    box-shadow:0 0 10px var(--cyan)}
+  .mic .mic-ring{position:absolute;inset:-1px;border-radius:50%;border:1px solid var(--cyan);opacity:0}
+  .voice.listening .mic{border-color:var(--cyan);box-shadow:0 0 22px rgba(139,211,251,.6)}
+  .voice.listening .mic .mic-ring{animation:micpulse 1.3s ease-out infinite}
+  @keyframes micpulse{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.65)}}
+  .voice-meta{min-width:0}
+  .voice-word{font-family:var(--font-display);font-weight:700;font-size:13px;
+    letter-spacing:.22em;color:var(--cyan)}
+  .voice.listening .voice-word{color:#eafbff;text-shadow:0 0 14px rgba(139,211,251,.85);
+    animation:listenblink 1.1s steps(2,jump-none) infinite}
+  .voice.thinking .voice-word{color:var(--amber)}
+  @keyframes listenblink{50%{opacity:.5}}
+  .voice-sub{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.14em;
+    color:var(--txt-dim);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .voice-line{font-family:var(--font-mono);font-size:11px;color:var(--txt-dim);
+    margin:0 0 6px;border-left:2px solid var(--line-strong);padding-left:8px}
+  .voice-reply{font-family:var(--font-body);font-size:13px;line-height:1.45;color:var(--txt);
+    min-height:34px;margin-bottom:9px}
+  .voice.thinking .voice-reply{color:var(--txt-dim)}
+  .voice-badge{margin-left:auto;font-family:var(--font-mono);font-size:8px;letter-spacing:.18em;
+    color:var(--txt-dim);border:1px solid var(--line);border-radius:2px;padding:3px 6px}
+  .voice.listening .voice-badge{color:var(--cyan);border-color:var(--line-strong)}
+  .voice.thinking .voice-badge{color:var(--amber);border-color:rgba(251,202,3,.5)}
+  #voice-form input{width:100%;background:rgba(0,0,0,.32);border:1px solid var(--line);
+    border-radius:3px;color:#eafbff;font-family:var(--font-mono);font-size:11px;
+    letter-spacing:.04em;padding:8px 10px;outline:none}
+  #voice-form input:focus{border-color:var(--line-strong);box-shadow:0 0 12px rgba(139,211,251,.25)}
+  /* a guarded control JARVIS asks you to throw briefly flashes to draw the eye */
+  .flash{animation:flashctl 1.3s ease-in-out 2}
+  @keyframes flashctl{0%,100%{box-shadow:0 0 0 rgba(139,211,251,0)}50%{box-shadow:0 0 22px rgba(139,211,251,.7)}}
+
   /* ---- control view (hidden until CONTROL mode) ---- */
   #control-col{display:none}
   body.mode-control #control-col{display:flex}
@@ -401,8 +439,27 @@
   </section>
 
   <main>
-    <!-- LEFT: vitals + machines (monitoring) -->
+    <!-- LEFT: voice + vitals + machines (monitoring) -->
     <div class="col">
+      <!-- voice interface — speak or type; routed through the AI brain (/api/voice) -->
+      <section class="panel voice" data-interactive>
+        <h2><span class="ttl">Voice Interface</span><span class="ln"></span>
+          <span class="voice-badge" id="voice-badge">READY</span></h2>
+        <div class="voice-head">
+          <button class="mic" id="mic-btn" type="button" aria-label="Speak to JARVIS">
+            <span class="mic-ring"></span><span class="mic-dot"></span>
+          </button>
+          <div class="voice-meta">
+            <div class="voice-word" id="voice-word">TAP TO SPEAK</div>
+            <div class="voice-sub" id="voice-sub">“status” · “tidy” · “deep clean” · “engage”</div>
+          </div>
+        </div>
+        <div class="voice-line" id="voice-transcript" hidden></div>
+        <div class="voice-reply" id="voice-reply">JARVIS standing by.</div>
+        <form id="voice-form" autocomplete="off">
+          <input id="voice-input" type="text" placeholder="or type a command…" aria-label="type a command" />
+        </form>
+      </section>
       <section class="panel">
         <h2><span class="ttl">Core Vitals</span><span class="ln"></span>
           <span class="fresh" data-fresh="system"><i></i><span class="lbl-fresh">LIVE</span></span></h2>
@@ -1300,6 +1357,7 @@ $$(".modesw button").forEach((b) => b.addEventListener("click", () => setMode(b.
 // ⌘K command palette
 const PALETTE_CMDS = [
   { ic: "↻", label: "Refresh telemetry", hint: "STATS", run: () => runAction("refresh") },
+  { ic: "🎙", label: "Voice command — speak to JARVIS", hint: "VOICE", run: () => startListening() },
   { ic: "⚲", label: "Tidy preview (dry-run)", hint: "SAFE", run: () => runAction("tidy_preview") },
   { ic: "⚡", label: "Execute tidy (delete)", hint: "DESTRUCTIVE", run: () => runAction("tidy_execute") },
   { ic: "⌦", label: "Docker prune scan", hint: "SAFE", run: () => runAction("docker_prune_preview") },
@@ -1345,6 +1403,95 @@ $("#toggle-void").addEventListener("click", () => {
   document.body.classList.toggle("transparent");
   logc("transparent mode " + (document.body.classList.contains("transparent") ? "ON" : "OFF"), "info");
 });
+
+// ===========================================================================
+//  Voice interface — the "- LISTENING -" loop. Speak (Web Speech API) or type a
+//  command; JARVIS routes it through /api/voice (the read-only NL layer over the
+//  agent brain) and speaks the reply back. Destructive steps still demand the
+//  guarded cockpit control — voice can request, only the guard throw authorises.
+// ===========================================================================
+const voicePanel = $(".voice");
+const voiceWord = $("#voice-word"), voiceReply = $("#voice-reply");
+const voiceTranscript = $("#voice-transcript"), voiceBadge = $("#voice-badge");
+const voiceInput = $("#voice-input"), micBtn = $("#mic-btn");
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog = null, listening = false;
+
+function setVoiceState(state) {            // ready | listening | thinking
+  if (!voicePanel) return;
+  voicePanel.classList.toggle("listening", state === "listening");
+  voicePanel.classList.toggle("thinking", state === "thinking");
+  voiceBadge.textContent = state.toUpperCase();
+  voiceWord.textContent = state === "listening" ? "– LISTENING –"
+    : state === "thinking" ? "PROCESSING…"
+    : SpeechRec ? "TAP TO SPEAK" : "TYPE A COMMAND";
+}
+
+// JARVIS speaks his reply aloud when the platform exposes TTS (works in-app).
+function speak(text) {
+  try {
+    if (!window.speechSynthesis) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.02; u.pitch = 0.9;
+    speechSynthesis.speak(u);
+  } catch (_) { /* TTS is optional */ }
+}
+
+async function submitVoice(text) {
+  const phrase = (text || "").trim();
+  if (!phrase) return;
+  voiceTranscript.hidden = false;
+  voiceTranscript.textContent = "“" + phrase + "”";
+  setVoiceState("thinking");
+  logc("🎙 " + phrase, "info");
+  try {
+    const res = await fetch("/api/voice", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: phrase }),
+    });
+    const out = await res.json();
+    const reply = out.speech || "I'm not certain, sir.";
+    voiceReply.textContent = reply;
+    logc("⟁ " + reply, out.requires_guard ? "warn" : "ok");
+    speak(reply);
+    // a status read carries fresh telemetry — paint it immediately
+    if (out.result && out.result.system) render(out.result);
+    // a guarded request: switch to controls and flash the lever to throw
+    if (out.requires_guard && out.action) {
+      setMode("control");
+      const ctl = document.querySelector(`[data-action="${out.action}"]`);
+      if (ctl) { ctl.classList.add("flash"); setTimeout(() => ctl.classList.remove("flash"), 2700); }
+    }
+  } catch (e) {
+    voiceReply.textContent = "Voice link interrupted, sir.";
+    logc("✕ voice: " + e.message, "err");
+  } finally {
+    setVoiceState("ready");
+  }
+}
+
+function startListening() {
+  // No Web Speech API (e.g. inside the .app) → fall back to the text field.
+  if (!SpeechRec) { voiceInput.focus(); return; }
+  if (listening) { recog && recog.stop(); return; }
+  recog = new SpeechRec();
+  recog.lang = "en-US"; recog.interimResults = false; recog.maxAlternatives = 1;
+  recog.onstart = () => { listening = true; setVoiceState("listening"); };
+  recog.onerror = () => { listening = false; setVoiceState("ready"); };
+  recog.onend = () => { listening = false; if (!voicePanel.classList.contains("thinking")) setVoiceState("ready"); };
+  recog.onresult = (e) => submitVoice(e.results[0][0].transcript);
+  try { recog.start(); } catch (_) { setVoiceState("ready"); }
+}
+
+if (micBtn) micBtn.addEventListener("click", startListening);
+const voiceForm = $("#voice-form");
+if (voiceForm) voiceForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const v = voiceInput.value; voiceInput.value = "";
+  submitVoice(v);
+});
+setVoiceState("ready");
 
 logc("HUD initialised — awaiting telemetry", "info");
 </script>
