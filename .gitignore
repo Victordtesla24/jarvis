@@ -1,111 +1,41 @@
-# =============================================================================
-# JARVIS Telemetry — .gitignore
-# =============================================================================
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# ── Build artifacts ─────────────────────────────────────────────────────────
-.build/
-build/
-DerivedData/
-*.o
-*.d
-*.swp
-*.swo
-*.xcuserdata
-*.xcworkspace/
+node_modules
+dist
+dist-ssr
+*.local
 
-# ── Compiled Go binary (built per-machine from mactop/) ─────────────────────
-jarvis-mactop-daemon
-JarvisTelemetry/Sources/JarvisTelemetry/Resources/jarvis-mactop-daemon
-mactop/mactop
-mactop/.git
-mactop/mactop.gif
-mactop/screenshota.png
-mactop_backup/
-
-# ── macOS junk ──────────────────────────────────────────────────────────────
-.DS_Store
-.AppleDouble
-.LSOverride
-
-# ── Python (pipeline tooling under scripts/) ────────────────────────────────
-**/.venv/
-**/venv/
-**/__pycache__/
-*.pyc
-*.pyo
-*.pkl
-.pytest_cache/
-.coverage
-htmlcov/
-
-# ── Node / npm ──────────────────────────────────────────────────────────────
-node_modules/
-package-lock.json
-package.json
-# Allow the locked manifests for the animation stack (HC-5 requires commit)
-!js/package.json
-!js/package-lock.json
-
-# ── Vite build artifacts (regenerable; HC-10) ───────────────────────────────
-prototypes/dist/
-
-# ── IDEs & editor state ─────────────────────────────────────────────────────
-.vscode/
-.idea/
-.cursor/
-.cursorrules
-
-# ── Claude Code / agent tooling state (per-machine) ─────────────────────────
-.claude/
-.remember/
-.superpowers/
-.serena/
-.context/
-.filescope/
-.sourcerer/
-.juno_task/
-.ralph-infinite.log
+# Runtime / session state (written by the running backend, not source)
+data/sessions.json
+data/snapshots/
+server-logs
+diagnostics
 mcp-debug.log
 
-# ── Logs (universal) ────────────────────────────────────────────────────────
-*.log
-logs/
-state/
-tmp/
-# ── Generated media assets (regenerable via scripts/promo-video/) ───────────
-*.png
-*.jpeg
-*.jpg
-*.mp4
-*.gif
-promo/
-scripts/promo-video/fonts/
+# Local agent/session tooling
+.juno_task
+.remember
+.claude
 
-# ── Secrets — NEVER commit ──────────────────────────────────────────────────
-.env
-.env.*
-tests/api_keys.env
-mcp.json
+# Working render captures / screenshots (not project assets)
+.shots
+.playwright-mcp
+*.screenshot.png
 
-# ── CI workflows are managed externally for now ─────────────────────────────
-.github/
-
-# ── Per-machine docs that override repo defaults ────────────────────────────
-LICENSE
-CLAUDE.md
-CHANGELOG.md
-CONTRIBUTING.md
-SECURITY.md
-.editorconfig
-
-# Playwright MCP session artifacts
-.playwright-mcp/
-
-# Assembled .app bundle (built per-machine from build-app.sh)
-JarvisWallpaper.app/
-
-# Session / per-machine state
-data/
-.ruff_cache/
-.mypy_cache/
-
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

@@ -1,0 +1,31 @@
+# J.A.R.V.I.S. — the always-on reasoning core for the holographic dashboard.
+#
+#   docker compose up -d --build      # bring JARVIS online (stays up across reboots)
+#   docker compose logs -f jarvis     # listen to the core
+#
+# Model is env-driven. Defaults target MiniMax M2 at maximum reasoning effort;
+# drop a MiniMax key into .env.local as JARVIS_API_KEY to engage it, or leave the
+# existing LLM_* (DeepSeek) values to run immediately.
+services:
+  jarvis:
+    build: ./agent
+    image: jarvis-brain:2.7
+    container_name: jarvis-brain
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.local
+    environment:
+      # MiniMax M2 — highest reasoning effort. Override any of these in .env.local.
+      JARVIS_BASE_URL: ${JARVIS_BASE_URL:-https://api.minimax.io/v1}
+      JARVIS_MODEL: ${JARVIS_MODEL:-MiniMax-M2}
+      JARVIS_REASONING_EFFORT: ${JARVIS_REASONING_EFFORT:-high}
+      # If no MiniMax key is set, the brain falls back to the project's LLM_* values.
+      JARVIS_API_KEY: ${JARVIS_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/jarvis/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
