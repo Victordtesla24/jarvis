@@ -3,6 +3,7 @@ import React, { useRef, useMemo, useEffect, useState, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, ChromaticAberration, Vignette } from '@react-three/postprocessing';
 import { KernelSize } from 'postprocessing';
+import { bootSheet, types } from '../theatre/project';
 
 // ── BootSequence ─────────────────────────────────────────────────────────────
 // A 14-second cinematic JARVIS power-on, storyboard-matched to the reference reel
@@ -34,6 +35,14 @@ const P = { reticleIn: 0.5, reticleSet: 2.0, flyStart: 4.5, flyEnd: 5.5, plexIn:
 const GLOW = hdr('#7FE9FF', 2.4);
 const GLOW_HOT = hdr('#FFFFFF', 4.2);
 const DIM = new THREE.Color('#0D254C');
+
+// Theatre.js power-on envelope for the whole boot frame (keyframed in src/theatre/project.ts).
+// Defined at module scope so it survives component remounts — Theatre objects are singletons.
+const bootObj = bootSheet.object('boot-overlay', {
+  opacity: types.number(0, { range: [0, 1] }),
+  translateY: types.number(10, { range: [-100, 100] }),
+  scale: types.number(0.99, { range: [0, 2] }),
+});
 
 function radialTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas'); c.width = c.height = 128;
@@ -239,6 +248,7 @@ interface BootSequenceProps { onComplete: () => void; }
 
 const BootSequence: React.FC<BootSequenceProps> = ({ onComplete }) => {
   const doneRef = useRef(false);
+  const bootFrameRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
   const subRef = useRef<HTMLDivElement>(null);
   const arcL = useRef<HTMLDivElement>(null);
@@ -249,7 +259,25 @@ const BootSequence: React.FC<BootSequenceProps> = ({ onComplete }) => {
   const finish = () => { if (!doneRef.current) { doneRef.current = true; onComplete(); } };
 
   useEffect(() => {
-    if (reduced) { const id = window.setTimeout(finish, 600); return () => window.clearTimeout(id); }
+    // Theatre.js power-on envelope drives the whole boot frame's fade/scale-in.
+    const unsubBoot = bootObj.onValuesChange(({ opacity, translateY, scale }) => {
+      const el = bootFrameRef.current;
+      if (!el) return;
+      el.style.opacity = String(opacity);
+      el.style.transform = `translateY(${translateY}px) scale(${scale})`;
+    });
+    const seq = bootSheet.sequence;
+
+    if (reduced) {
+      // Reduced motion: play the brief envelope, then hand off — no manual timers.
+      seq.play({ iterationCount: 1, range: [0, 0.6] }).then((completed) => {
+        if (completed) finish();
+      });
+      return () => { unsubBoot(); seq.pause(); };
+    }
+
+    seq.play({ iterationCount: 1, range: [0, 0.8] });
+
     const start = performance.now();
     let raf = 0;
     const loop = () => {
@@ -274,7 +302,7 @@ const BootSequence: React.FC<BootSequenceProps> = ({ onComplete }) => {
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => { unsubBoot(); seq.pause(); cancelAnimationFrame(raf); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reduced]);
 
@@ -286,6 +314,12 @@ const BootSequence: React.FC<BootSequenceProps> = ({ onComplete }) => {
       role="button"
       aria-label="Skip JARVIS boot sequence"
     >
+      {/* Theatre.js-driven power-on frame: the scene fades/scales in together at boot. */}
+      <div
+        ref={bootFrameRef}
+        className="absolute inset-0"
+        style={{ opacity: 0, transform: 'translateY(10px) scale(0.99)', willChange: 'opacity, transform' }}
+      >
       {!reduced && (
         <Canvas
           camera={{ position: [0, 0, 5], fov: 50, near: 0.1, far: 50 }}
@@ -328,6 +362,7 @@ const BootSequence: React.FC<BootSequenceProps> = ({ onComplete }) => {
 
       <div className="scanlines opacity-25" />
       <div ref={fadeRef} className="absolute inset-0 bg-black pointer-events-none" style={{ opacity: 0 }} />
+      </div>
 
       <button
         onClick={(e) => { e.stopPropagation(); finish(); }}

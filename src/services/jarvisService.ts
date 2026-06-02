@@ -36,6 +36,25 @@ export const JarvisService = {
     }
   },
 
+  // Poll the brain's health on an interval (probes immediately, then every intervalMs).
+  // Returns an unsubscribe that stops polling — keeps timer ownership in the service layer.
+  subscribeHealth(
+    onChange: (health: { status: string; model: string; key_configured: boolean } | null) => void,
+    intervalMs = 15000,
+  ): () => void {
+    let alive = true;
+    const probe = async () => {
+      const h = await JarvisService.health();
+      if (alive) onChange(h);
+    };
+    void probe();
+    const id = setInterval(probe, intervalMs);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  },
+
   // Stream a JARVIS reply. Returns an AbortController so the caller can cancel.
   chat(
     messages: JarvisMessage[],

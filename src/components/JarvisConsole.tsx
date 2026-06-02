@@ -1,6 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { JarvisService, JarvisMessage } from '../services/jarvisService';
+import { consoleSheet, types } from '../theatre/project';
 import { RegionName } from '../types';
+
+// Theatre.js console reveal — fades the panel in and staggers its opening lines
+// (keyframed in src/theatre/project.ts). Module scope so it survives remounts.
+const consoleObj = consoleSheet.object('console-lines', {
+  linesVisible: types.number(0, { range: [0, 20] }),
+  opacity: types.number(0, { range: [0, 1] }),
+});
 
 // J.A.R.V.I.S. Console — the holographic comms surface the reasoning core speaks
 // through. The Docker brain "wears" this panel: tokens stream in live, reasoning
@@ -38,25 +46,35 @@ const JarvisConsole: React.FC<JarvisConsoleProps> = ({ currentRegion }) => {
   const [reasoning, setReasoning] = useState('');
   const [online, setOnline] = useState<boolean | null>(null);
   const [model, setModel] = useState('MiniMax-M2');
+  const [visibleLineCount, setVisibleLineCount] = useState(0);
+  const [containerOpacity, setContainerOpacity] = useState(0);
+  const [revealed, setRevealed] = useState(false);
 
   const idRef = useRef(1);
   const abortRef = useRef<AbortController | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  // Probe the brain on mount (and periodically) for the status light.
+  // Probe the brain on mount (and periodically) for the status light. The polling
+  // interval lives in JarvisService, so this component holds no timers of its own.
   useEffect(() => {
-    let alive = true;
-    const probe = async () => {
-      const h = await JarvisService.health();
-      if (!alive) return;
+    return JarvisService.subscribeHealth((h) => {
       setOnline(!!h && h.key_configured);
       if (h?.model) setModel(h.model);
-    };
-    probe();
-    const id = window.setInterval(probe, 15000);
+    });
+  }, []);
+
+  // Theatre.js mount reveal: fade the console in and stagger its opening lines.
+  useEffect(() => {
+    const unsub = consoleObj.onValuesChange(({ linesVisible, opacity }) => {
+      setVisibleLineCount(Math.round(linesVisible));
+      setContainerOpacity(opacity);
+    });
+    consoleSheet.sequence.play({ iterationCount: 1, range: [0, 2] }).then((completed) => {
+      if (completed) setRevealed(true);
+    });
     return () => {
-      alive = false;
-      window.clearInterval(id);
+      unsub();
+      consoleSheet.sequence.pause();
     };
   }, []);
 
@@ -163,11 +181,15 @@ const JarvisConsole: React.FC<JarvisConsoleProps> = ({ currentRegion }) => {
     );
   }
 
+  // During the Theatre reveal, stagger the opening lines in; once complete, show all.
+  const shownLog = revealed ? log : log.slice(0, visibleLineCount);
+
   return (
     <div
       className="absolute bottom-6 right-6 z-50 pointer-events-auto w-[380px] max-w-[92vw] font-sans text-holo-cyan flex flex-col"
       style={{
         height: 'min(520px, 70vh)',
+        opacity: containerOpacity,
         background: 'linear-gradient(160deg, rgba(0,18,28,0.82), rgba(0,8,16,0.92))',
         border: '1px solid rgba(0,240,255,0.45)',
         boxShadow: '0 0 40px rgba(0,240,255,0.18), inset 0 0 30px rgba(0,80,120,0.12)',
@@ -218,7 +240,7 @@ const JarvisConsole: React.FC<JarvisConsoleProps> = ({ currentRegion }) => {
 
       {/* Message log */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 text-sm">
-        {log.map((e) =>
+        {shownLog.map((e) =>
           e.role === 'user' ? (
             <div key={e.id} className="flex justify-end">
               <div className="max-w-[85%] px-3 py-1.5 text-right text-holo-cyan/90 border-r-2 border-holo-cyan/60 bg-holo-cyan/5">

@@ -5,6 +5,13 @@ import App from './App';
 import CoreLab from './components/relativity/CoreLab';
 import AtomicOrbitals from './components/relativity/AtomicOrbitals';
 
+// Theatre.js Studio is the visual keyframe editor — dev-only, never shipped to production.
+if (import.meta.env.DEV) {
+  import('@theatre/studio').then(({ default: studio }) => {
+    studio.initialize();
+  });
+}
+
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   throw new Error("Could not find root element to mount to");
