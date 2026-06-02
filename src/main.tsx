@@ -6,9 +6,13 @@ import CoreLab from './components/relativity/CoreLab';
 import AtomicOrbitals from './components/relativity/AtomicOrbitals';
 
 // Theatre.js Studio is the visual keyframe editor — dev-only, never shipped to production.
+// Kept collapsed by default so it doesn't cover the dashboard; append ?studio to open it.
 if (import.meta.env.DEV) {
   import('@theatre/studio').then(({ default: studio }) => {
     studio.initialize();
+    if (typeof window !== 'undefined' && !window.location.search.includes('studio')) {
+      studio.ui.hide();
+    }
   });
 }
 
