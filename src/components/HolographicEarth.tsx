@@ -6,6 +6,7 @@ import { Points, PointMaterial, Text } from '@react-three/drei';
 import * as random from 'maath/random/dist/maath-random.esm';
 import { HandTrackingState, RegionName } from '../types';
 import { SoundService } from '../services/soundService';
+import { HolographicMaterial } from '../materials/HolographicMaterial';
 
 interface HolographicEarthProps {
   handTrackingRef: React.MutableRefObject<HandTrackingState>;
@@ -285,8 +286,9 @@ const TerrainModel: React.FC<{
 
 
 const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, setRegion }) => {
-  const earthGroupRef = useRef<Group>(null); 
+  const earthGroupRef = useRef<Group>(null);
   const earthRef = useRef<Mesh>(null);
+  const holoShellRef = useRef<Mesh>(null);
   const cloudsRef = useRef<Mesh>(null);
   const wireframeRef = useRef<Mesh>(null);
   const ringRef = useRef<Mesh>(null);
@@ -392,8 +394,10 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
     // --- Earth Animations (Only if visible) ---
     if (earthGroupRef.current.visible) {
         const baseScale = 1.5;
-        const coreScale = baseScale * (1 - Math.max(0, exp - 0.3) * 0.5); 
+        const coreScale = baseScale * (1 - Math.max(0, exp - 0.3) * 0.5);
         earthRef.current.scale.set(coreScale, coreScale, coreScale);
+        // Keep the additive holographic Fresnel shell hugging the textured globe.
+        if (holoShellRef.current) holoShellRef.current.scale.setScalar(coreScale * 1.03);
 
         const cloudScale = baseScale * 1.02 + (exp * 1.0); 
         if (cloudsRef.current) {
@@ -455,6 +459,20 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
                     transparent={true}
                     opacity={0.95}
                     blending={AdditiveBlending}
+                />
+            </mesh>
+
+            {/* Additive holographic Fresnel shell — gold Stark-HUD rim glow + animated
+                scanlines layered over the textured globe (textured Earth preserved). */}
+            <mesh ref={holoShellRef}>
+                <sphereGeometry args={[1, 64, 64]} />
+                <HolographicMaterial
+                    hologramColor="#C9A84C"
+                    fresnelOpacity={0.6}
+                    fresnelAmount={0.5}
+                    scanlineSize={10}
+                    signalSpeed={0.4}
+                    hologramOpacity={0.95}
                 />
             </mesh>
 
