@@ -1,7 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import gsap from 'gsap';
 import { JarvisService, JarvisMessage } from '../services/jarvisService';
 import { consoleSheet, types } from '../theatre/project';
 import { RegionName } from '../types';
+
+// GSAP numeric ease — counts a readout up from `from` to `to` once. Returns the tween
+// so the caller can kill it on cleanup.
+function animateCounter(el: HTMLElement, from: number, to: number, duration = 2.0): gsap.core.Tween {
+  const obj = { value: from };
+  return gsap.to(obj, {
+    value: to,
+    duration,
+    ease: 'power2.out',
+    onUpdate() {
+      el.textContent = Math.round(obj.value).toString();
+    },
+  });
+}
 
 // Theatre.js console reveal — fades the panel in and staggers its opening lines
 // (keyframed in src/theatre/project.ts). Module scope so it survives remounts.
@@ -53,6 +68,10 @@ const JarvisConsole: React.FC<JarvisConsoleProps> = ({ currentRegion }) => {
   const idRef = useRef(1);
   const abortRef = useRef<AbortController | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const syncRef = useRef<HTMLSpanElement>(null);
+  const loadRef = useRef<HTMLSpanElement>(null);
+  const latRef = useRef<HTMLSpanElement>(null);
+  const quickRef = useRef<HTMLDivElement>(null);
 
   // Probe the brain on mount (and periodically) for the status light. The polling
   // interval lives in JarvisService, so this component holds no timers of its own.
@@ -75,6 +94,30 @@ const JarvisConsole: React.FC<JarvisConsoleProps> = ({ currentRegion }) => {
     return () => {
       unsub();
       consoleSheet.sequence.pause();
+    };
+  }, []);
+
+  // GSAP: count the calibration readouts up once and stagger the quick-command chips in.
+  useEffect(() => {
+    const tweens: gsap.core.Tween[] = [];
+    if (syncRef.current) tweens.push(animateCounter(syncRef.current, 0, 100, 2.2));
+    if (loadRef.current) tweens.push(animateCounter(loadRef.current, 0, 87, 2.6));
+    if (latRef.current) tweens.push(animateCounter(latRef.current, 0, 12, 1.8));
+
+    let tl: gsap.core.Timeline | null = null;
+    const chips = quickRef.current?.querySelectorAll('.quick-cmd');
+    if (chips && chips.length) {
+      tl = gsap.timeline();
+      tl.fromTo(
+        chips,
+        { opacity: 0, x: -20 },
+        { opacity: 1, x: 0, duration: 0.3, stagger: 0.08, ease: 'power2.out' },
+      );
+    }
+
+    return () => {
+      tweens.forEach((t) => t.kill());
+      if (tl) tl.kill();
     };
   }, []);
 
@@ -231,6 +274,13 @@ const JarvisConsole: React.FC<JarvisConsoleProps> = ({ currentRegion }) => {
         </div>
       </div>
 
+      {/* Calibration telemetry — GSAP counts these up once on mount. */}
+      <div className="flex items-center justify-between px-4 py-1.5 border-b border-holo-cyan/10 text-[9px] tracking-[0.18em] text-holo-cyan/55 font-display">
+        <span>NEURAL SYNC <span ref={syncRef} className="text-holo-cyan/90">0</span>%</span>
+        <span>CORE LOAD <span ref={loadRef} className="text-holo-cyan/90">0</span>%</span>
+        <span>LATENCY <span ref={latRef} className="text-holo-cyan/90">0</span>MS</span>
+      </div>
+
       {/* Reasoning sub-channel (faint, only while thinking) */}
       {reasoning && (
         <div className="px-4 py-1 text-[9px] tracking-wide text-holo-blue/50 italic truncate border-b border-holo-cyan/10">
@@ -263,13 +313,13 @@ const JarvisConsole: React.FC<JarvisConsoleProps> = ({ currentRegion }) => {
       </div>
 
       {/* Quick commands */}
-      <div className="px-3 pb-2 flex flex-wrap gap-1.5">
+      <div ref={quickRef} className="px-3 pb-2 flex flex-wrap gap-1.5">
         {QUICK_COMMANDS.map((c) => (
           <button
             key={c}
             onClick={() => send(c)}
             disabled={status !== 'idle'}
-            className="text-[9px] tracking-wide px-2 py-1 border border-holo-cyan/25 text-holo-cyan/70 hover:border-holo-cyan/70 hover:text-holo-cyan disabled:opacity-40 transition-all"
+            className="quick-cmd text-[9px] tracking-wide px-2 py-1 border border-holo-cyan/25 text-holo-cyan/70 hover:border-holo-cyan/70 hover:text-holo-cyan disabled:opacity-40 transition-all"
           >
             {c}
           </button>
