@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Environment files (may contain secrets / API keys)
+.env
+.env.*
+
 # Runtime / session state (written by the running backend, not source)
 data/sessions.json
 data/snapshots/
