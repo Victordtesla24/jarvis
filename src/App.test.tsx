@@ -8,6 +8,16 @@ import App from './App';
 vi.mock('@react-three/fiber', () => ({
   Canvas: ({ children }: { children: React.ReactNode }) => <div data-testid="canvas">{children}</div>,
 }));
+// Post-processing effects use R3F hooks (useThree) that require a live Canvas context,
+// which the mocked Canvas above does not provide. Stub them out — real bloom/CA/vignette
+// rendering is verified via headless-browser capture, not this state-machine suite.
+vi.mock('@react-three/postprocessing', () => ({
+  EffectComposer: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  Bloom: () => null,
+  ChromaticAberration: () => null,
+  Noise: () => null,
+  Vignette: () => null,
+}));
 vi.mock('./components/HolographicEarth', () => ({
   default: () => <div data-testid="holographic-earth" />,
 }));

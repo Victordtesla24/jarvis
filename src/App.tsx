@@ -1,6 +1,9 @@
 
-import React, { useRef, useState, Suspense } from 'react';
+import React, { useRef, useState, useMemo, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { EffectComposer, Bloom, ChromaticAberration, Noise, Vignette } from '@react-three/postprocessing';
+import { BlendFunction } from 'postprocessing';
+import { Vector2 } from 'three';
 import HolographicEarth from './components/HolographicEarth';
 import HudBackdrop from './components/relativity/HudBackdrop';
 import ReactorCore3D from './components/relativity/ReactorCore3D';
@@ -36,6 +39,9 @@ const App: React.FC = () => {
   const [globeMode, setGlobeMode] = useState(false);
   const [gesturesOn, setGesturesOn] = useState(false);
   const [instrumentsMode, setInstrumentsMode] = useState(true);
+
+  // Stable chromatic-aberration offset for the globe post-processing pipeline.
+  const caOffset = useMemo(() => new Vector2(0.0005, 0.0005), []);
 
   const startSystem = () => setBootStarted(true);
 
@@ -116,6 +122,20 @@ const App: React.FC = () => {
             <Suspense fallback={null}>
               <HolographicEarth handTrackingRef={fakeHandTrackingRef} setRegion={setCurrentRegion} />
             </Suspense>
+            {/* Unified globe post-processing: selective bloom on emissive glow, subtle
+                chromatic aberration, film grain and vignette — consolidated here as the
+                Canvas's last child (one pipeline for the whole scene). */}
+            <EffectComposer multisampling={0} enableNormalPass={false}>
+              <Bloom luminanceThreshold={0.2} mipmapBlur intensity={1.5} radius={0.6} />
+              <ChromaticAberration
+                offset={caOffset}
+                blendFunction={BlendFunction.NORMAL}
+                radialModulation={false}
+                modulationOffset={0.0}
+              />
+              <Noise opacity={0.04} blendFunction={BlendFunction.SOFT_LIGHT} />
+              <Vignette eskil={false} offset={0.2} darkness={0.7} blendFunction={BlendFunction.NORMAL} />
+            </EffectComposer>
           </Canvas>
         ) : (
           <HudBackdrop />

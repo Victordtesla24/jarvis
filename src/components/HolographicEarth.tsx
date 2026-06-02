@@ -1,7 +1,6 @@
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame, useLoader } from '@react-three/fiber';
 import { TextureLoader, Mesh, AdditiveBlending, DoubleSide, Group, BufferAttribute, Vector3, PlaneGeometry } from 'three';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { Points, PointMaterial, Text } from '@react-three/drei';
 import * as random from 'maath/random/dist/maath-random.esm';
 import { HandTrackingState, RegionName } from '../types';
@@ -437,11 +436,9 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
   });
 
   return (
+    // Post-processing (bloom + chromatic aberration + grain + vignette) is owned by the
+    // App-level globe Canvas composer so the whole scene shares one pipeline — see App.tsx.
     <group position={[0, 0, 0]}>
-        <EffectComposer enableNormalPass={false}>
-           <Bloom luminanceThreshold={0.2} mipmapBlur intensity={1.5} radius={0.6} />
-        </EffectComposer>
-
         {/* EARTH GROUP */}
         <group ref={earthGroupRef}>
             <mesh ref={earthRef}>
@@ -453,7 +450,7 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
                     color="#0066ff"
                     emissive="#001133"
                     emissiveMap={colorMap} // Continents will glow
-                    emissiveIntensity={0.5}
+                    emissiveIntensity={1.5}
                     specular="#111111"
                     shininess={15}
                     transparent={true}
