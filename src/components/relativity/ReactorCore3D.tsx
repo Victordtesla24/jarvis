@@ -73,13 +73,14 @@ function useMaterials() {
       coreHot: basic(hdr('#FFFFFF', 5.2)),
       coreMid: basic(hdr('#DBF8FF', 2.7)),
       coreRing: basic(hdr('#AEEBFF', 2.2)),
-      toothLip: basic(hdr('#C2EEFF', 2.7)),
+      toothLip: basic(hdr('#FFD9A6', 3.0)),              // warm-white coil lip (Stark arc glow) — blooms hard
       index: basic(hdr('#9FF4FF', 2.2)),
       containLip: basic(hdr('#7DF9FF', 1.9)),
       accent: basic(hdr('#7DF9FF', 2.1)),
+      warmIndex: basic(hdr('#FFC074', 2.4)),             // warm directional markers (contrast vs cyan dial)
       majorTickBase: basic(new THREE.Color(1, 1, 1)),    // instanceColor-driven
       // STRUCTURE (≤1, crisp, never bloom)
-      toothBody: basic(hdr('#3FB8E6', 0.72)),
+      toothBody: basic(hdr('#3E6E8E', 0.62)),            // steel coil segments — present but recessed; warm lips define each tooth
       innerArc: basic(hdr('#5FD0F0', 0.8)),
       spoke: basic(hdr('#3FB8E6', 0.55)),
       outerArc: basic(hdr('#4FC4E8', 0.68)),
@@ -428,7 +429,7 @@ function ReactorFace({ splitRef, speedRef, M, G }: {
 
       {/* L4 + L5 — index triangles + fine graduation tick ring (rotate together) */}
       <group ref={refs.grad}>
-        <TriMarkers r={0.535 * R} degs={[0, 90, 180, 270]} mat={M.index} size={0.05} />
+        <TriMarkers r={0.535 * R} degs={[0, 90, 180, 270]} mat={M.warmIndex} size={0.05} />
         <TriMarkers r={0.535 * R} degs={[45, 135, 225, 315]} mat={M.accent} size={0.03} />
         <InstancedRing count={120} radius={0.595 * R} geo={G.tickPlane} mat={M.majorTickBase} sx={0.05} sy={0.006}
           elongateEvery={10} elongateScale={1.9} colorFn={gradColor} />
@@ -574,8 +575,15 @@ function Assembly({ handTrackingRef, scale, splitRef }: {
       // ring and the white-hot core recedes small to the far end — exactly as in the
       // reference reel. Azimuth orbit + slow yaw drift give the compound-rotation PARALLAX
       // that sells true depth. Resting tilt (0.04) is unchanged so the integrated face is intact.
-      const tilt = 0.04 - sp * 1.16 + (-py) * 0.12 * k;
-      const orbit = sp * 0.36 + Math.sin(state.clock.elapsedTime * 0.13) * 0.22 * sp + px * 0.18 * k;
+      // Idle is no longer dead-flat: a gentle oblique tilt + slow azimuth sway makes the
+      // Z-layered ring families parallax against each other so the integrated face reads as
+      // genuine 3D. Both idle terms scale with k=(1-split) so they vanish into the steep
+      // disintegration tilt, keeping the split choreography frame-for-frame intact.
+      const t = state.clock.elapsedTime;
+      const idleTilt = 0.14 + Math.sin(t * 0.17) * 0.045;
+      const idleOrbit = Math.sin(t * 0.11) * 0.20;
+      const tilt = idleTilt * k - sp * 1.16 + (-py) * 0.12 * k;
+      const orbit = idleOrbit * k + sp * 0.36 + Math.sin(t * 0.13) * 0.22 * sp + px * 0.18 * k;
       rot.current.x += (tilt - rot.current.x) * Math.min(1, d * 2.5);
       rot.current.y += (orbit - rot.current.y) * Math.min(1, d * 2.5);
     }
