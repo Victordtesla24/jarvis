@@ -28,11 +28,6 @@ const App: React.FC = () => {
     rightHand: null
   });
 
-  const fakeHandTrackingRef = useRef<HandTrackingState>({
-    leftHand: null,
-    rightHand: null
-  });
-
   const [currentRegion, setCurrentRegion] = useState<RegionName>(RegionName.ASIA);
   const [booted, setBooted] = useState(false);
   const [bootStarted, setBootStarted] = useState(false);
@@ -120,7 +115,7 @@ const App: React.FC = () => {
         {globeMode ? (
           <Canvas camera={{ position: [0, 0, 4], fov: 55 }} gl={{ alpha: true, antialias: false }} dpr={[1, 1.5]}>
             <Suspense fallback={null}>
-              <HolographicEarth handTrackingRef={fakeHandTrackingRef} setRegion={setCurrentRegion} />
+              <HolographicEarth handTrackingRef={handTrackingRef} setRegion={setCurrentRegion} />
             </Suspense>
             {/* Unified globe post-processing: selective bloom on emissive glow, subtle
                 chromatic aberration, film grain and vignette — consolidated here as the

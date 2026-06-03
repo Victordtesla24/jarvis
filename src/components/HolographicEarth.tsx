@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame, useLoader } from '@react-three/fiber';
-import { TextureLoader, Mesh, AdditiveBlending, DoubleSide, Group, BufferAttribute, Vector3, PlaneGeometry } from 'three';
+import { TextureLoader, Mesh, AdditiveBlending, DoubleSide, Group, BufferAttribute, Vector3, PlaneGeometry, MeshPhongMaterial, DirectionalLight } from 'three';
 import { Points, PointMaterial, Text } from '@react-three/drei';
 import * as random from 'maath/random/dist/maath-random.esm';
 import { HandTrackingState, RegionName } from '../types';
@@ -10,6 +10,34 @@ import { HolographicMaterial } from '../materials/HolographicMaterial';
 interface HolographicEarthProps {
   handTrackingRef: React.MutableRefObject<HandTrackingState>;
   setRegion: (region: RegionName) => void;
+}
+
+const DEG = Math.PI / 180;
+
+// Unit direction to the sun in the globe's (world) frame, from real wall-clock time, so
+// the day/night terminator on the globe tracks the operator's actual system clock. The
+// subsolar point: longitude follows UTC (solar noon at 0° at 12:00 UTC), latitude is the
+// seasonal declination from the day-of-year.
+function sunDirection(date: Date): Vector3 {
+  const start = Date.UTC(date.getUTCFullYear(), 0, 0);
+  const dayOfYear = Math.floor((date.getTime() - start) / 86400000);
+  const decl = -23.44 * Math.cos((360 / 365) * (dayOfYear + 10) * DEG);
+  const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
+  const sunLon = -15 * (utcHours - 12);
+  const latR = decl * DEG, lonR = sunLon * DEG;
+  return new Vector3(
+    Math.cos(latR) * Math.cos(lonR),
+    Math.sin(latR),
+    -Math.cos(latR) * Math.sin(lonR),
+  ).normalize();
+}
+
+// Day/night shader injection for the Earth's phong material: keeps the lit hemisphere
+// sun-shaded while the night hemisphere reveals city lights from the night-lights texture.
+interface EarthShader {
+  uniforms: { [name: string]: { value: unknown } };
+  vertexShader: string;
+  fragmentShader: string;
 }
 
 // --- Tactical Terrain Component (Iron Man HUD Style) ---
@@ -296,11 +324,19 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
   const smoothExpansionRef = useRef(0);
   const wasTerrainModeRef = useRef(false);
 
+  // Day/night: sun light + shader uniform tracked from the live system clock.
+  const earthMatRef = useRef<MeshPhongMaterial>(null);
+  const sunLightRef = useRef<DirectionalLight>(null);
+  const sunUniformRef = useRef<{ value: Vector3 } | null>(null);
+  const sunDirRef = useRef<Vector3>(sunDirection(new Date()));
+  const sunFrame = useRef(0);
+
   // Load Color, Normal, and Specular maps for realistic texture
-  const [colorMap, normalMap, specularMap] = useLoader(TextureLoader, [
+  const [colorMap, normalMap, specularMap, nightMap] = useLoader(TextureLoader, [
     'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg',
     'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_normal_2048.jpg',
-    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg'
+    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg',
+    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_lights_2048.png'
   ]);
   
   const satelliteData = useMemo(() => {
@@ -311,8 +347,34 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
      }
   }, []);
 
+  // Inject day/night into the Earth's phong material: city lights emerge on the night
+  // hemisphere (sun-direction masked), the lit hemisphere stays sun-shaded.
+  useEffect(() => {
+    const mat = earthMatRef.current;
+    if (!mat) return;
+    mat.onBeforeCompile = (shader: EarthShader) => {
+      shader.uniforms.uSunDir = { value: sunDirRef.current };
+      shader.uniforms.uNightTex = { value: nightMap };
+      shader.uniforms.uNightStrength = { value: 2.4 };
+      sunUniformRef.current = shader.uniforms.uSunDir as { value: Vector3 };
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vWorldNrmDN;')
+        .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vWorldNrmDN = normalize(mat3(modelMatrix) * objectNormal);');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uSunDir;\nuniform sampler2D uNightTex;\nuniform float uNightStrength;\nvarying vec3 vWorldNrmDN;')
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float dnDot = dot(normalize(vWorldNrmDN), normalize(uSunDir));\n  float nightAmt = smoothstep(0.12, -0.22, dnDot);\n  totalEmissiveRadiance += texture2D(uNightTex, vMapUv).rgb * nightAmt * uNightStrength;');
+    };
+    mat.needsUpdate = true;
+  }, [nightMap]);
+
   useFrame((state, delta) => {
     if (!earthRef.current || !earthGroupRef.current) return;
+
+    // Advance the day/night terminator from the live system clock (throttled recompute).
+    sunFrame.current = (sunFrame.current + 1) % 90;
+    if (sunFrame.current === 0) sunDirRef.current = sunDirection(new Date());
+    if (sunUniformRef.current) sunUniformRef.current.value.copy(sunDirRef.current);
+    if (sunLightRef.current) sunLightRef.current.position.copy(sunDirRef.current).multiplyScalar(10);
 
     const leftHand = handTrackingRef.current.leftHand;
     const rightHand = handTrackingRef.current.rightHand;
@@ -443,16 +505,17 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
         <group ref={earthGroupRef}>
             <mesh ref={earthRef}>
                 <sphereGeometry args={[1, 64, 64]} />
-                <meshPhongMaterial 
-                    map={colorMap} 
+                <meshPhongMaterial
+                    ref={earthMatRef}
+                    map={colorMap}
                     normalMap={normalMap}
                     specularMap={specularMap}
-                    color="#0066ff"
+                    color="#2b6fb0"
                     emissive="#001133"
-                    emissiveMap={colorMap} // Continents will glow
-                    emissiveIntensity={1.5}
-                    specular="#111111"
-                    shininess={15}
+                    emissiveMap={colorMap} // faint continent self-glow; day/night added via shader
+                    emissiveIntensity={0.3}
+                    specular="#223a55"
+                    shininess={18}
                     transparent={true}
                     opacity={0.95}
                     blending={AdditiveBlending}
@@ -523,7 +586,10 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
         {/* TERRAIN MODEL OVERLAY */}
         <TerrainModel expansionRef={smoothExpansionRef} />
         
-        <ambientLight intensity={0.2} color="#002FA7" />
+        {/* Warm directional sun — its position is driven by the live system clock so the
+            globe carries a real day/night terminator (city lights bloom on the night side). */}
+        <directionalLight ref={sunLightRef} color="#fff4e0" intensity={2.4} />
+        <ambientLight intensity={0.12} color="#002FA7" />
         <pointLight position={[10, 10, 10]} intensity={2} color="#00F0FF" />
         <pointLight position={[-10, -10, -5]} intensity={1} color="#FF00FF" />
     </group>
