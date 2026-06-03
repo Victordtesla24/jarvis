@@ -6,7 +6,7 @@ import { KernelSize } from 'postprocessing';
 import { easing } from 'maath';
 import { HandTrackingState } from '../../types';
 import { AgentBus } from '../../services/agentState';
-import { rosetteGeometry, makeRosetteMaterial } from './AtomicOrbitals';
+import { rosetteGeometry, makeRosetteMaterial, starfieldGeometry, coreSparkGeometry, makeMoteMaterial } from './AtomicOrbitals';
 
 // ── ReactorCore3D ───────────────────────────────────────────────────────────
 // A fully PROCEDURAL holographic arc reactor — the consolidation of the
@@ -179,8 +179,8 @@ function InstancedRing({ count, radius, geo, mat, sx, sy, elongateEvery = 0, elo
 // A dense (~19k) sunflower rosette of EXTREMELY FINE points — matched to the
 // "Atomic Orbitals" reference reel — that blooms out of the core as it disintegrates:
 // soft round sub-pixel motes (round-mask + dusty quadratic tip falloff in the shader),
-// additive HDR so overlaps sum into a glowing energy mist, a cyan-core→warm-amber-tip
-// radius ramp, and a slow precession so the spiral arms turn. Faint at rest, full dome
+// additive HDR so overlaps sum into a glowing energy mist, a MONOCHROMATIC ice-core→
+// holo-cyan-tip radius ramp, and a slow precession so the spiral arms turn. Faint at rest, full dome
 // at split — the fine dust is the volumetric depth between the separating plates.
 function SplitOrbitals({ splitRef, speedRef }: { splitRef: React.MutableRefObject<number>; speedRef: React.MutableRefObject<number>; }) {
   const grp = useRef<THREE.Group>(null);
@@ -201,42 +201,49 @@ function SplitOrbitals({ splitRef, speedRef }: { splitRef: React.MutableRefObjec
     u.uSizeBase.value = 0.0017 + s * 0.0013;                               // sub-pixel star dust
     u.uBright.value = 1.0 + a0.intensity * 0.6;
     // faint dust halo at rest, glowing dome at full split (mood/energy modulated)
-    mat.opacity = (0.05 + s * 0.17) * (0.72 + a0.intensity * 0.45);
-    if (a0.mood === 'alert') { u.uColorA.value.set('#FFD9CC'); u.uColorB.value.set('#FF4D2E'); }
-    else { u.uColorA.value.set('#D6F6FF'); u.uColorB.value.set('#FFC07A'); } // cyan core → warm amber tips
+    mat.opacity = (0.07 + s * 0.18) * (0.72 + a0.intensity * 0.45);
+    if (a0.mood === 'alert') { u.uColorA.value.set('#FFD9CC'); u.uColorB.value.set('#FF4D2E'); } // alert state only
+    else { u.uColorA.value.set('#EAFBFF'); u.uColorB.value.set('#33D6F2'); } // monochromatic ice core → holo-cyan tips
   });
   return <group ref={grp}><points geometry={geom} material={mat} /></group>;
 }
 
-// ── ambient star-dust shell — a sparse, ever-present fine-particle nebula that
-// frames the reactor with cosmic depth (the faint background motes in the reference).
+// ── ambient star-dust shell — an ever-present fine-particle nebula that frames
+// the reactor with cosmic depth. Soft ROUND motes that each scintillate on their
+// own phase (matched to youtu.be/XcIPaKHC2Wg's living energy field), replacing the
+// flat square-point dust that read as cheap. Monochromatic cyan, additive HDR.
 function StarDust({ splitRef }: { splitRef: React.MutableRefObject<number> }) {
   const grp = useRef<THREE.Group>(null);
-  const { geo, mat } = useMemo(() => {
-    const N = 1600;
-    const pos = new Float32Array(N * 3);
-    for (let i = 0; i < N; i++) {
-      // even-ish sphere (fibonacci) within a shell, jittered radius → depth scatter
-      const y = 1 - (i / (N - 1)) * 2;
-      const rad = Math.sqrt(Math.max(0, 1 - y * y));
-      const phi = i * 2.399963;
-      const shell = 1.5 + (((i * 131) % 100) / 100) * 1.7;   // 1.5 … 3.2
-      pos[i * 3] = Math.cos(phi) * rad * shell;
-      pos[i * 3 + 1] = y * shell;
-      pos[i * 3 + 2] = Math.sin(phi) * rad * shell;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const mat = new THREE.PointsMaterial({
-      color: hdr('#BFEFFF', 1.2), size: 0.012, sizeAttenuation: true,
-      transparent: true, opacity: 0.0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
-    });
-    return { geo, mat };
-  }, []);
+  const geo = useMemo(() => starfieldGeometry({ count: 2200, inner: 1.5, outer: 3.3 }), []);
+  const mat = useMemo(() => makeMoteMaterial({ sizeBase: 0.05, color: '#BFEFFF', bright: 1.25 }), []);
   useEffect(() => () => { geo.dispose(); mat.dispose(); }, [geo, mat]);
-  useFrame((_, dt) => {
+  useFrame((state, dt) => {
     if (grp.current) { grp.current.rotation.y += dt * 0.012; grp.current.rotation.x = 0.1; }
-    mat.opacity = 0.16 + splitRef.current * 0.22;   // always faintly present, denser feel on split
+    const u = mat.userData.u;
+    u.uTime.value = state.clock.elapsedTime;
+    u.uDrift.value = 0.05 + splitRef.current * 0.06;          // breathe wider as the core opens
+    mat.opacity = 0.3 + splitRef.current * 0.32;              // twinkling at rest, denser on split
+  });
+  return <group ref={grp}><points geometry={geo} material={mat} /></group>;
+}
+
+// ── core-face spark overlay — a thin disc of fine cyan sparks hugging the front
+// of the reactor (youtu.be/XcIPaKHC2Wg @0:19/0:44/0:57): they drift and twinkle
+// over the integrated face to lift its beauty head-on, then recede as the core
+// disintegrates so they never clutter the depth tunnel.
+function CoreSparks({ splitRef }: { splitRef: React.MutableRefObject<number> }) {
+  const grp = useRef<THREE.Group>(null);
+  const geo = useMemo(() => coreSparkGeometry({ count: 900, inner: 0.16, outer: 0.9, thickness: 0.12 }), []);
+  const mat = useMemo(() => makeMoteMaterial({ sizeBase: 0.018, color: '#D6F6FF', bright: 1.4 }), []);
+  useEffect(() => () => { geo.dispose(); mat.dispose(); }, [geo, mat]);
+  useFrame((state, dt) => {
+    if (grp.current) grp.current.rotation.z += dt * 0.05;     // slow swirl over the face
+    const a = AgentBus.get();
+    const u = mat.userData.u;
+    u.uTime.value = state.clock.elapsedTime;
+    u.uDrift.value = 0.018;
+    // bright on the head-on integrated face (energy + agent intensity), gone by full split
+    mat.opacity = (0.34 + a.intensity * 0.22) * (1 - smooth(0.0, 0.55, splitRef.current));
   });
   return <group ref={grp}><points geometry={geo} material={mat} /></group>;
 }
@@ -621,6 +628,7 @@ function Assembly({ handTrackingRef, scale, splitRef }: {
         <SplitOrbitals splitRef={splitRef} speedRef={speedRef} />
         <OrbitGuides splitRef={splitRef} />
         <ReactorFace splitRef={splitRef} speedRef={speedRef} M={M} G={G} />
+        <CoreSparks splitRef={splitRef} />
       </group>
     </group>
   );
