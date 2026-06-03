@@ -196,6 +196,58 @@ export const NetworkGraph: React.FC = () => {
   return <HudCanvas title="NEURAL LATTICE" code="NET-05" draw={draw} height={150} />;
 };
 
+// ── 7. LOAD DISTRIBUTION (power trunk) ───────────────────────────────────────
+// The reference's POWER_DISTRIBUTION flow (youtu.be/yXpkIrR81w8 @1:07–1:11): a bundle
+// of cyan trunk-lines that pinch through a central bus then fan out to the grid nodes,
+// with energy packets travelling the active conduits. Throughput follows the agent's
+// energy + the operator's open-palm expansion; a node browns out (dims) on alert.
+export const LoadDistribution: React.FC = () => {
+  const N = 5; // conduits per side
+  const lanes = useMemo(() => Array.from({ length: N }, (_, i) => ({
+    y: (i + 0.5) / N,                       // 0..1 vertical lane
+    ph: (i * 0.37) % 1,                     // packet phase offset
+    speed: 0.6 + ((i * 53) % 50) / 100,     // per-lane packet speed
+    live: i % 4 !== 2,                      // one lane idle (a "N/A" grid node)
+  })), []);
+  const draw: DrawFn = (d) => {
+    const { ctx, w, h, sig, a } = d; const c = moodColor(a.mood); const e = energyOf(a);
+    const flow = clamp01(0.3 + e * 0.7 + sig.expansion * 0.4);
+    const cx = w / 2, midPinch = h * 0.5, busHalf = h * 0.13;
+    // central bus bracket
+    ctx.shadowBlur = 0; ctx.strokeStyle = rgba(c, 0.5); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(cx, midPinch - busHalf); ctx.lineTo(cx, midPinch + busHalf); ctx.stroke();
+    for (const side of [-1, 1]) {
+      lanes.forEach((ln, i) => {
+        const yEdge = 8 + ln.y * (h - 16);
+        const yBus = midPinch + (i - (N - 1) / 2) * (busHalf * 1.6 / N);
+        const xEdge = side < 0 ? 2 : w - 2;
+        const xKnee = cx + side * w * 0.18;     // where the lane bends toward the bus
+        // conduit: edge → knee (flat) → bus (pinched)
+        ctx.beginPath();
+        ctx.moveTo(xEdge, yEdge); ctx.lineTo(xKnee, yEdge); ctx.lineTo(cx, yBus);
+        ctx.strokeStyle = rgba(c, ln.live ? 0.22 + flow * 0.25 : 0.08);
+        ctx.lineWidth = 1; ctx.shadowBlur = 0; ctx.stroke();
+        if (!ln.live) return;
+        // travelling packet (edge → bus on one side, bus → edge on the other)
+        const p = (d.t * ln.speed * (0.4 + flow) + ln.ph) % 1;
+        const seg1 = Math.abs(xKnee - xEdge) / (Math.abs(xKnee - xEdge) + Math.hypot(cx - xKnee, yBus - yEdge));
+        let px: number, py: number;
+        if (p < seg1) { const u = p / seg1; px = xEdge + (xKnee - xEdge) * u; py = yEdge; }
+        else { const u = (p - seg1) / (1 - seg1); px = xKnee + (cx - xKnee) * u; py = yEdge + (yBus - yEdge) * u; }
+        ctx.beginPath(); ctx.arc(px, py, 1.6 + flow, 0, TAU);
+        ctx.fillStyle = rgba(c, 0.85); ctx.shadowColor = rgba(c, 0.9); ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0;
+        // grid-node terminal block at the edge
+        ctx.strokeStyle = rgba(c, 0.4); ctx.lineWidth = 1;
+        ctx.strokeRect(side < 0 ? 1 : w - 11, yEdge - 4, 10, 8);
+      });
+    }
+    // central bus glow node
+    ctx.beginPath(); ctx.arc(cx, midPinch, 2.5 + flow * 2, 0, TAU);
+    ctx.fillStyle = rgba(c, 0.95); ctx.shadowColor = rgba(c, 0.9); ctx.shadowBlur = 10 + flow * 8; ctx.fill(); ctx.shadowBlur = 0;
+  };
+  return <HudCanvas title="LOAD DISTRIBUTION" code="PWR-07" draw={draw} height={150} />;
+};
+
 // ── 6. ORBITAL SCANNER (targeting) ───────────────────────────────────────────
 export const OrbitalScanner: React.FC = () => {
   const st = useRef({ orbit: 0, tilt: 0.5, lock: 0 });

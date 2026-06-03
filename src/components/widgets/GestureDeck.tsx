@@ -1,7 +1,7 @@
 import React from 'react';
 import { HandTrackingState } from '../../types';
 import { HandCtx } from './HudCanvas';
-import { RadarSweep, WaveformMonitor, SpectrumBars, RadialGauges, NetworkGraph, OrbitalScanner } from './instruments';
+import { RadarSweep, WaveformMonitor, SpectrumBars, RadialGauges, NetworkGraph, OrbitalScanner, LoadDistribution } from './instruments';
 
 // ── GestureDeck ──────────────────────────────────────────────────────────────
 // Six gesture-driven, AI-modulated instruments in a collision-free L-layout that
@@ -23,6 +23,9 @@ const GestureDeck: React.FC<GestureDeckProps> = ({ handTrackingRef }) => (
       <div className="absolute left-4 bottom-4 w-[236px]"><SpectrumBars /></div>
       <div className="absolute left-[256px] bottom-4 w-[256px]"><WaveformMonitor /></div>
       <div className="absolute left-[528px] bottom-4 w-[208px]"><OrbitalScanner /></div>
+      {/* power-trunk flow, filling the gap before the console (wide viewports only,
+          so it never collides with the bottom-right JARVIS console) */}
+      <div className="hidden min-[1180px]:block absolute left-[744px] bottom-4 w-[224px]"><LoadDistribution /></div>
     </div>
   </HandCtx.Provider>
 );
