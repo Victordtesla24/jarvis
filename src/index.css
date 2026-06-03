@@ -135,6 +135,14 @@ body {
 .hud-rel { animation: hud-rise .8s ease-out both; }
 .hud-mono { font-family: 'Share Tech Mono', 'Roboto Mono', ui-monospace, monospace; }
 
+/* GestureDeck top band — the reference-video telemetry panels (ENERGY RESERVES /
+   POWER DISTRIBUTION / TELEMETRY MULTIGRAPH). Only mounts where there is room above
+   the centred reactor dial, so it never collides with the dial, clock strip or AUX list. */
+.deck-topband { display: none; }
+@media (min-width: 1440px) and (min-height: 760px) {
+  .deck-topband { display: block; }
+}
+
 /* ── Boot sequence (cinematic JARVIS startup) ──────────────────────────── */
 @keyframes boot-textglitch {
   0%   { opacity: 0; transform: scale(0.985); filter: blur(2px); clip-path: inset(45% 0 45% 0); }

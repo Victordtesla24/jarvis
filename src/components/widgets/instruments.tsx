@@ -286,3 +286,154 @@ export const OrbitalScanner: React.FC = () => {
   };
   return <HudCanvas title="ORBITAL SCANNER" code="ORB-06" draw={draw} height={150} />;
 };
+
+// ── 8. ENERGY RESERVES (telemetry @0:54–0:59) ────────────────────────────────
+// Reference frame @0:57 (youtu.be/yXpkIrR81w8): a stack of single-colour reserve rows,
+// each a segmented square-block bar that fills to a live % readout — the video's
+// "real telemetry in one colour" panel. Levels breathe independently and rise with the
+// agent's energy + the operator's open-palm expansion. Cyan-only by identity.
+export const EnergyReserves: React.FC = () => {
+  const ROWS = ['TYPE_A', 'TYPE_B', 'TYPE_C', 'TYPE_D'];
+  const SEG = 15;
+  const lv = useRef<number[]>(ROWS.map((_, i) => 0.3 + ((i * 37) % 50) / 100));
+  const seed = useRef<number[]>(ROWS.map((_, i) => 0.55 + ((i * 53) % 40) / 100));
+  const draw: DrawFn = (d) => {
+    const { ctx, w, h, sig, a } = d; const c = moodColor(a.mood); const e = energyOf(a);
+    const drive = clamp01(0.25 + e * 0.6 + sig.expansion * 0.4);
+    const rowH = h / ROWS.length;
+    const labelW = 40, valW = 32;
+    const barX = labelW + 4, barW = w - barX - valW - 2;
+    const gap = 2, sw = (barW - gap * (SEG - 1)) / SEG;
+    ROWS.forEach((name, r) => {
+      const target = clamp01(seed.current[r] * drive * (0.7 + 0.3 * Math.sin(d.t * (0.6 + r * 0.2) + r)));
+      lv.current[r] = follow(lv.current[r], target, 0.06);
+      const v = lv.current[r];
+      const cy = r * rowH + rowH / 2;
+      // row label
+      ctx.shadowBlur = 0; ctx.fillStyle = rgba(c, 0.55); ctx.font = '8px Orbitron, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(name, 0, cy + 3);
+      // segmented square-block bar (lit segments = level)
+      const lit = Math.round(v * SEG);
+      for (let s = 0; s < SEG; s++) {
+        const x = barX + s * (sw + gap), on = s < lit;
+        ctx.fillStyle = rgba(c, on ? 0.85 : 0.14);
+        ctx.shadowColor = rgba(c, 0.8); ctx.shadowBlur = on ? 5 : 0;
+        ctx.fillRect(x, cy - rowH * 0.2, sw, rowH * 0.4);
+      }
+      ctx.shadowBlur = 0;
+      // live % readout
+      ctx.fillStyle = rgba(c, 0.95); ctx.font = '700 10px Orbitron, sans-serif'; ctx.textAlign = 'right';
+      ctx.fillText(String(Math.round(v * 100)).padStart(2, '0') + '%', w, cy + 3);
+    });
+    ctx.textAlign = 'left';
+  };
+  return <HudCanvas title="ENERGY RESERVES" code="RSV-08" draw={draw} height={120} />;
+};
+
+// ── 9. POWER DISTRIBUTION GRID (load distribution @1:07–1:11) ────────────────
+// Reference frame @1:10: the POWER_DISTRIBUTION / GRD node matrix — a grid of live signed
+// node values with one or two browned-out (N/A ✕) cells and a scan highlight raking the
+// rows. Pairs with the LOAD DISTRIBUTION trunk; the value-roll cadence rises with the
+// agent's energy. Cyan-only — a dim ✕ marks the dead node rather than the video's red.
+export const PowerDistributionGrid: React.FC = () => {
+  const COLS = 2, ROWS = 4, N = COLS * ROWS;
+  const cells = useMemo(() => Array.from({ length: N }, (_, i) => ({
+    base: ((i * 53) % 90) / 10 - 4.5,   // -4.5..4.4 seed value
+    na: i === 2 || i === 5,             // two browned-out grid nodes
+  })), [N]);
+  const vals = useRef<number[]>(cells.map((c) => c.base));
+  const tgt = useRef<number[]>(cells.map((c) => c.base));
+  const nextRoll = useRef(0);
+  const draw: DrawFn = (d) => {
+    const { ctx, w, h, a } = d; const c = moodColor(a.mood); const e = energyOf(a);
+    // roll new live targets periodically (faster as the agent's energy climbs)
+    if (d.t > nextRoll.current) {
+      nextRoll.current = d.t + 0.9 - e * 0.4;
+      cells.forEach((cell, i) => { if (!cell.na) tgt.current[i] = cell.base + Math.sin(d.t * 1.7 + i * 2.1) * 3.2; });
+    }
+    const padX = 3, padY = 11, gx = 6, gy = 5;
+    const cw = (w - padX * 2 - gx * (COLS - 1)) / COLS;
+    const ch = (h - padY - gy * (ROWS - 1)) / ROWS;
+    const scanRow = Math.floor((d.t * (0.8 + e)) % ROWS);
+    cells.forEach((cell, i) => {
+      const col = i % COLS, row = Math.floor(i / COLS);
+      const x = padX + col * (cw + gx), y = padY + row * (ch + gy);
+      const hot = row === scanRow && !cell.na;
+      ctx.shadowBlur = 0; ctx.lineWidth = 1;
+      ctx.strokeStyle = rgba(c, cell.na ? 0.16 : hot ? 0.6 : 0.3);
+      ctx.strokeRect(x, y, cw, ch);
+      // node id
+      ctx.fillStyle = rgba(c, 0.45); ctx.font = '7px Orbitron, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('N' + (i + 1), x + 4, y + 10);
+      if (cell.na) {
+        const mx = x + cw / 2, my = y + ch * 0.62, s = Math.min(cw, ch) * 0.16;
+        ctx.strokeStyle = rgba(c, 0.28 + 0.18 * Math.sin(d.t * 4 + i)); ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(mx - s, my - s); ctx.lineTo(mx + s, my + s);
+        ctx.moveTo(mx + s, my - s); ctx.lineTo(mx - s, my + s); ctx.stroke();
+        ctx.fillStyle = rgba(c, 0.3); ctx.font = '7px Orbitron, sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText('N/A', x + cw - 4, y + 10);
+      } else {
+        vals.current[i] = follow(vals.current[i], tgt.current[i], 0.08);
+        const v = vals.current[i];
+        ctx.fillStyle = rgba(c, hot ? 0.98 : 0.85);
+        ctx.shadowColor = rgba(c, 0.8); ctx.shadowBlur = hot ? 6 : 0;
+        ctx.font = '700 13px Orbitron, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(v.toFixed(1), x + cw / 2, y + ch * 0.72);
+        ctx.shadowBlur = 0;
+      }
+    });
+    ctx.textAlign = 'left';
+  };
+  return <HudCanvas title="POWER DISTRIBUTION" code="GRD-09" draw={draw} height={120} />;
+};
+
+// ── 10. TELEMETRY MULTIGRAPH (remaining telemetry @1:30–1:32) ────────────────
+// Reference frame @1:31: the multi-graph wall — a scrolling wave-spec line above a
+// breathing levels area-fill, the "all other telemetry" read. Both scroll right→left
+// at a fixed cadence; amplitude tracks the agent's energy + the operator's expansion.
+export const TelemetryMultigraph: React.FC = () => {
+  const M = 64;
+  const wave = useRef<number[]>(Array(M).fill(0.5));
+  const lvl = useRef<number[]>(Array(M).fill(0.4));
+  const acc = useRef(0);
+  const draw: DrawFn = (d) => {
+    const { ctx, w, h, sig, a } = d; const c = moodColor(a.mood); const e = energyOf(a);
+    const amp = clamp01(0.3 + e * 0.6 + sig.expansion * 0.4);
+    // advance the scroll buffers at a fixed cadence (frame-rate independent)
+    acc.current += d.dt;
+    while (acc.current > 0.05) {
+      acc.current -= 0.05;
+      const ph = d.t * 3;
+      wave.current.push(clamp01(0.5 + Math.sin(ph) * 0.32 * amp + Math.sin(ph * 2.7) * 0.12 * amp));
+      wave.current.shift();
+      lvl.current.push(clamp01(lvl.current[lvl.current.length - 1] + Math.sin(ph * 1.3) * 0.06 * (0.4 + amp)));
+      lvl.current.shift();
+    }
+    const split = h * 0.5;
+    ctx.shadowBlur = 0; ctx.strokeStyle = rgba(c, 0.12); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, split); ctx.lineTo(w, split); ctx.stroke();
+    // top — scrolling wave-spec line
+    glowStroke(ctx, c, 7, 1.5); ctx.beginPath();
+    wave.current.forEach((v, i) => {
+      const x = (i / (M - 1)) * w, y = 4 + (1 - v) * (split - 8);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke(); ctx.shadowBlur = 0;
+    // bottom — breathing levels area-fill
+    const g = ctx.createLinearGradient(0, split, 0, h);
+    g.addColorStop(0, rgba(c, 0.32)); g.addColorStop(1, rgba(c, 0.03));
+    const ly = (v: number) => split + 4 + (1 - v) * (h - split - 8);
+    ctx.beginPath(); ctx.moveTo(0, h);
+    lvl.current.forEach((v, i) => ctx.lineTo((i / (M - 1)) * w, ly(v)));
+    ctx.lineTo(w, h); ctx.closePath(); ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = rgba(c, 0.7); ctx.lineWidth = 1; ctx.beginPath();
+    lvl.current.forEach((v, i) => { const x = (i / (M - 1)) * w; i === 0 ? ctx.moveTo(x, ly(v)) : ctx.lineTo(x, ly(v)); });
+    ctx.stroke();
+    // leading scan dot on the wave
+    const lastY = 4 + (1 - wave.current[M - 1]) * (split - 8);
+    ctx.beginPath(); ctx.arc(w - 1, lastY, 2, 0, TAU);
+    ctx.fillStyle = rgba(c, 0.95); ctx.shadowColor = rgba(c, 0.9); ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0;
+  };
+  return <HudCanvas title="TELEMETRY MULTIGRAPH" code="GPH-10" draw={draw} height={120} />;
+};
