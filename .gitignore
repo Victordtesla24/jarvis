@@ -33,6 +33,9 @@ mcp-debug.log
 .playwright-mcp
 *.screenshot.png
 
+# Reference-video analysis working dir (raw mp4 + sampled frames; report copied to docs/)
+.video-analysis
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
