@@ -348,7 +348,7 @@ const RadialSpectrumPanel: React.FC = () => {
       <svg viewBox="0 0 156 156" width="150" height="150" className="mt-1">
         <circle cx={cx} cy={cy} r="68" fill="none" stroke={DIM} strokeWidth="0.6" />
         <circle cx={cx} cy={cy} r="56" fill="none" stroke={DIM} strokeWidth="0.6" strokeDasharray="2 4" />
-        <g style={{ transformOrigin: `${cx}px ${cy}px`, animation: 'hud-spin 48s linear infinite' }}>
+        <g style={{ transformOrigin: `${cx}px ${cy}px`, animation: 'hud-spin 14s linear infinite' }}>
           {bars.map((b, i) => (
             <line key={i}
               x1={cx + Math.cos(b.a) * 20} y1={cy + Math.sin(b.a) * 20}
