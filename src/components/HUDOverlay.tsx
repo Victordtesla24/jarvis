@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, useFrame } from '@react-three/fiber';
+import { useSpring as useSpring3, animated as animated3 } from '@react-spring/three';
+import { useSpring as useSpringWeb, animated as animatedWeb } from '@react-spring/web';
 import { HandTrackingState, RegionName } from '../types';
 import { SoundService } from '../services/soundService';
 
@@ -107,6 +109,22 @@ export function HUDActivationBurst({ position = [0, 0, 0] }: { position?: [numbe
   return <points geometry={geo} material={mat} position={position} />;
 }
 
+// @react-spring/three (in-Canvas): springs a 3D HUD element in with physical overshoot
+// on mount, and scales it back to nothing when hidden — spring-driven mount/unmount.
+export function AnimatedHUDPanel({ visible, position, children }: {
+  visible: boolean; position: [number, number, number]; children: React.ReactNode;
+}) {
+  const spring = useSpring3({
+    scale: visible ? 1 : 0.001,
+    config: { tension: 260, friction: 18, precision: 0.001 },   // low friction → visible overshoot
+  });
+  return (
+    <animated3.group position={position} scale={spring.scale}>
+      {children}
+    </animated3.group>
+  );
+}
+
 // Live AR overlay: the hand-skeleton canvas, expansion gauge and pinch reticle are
 // all driven directly by the MediaPipe hand-tracking ref. The rich GMC dashboard
 // chrome now lives in the 3D HoloDashboard; this layer keeps only live telemetry
@@ -119,6 +137,20 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
   const [showIntelPanel, setShowIntelPanel] = useState(false);
   const [panelPos, setPanelPos] = useState({ x: 0, y: 0 });
   const [panelData, setPanelData] = useState({ signal: 40, az: 0, el: 0 });
+  const [hudShown, setHudShown] = useState(false);
+
+  // @react-spring/web (DOM, outside Canvas): the intel panel springs in/out on pinch.
+  const panelSpring = useSpringWeb({
+    opacity: showIntelPanel ? 1 : 0,
+    transform: showIntelPanel ? 'scale(1)' : 'scale(0.86)',
+    config: { tension: 300, friction: 22 },
+  });
+
+  // Spring the in-Canvas 3D HUD accent in once the overlay mounts (power-on overshoot).
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setHudShown(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
 
   const reticleRotationRef = useRef(0);
   const wasPinchingRef = useRef(false);
@@ -333,20 +365,33 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
         <Canvas camera={{ position: [0, 0, 5], fov: 60 }} gl={{ alpha: true, antialias: false }} dpr={[1, 1.5]} style={{ width: '100%', height: '100%' }}>
           <AmbientDataParticles />
           <HUDActivationBurst position={[0, 0, 0]} />
+          {/* spring-physics 3D comms reticle, low at frame bottom — springs in on power-on */}
+          <AnimatedHUDPanel visible={hudShown} position={[0, -2.4, 0]}>
+            <mesh>
+              <torusGeometry args={[0.34, 0.008, 10, 80]} />
+              <meshBasicMaterial color="#4CCAC9" transparent opacity={0.45} toneMapped={false} />
+            </mesh>
+            <mesh rotation={[0, 0, Math.PI * 0.15]}>
+              <ringGeometry args={[0.4, 0.43, 64, 1, 0, Math.PI * 1.25]} />
+              <meshBasicMaterial color="#C9A84C" transparent opacity={0.5} toneMapped={false} />
+            </mesh>
+          </AnimatedHUDPanel>
         </Canvas>
       </div>
       <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full z-20" />
       <div className="vignette"></div>
       <div className="scanlines z-10 opacity-50"></div>
 
-      {/* --- INTERACTIVE FLOATING PANEL (PINCH) — wired to live telemetry --- */}
-      {showIntelPanel && (
-          <div
-            className="absolute z-40 animate-flash origin-top-left"
+      {/* --- INTERACTIVE FLOATING PANEL (PINCH) — spring mount/unmount via @react-spring/web --- */}
+      <animatedWeb.div
+            className="absolute z-40 origin-top-left"
             style={{
                 left: panelPos.x,
                 top: panelPos.y,
-                width: '300px'
+                width: '300px',
+                opacity: panelSpring.opacity,
+                transform: panelSpring.transform,
+                pointerEvents: 'none',
             }}
           >
             <div className="bg-black/80 border-l-2 border-alert-red shadow-[0_0_40px_rgba(255,42,42,0.3)] backdrop-blur-xl p-1 rounded-r-lg">
@@ -396,8 +441,7 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
             <svg className="absolute -left-4 top-0 w-4 h-full overflow-visible">
                  <path d="M 4,0 L 0,10 L 0,150" fill="none" stroke="#FF2A2A" strokeWidth="1" />
             </svg>
-          </div>
-      )}
+      </animatedWeb.div>
     </div>
   );
 };
