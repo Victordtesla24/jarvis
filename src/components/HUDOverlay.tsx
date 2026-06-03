@@ -1,10 +1,110 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
+import * as THREE from 'three';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { HandTrackingState, RegionName } from '../types';
 import { SoundService } from '../services/soundService';
 
 interface HUDOverlayProps {
   handTrackingRef: React.MutableRefObject<HandTrackingState>;
   currentRegion: RegionName;
+}
+
+// ── HUD GPU particle layer ────────────────────────────────────────────────────
+// Custom THREE.Points emitters (the project targets React 18 / @react-three/fiber 8,
+// with which wawa-vfx is incompatible — it requires React 19 / fiber 9 / drei 10 — so
+// these mirror its AmbientDataParticles / HUDActivationBurst API using the same custom
+// points pattern as the reactor's StarDust). Palette: gold #C9A84C, cyan #4CCAC9.
+const GOLD = new THREE.Color('#C9A84C');
+const CYAN = new THREE.Color('#4CCAC9');
+const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
+// deterministic hash-based scatter — procedural placement, not live data
+const hash = (i: number, salt: number) => {
+  const x = Math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+// Ambient floating data-particles: a slow drift field of fine gold/cyan motes.
+const AMBIENT_SETTINGS = { nbParticles: 150 };
+export function AmbientDataParticles() {
+  const ref = useRef<THREE.Points>(null);
+  const { geo, mat } = useMemo(() => {
+    const n = AMBIENT_SETTINGS.nbParticles;
+    const pos = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      pos[i * 3] = (hash(i, 1) - 0.5) * 8;
+      pos[i * 3 + 1] = (hash(i, 2) - 0.5) * 6;
+      pos[i * 3 + 2] = (hash(i, 3) - 0.5) * 2 - 0.6;
+      const c = hash(i, 4) < 0.25 ? CYAN : GOLD;
+      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const mat = new THREE.PointsMaterial({
+      size: 0.045, sizeAttenuation: true, vertexColors: true, transparent: true,
+      opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+    });
+    return { geo, mat };
+  }, []);
+  useEffect(() => () => { geo.dispose(); mat.dispose(); }, [geo, mat]);
+  useFrame((state, dt) => {
+    if (!ref.current) return;
+    const d = Math.min(dt, 0.05);
+    const attr = geo.getAttribute('position') as THREE.BufferAttribute;
+    const arr = attr.array as Float32Array;
+    for (let i = 0; i < arr.length; i += 3) {
+      arr[i + 1] += d * 0.18;                                                  // slow upward drift
+      arr[i] += Math.sin(state.clock.elapsedTime * 0.3 + i) * d * 0.04;        // gentle sway
+      if (arr[i + 1] > 3) arr[i + 1] = -3;                                     // wrap around
+    }
+    attr.needsUpdate = true;
+    mat.opacity = 0.42 + Math.sin(state.clock.elapsedTime * 0.8) * 0.1;        // breathe
+  });
+  return <points ref={ref} geometry={geo} material={mat} />;
+}
+
+// HUD activation burst: a gold spark that radiates outward and fades on a slow loop.
+const BURST_SETTINGS = { nbParticles: 80 };
+export function HUDActivationBurst({ position = [0, 0, 0] }: { position?: [number, number, number] }) {
+  const t0 = useRef(0);
+  const dir = useMemo(() => {
+    const n = BURST_SETTINGS.nbParticles;
+    const d = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      const y = 1 - (i / (n - 1)) * 2;
+      const r = Math.sqrt(Math.max(0, 1 - y * y));
+      const phi = i * 2.399963;
+      d[i * 3] = Math.cos(phi) * r; d[i * 3 + 1] = y; d[i * 3 + 2] = Math.sin(phi) * r;
+    }
+    return d;
+  }, []);
+  const { geo, mat } = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(BURST_SETTINGS.nbParticles * 3), 3));
+    const mat = new THREE.PointsMaterial({
+      color: GOLD, size: 0.06, sizeAttenuation: true, transparent: true,
+      opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+    });
+    return { geo, mat };
+  }, []);
+  useEffect(() => () => { geo.dispose(); mat.dispose(); }, [geo, mat]);
+  useFrame((state) => {
+    const CYCLE = 3.6, DUR = 0.75, MAXR = 1.6;
+    if (t0.current === 0) t0.current = state.clock.elapsedTime;
+    const phase = (state.clock.elapsedTime - t0.current) % CYCLE;
+    const p = clamp01(phase / DUR);
+    const ease = 1 - Math.pow(1 - p, 3);
+    const attr = geo.getAttribute('position') as THREE.BufferAttribute;
+    const arr = attr.array as Float32Array;
+    const rr = ease * MAXR;
+    for (let i = 0; i < arr.length; i += 3) {
+      arr[i] = dir[i] * rr; arr[i + 1] = dir[i + 1] * rr; arr[i + 2] = dir[i + 2] * rr;
+    }
+    attr.needsUpdate = true;
+    mat.opacity = phase < DUR ? (1 - p) * 0.9 : 0;                            // spark, then dormant to next cycle
+  });
+  return <points geometry={geo} material={mat} position={position} />;
 }
 
 // Live AR overlay: the hand-skeleton canvas, expansion gauge and pinch reticle are
@@ -228,6 +328,13 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
 
   return (
     <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden font-sans text-holo-cyan select-none">
+      {/* GPU particle layer — ambient gold/cyan data motes + a looping activation spark */}
+      <div className="absolute inset-0 z-[8]" style={{ pointerEvents: 'none' }}>
+        <Canvas camera={{ position: [0, 0, 5], fov: 60 }} gl={{ alpha: true, antialias: false }} dpr={[1, 1.5]} style={{ width: '100%', height: '100%' }}>
+          <AmbientDataParticles />
+          <HUDActivationBurst position={[0, 0, 0]} />
+        </Canvas>
+      </div>
       <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full z-20" />
       <div className="vignette"></div>
       <div className="scanlines z-10 opacity-50"></div>
