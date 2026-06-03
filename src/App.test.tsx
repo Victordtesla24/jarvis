@@ -15,6 +15,7 @@ vi.mock('@react-three/postprocessing', () => ({
   EffectComposer: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
   Bloom: () => null,
   ChromaticAberration: () => null,
+  Glitch: () => null,
   Noise: () => null,
   Vignette: () => null,
 }));
