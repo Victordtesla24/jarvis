@@ -12,6 +12,8 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@arwes/react": "^1.0.0-alpha.23",
+    "@emotion/react": "^11.14.0",
     "@mediapipe/tasks-vision": "0.10.9",
     "@react-spring/three": "^9.7.5",
     "@react-spring/web": "^9.7.5",

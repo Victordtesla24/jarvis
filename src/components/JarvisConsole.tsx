@@ -3,6 +3,7 @@ import gsap from 'gsap';
 import { JarvisService, JarvisMessage } from '../services/jarvisService';
 import { consoleSheet, types } from '../theatre/project';
 import { RegionName } from '../types';
+import DecryptedText from '../TextAnimations/DecryptedText';
 
 // GSAP numeric ease — counts a readout up from `from` to `to` once. Returns the tween
 // so the caller can kill it on cleanup.
@@ -301,7 +302,19 @@ const JarvisConsole: React.FC<JarvisConsoleProps> = ({ currentRegion }) => {
             <div key={e.id} className="flex gap-2">
               <span className="text-holo-cyan/40 select-none mt-[2px] text-xs">▸</span>
               <div className="max-w-[88%] text-holo-cyan/95 leading-snug">
-                {e.text}
+                {e.streaming ? (
+                  e.text
+                ) : (
+                  <DecryptedText
+                    text={e.text || ''}
+                    speed={30}
+                    maxIterations={6}
+                    sequential={true}
+                    revealDirection="start"
+                    animateOn="view"
+                    className="text-holo-cyan/95 leading-snug font-sans text-sm"
+                  />
+                )}
                 {e.streaming && (
                   <span className="inline-block w-2 h-3.5 ml-0.5 align-middle bg-holo-cyan animate-blink" />
                 )}

@@ -5,6 +5,8 @@ import { useSpring as useSpring3, animated as animated3 } from '@react-spring/th
 import { useSpring as useSpringWeb, animated as animatedWeb } from '@react-spring/web';
 import { HandTrackingState, RegionName } from '../types';
 import { SoundService } from '../services/soundService';
+import gsap from 'gsap';
+import { Animator, AnimatorGeneralProvider, FrameCorners, useFrameAssembler } from '@arwes/react';
 
 interface HUDOverlayProps {
   handTrackingRef: React.MutableRefObject<HandTrackingState>;
@@ -125,6 +127,25 @@ export function AnimatedHUDPanel({ visible, position, children }: {
   );
 }
 
+// Arwes animated corner-bracket frame for the intel panel. @arwes/react@1.0.0-alpha.23
+// API: FrameCorners draws the angular brackets; useFrameAssembler plays the draw-in
+// animation in sync with the nearest <Animator> (active when the panel is pinched open).
+// (The plan's FrameSVGCorners/aaVisibility symbols don't exist in this alpha — this is
+// the equivalent supported pattern.)
+function IntelPanelFrame() {
+  const frameRef = useRef<SVGSVGElement>(null);
+  useFrameAssembler(frameRef);
+  return (
+    <FrameCorners
+      elementRef={frameRef}
+      strokeWidth={1.5}
+      cornerLength={18}
+      // line = alert-red via currentColor; bg fill forced transparent (panel has its own bg)
+      style={{ color: '#FF2A2A', '--arwes-frames-bg-color': 'transparent' } as React.CSSProperties}
+    />
+  );
+}
+
 // Live AR overlay: the hand-skeleton canvas, expansion gauge and pinch reticle are
 // all driven directly by the MediaPipe hand-tracking ref. The rich GMC dashboard
 // chrome now lives in the 3D HoloDashboard; this layer keeps only live telemetry
@@ -154,6 +175,7 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
 
   const reticleRotationRef = useRef(0);
   const wasPinchingRef = useRef(false);
+  const signalBarRef = useRef<HTMLDivElement>(null);
 
   // Live intel-panel values while shown (sampled ~10Hz from real telemetry).
   useEffect(() => {
@@ -169,6 +191,25 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
     }, 100);
     return () => window.clearInterval(id);
   }, [showIntelPanel, handTrackingRef]);
+
+  // Step 7 — GSAP dramatic signal-bar fill: scaleX 0 → target over 1.5s when the panel
+  // opens, replacing the CSS width transition (which would fight GSAP). transformOrigin
+  // left makes it fill from the left, Prometheus-style.
+  useEffect(() => {
+    if (showIntelPanel && signalBarRef.current) {
+      gsap.fromTo(
+        signalBarRef.current,
+        { scaleX: 0 },
+        {
+          scaleX: panelData.signal / 100,
+          duration: 1.5,
+          ease: 'power2.out',
+          transformOrigin: 'left center',
+          overwrite: true,
+        },
+      );
+    }
+  }, [showIntelPanel, panelData.signal]);
 
   // Canvas Drawing Loop (Hand Skeletal & Effects)
   useEffect(() => {
@@ -394,7 +435,11 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
                 pointerEvents: 'none',
             }}
           >
-            <div className="bg-black/80 border-l-2 border-alert-red shadow-[0_0_40px_rgba(255,42,42,0.3)] backdrop-blur-xl p-1 rounded-r-lg">
+            <AnimatorGeneralProvider duration={{ enter: 0.3, exit: 0.2 }}>
+              <Animator active={showIntelPanel}>
+                <div style={{ position: 'relative' }}>
+                  <IntelPanelFrame />
+                  <div className="bg-black/80 border-l-2 border-alert-red shadow-[0_0_40px_rgba(255,42,42,0.3)] backdrop-blur-xl p-1 rounded-r-lg">
                 <div className="flex justify-between items-center bg-gradient-to-r from-alert-red/50 to-transparent p-2 mb-2 border-b border-white/10">
                     <span className="font-display font-bold text-sm tracking-widest text-white">GEO_INTEL_LIVE</span>
                     <div className="w-2 h-2 bg-alert-red rounded-full animate-ping"></div>
@@ -416,8 +461,9 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
                             </div>
                             <div className="w-full bg-gray-900 h-1.5 overflow-hidden rounded-sm">
                                 <div
-                                    className="bg-holo-cyan h-full shadow-[0_0_10px_#00F0FF] relative transition-all duration-150"
-                                    style={{ width: `${panelData.signal}%` }}
+                                    ref={signalBarRef}
+                                    className="bg-holo-cyan h-full shadow-[0_0_10px_#00F0FF] relative"
+                                    style={{ transform: 'scaleX(0)', transformOrigin: 'left center' }}
                                 >
                                     <div className="absolute top-0 left-0 h-full w-full bg-white/30 animate-[scanline_1s_linear_infinite]"></div>
                                 </div>
@@ -436,7 +482,10 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
                          </div>
                     </div>
                 </div>
-            </div>
+                  </div>
+                </div>
+              </Animator>
+            </AnimatorGeneralProvider>
             {/* Decorator Lines */}
             <svg className="absolute -left-4 top-0 w-4 h-full overflow-visible">
                  <path d="M 4,0 L 0,10 L 0,150" fill="none" stroke="#FF2A2A" strokeWidth="1" />

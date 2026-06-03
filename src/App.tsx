@@ -1,8 +1,8 @@
 
 import React, { useRef, useState, useMemo, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { EffectComposer, Bloom, ChromaticAberration, Noise, Vignette } from '@react-three/postprocessing';
-import { BlendFunction } from 'postprocessing';
+import { EffectComposer, Bloom, ChromaticAberration, Glitch, Noise, Vignette } from '@react-three/postprocessing';
+import { BlendFunction, GlitchMode } from 'postprocessing';
 import { Vector2 } from 'three';
 import HolographicEarth from './components/HolographicEarth';
 import HudBackdrop from './components/relativity/HudBackdrop';
@@ -127,6 +127,15 @@ const App: React.FC = () => {
                 blendFunction={BlendFunction.NORMAL}
                 radialModulation={false}
                 modulationOffset={0.0}
+              />
+              {/* Sporadic signal-instability glitch — calm 85% of the time (ratio), with a
+                  brief burst every 5–10s, matching the Prometheus hologram flicker. */}
+              <Glitch
+                delay={new Vector2(5, 10)}
+                duration={new Vector2(0.1, 0.2)}
+                strength={new Vector2(0.05, 0.15)}
+                mode={GlitchMode.SPORADIC}
+                ratio={0.85}
               />
               <Noise opacity={0.04} blendFunction={BlendFunction.SOFT_LIGHT} />
               <Vignette eskil={false} offset={0.2} darkness={0.7} blendFunction={BlendFunction.NORMAL} />

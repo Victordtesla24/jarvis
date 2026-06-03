@@ -562,8 +562,8 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
                 <Points positions={satelliteData} stride={3} frustumCulled={false}>
                     <PointMaterial
                         transparent
-                        color="#00F0FF"
-                        size={0.015}
+                        color="#C9A84C"
+                        size={0.02}
                         sizeAttenuation={true}
                         depthWrite={false}
                         blending={AdditiveBlending}

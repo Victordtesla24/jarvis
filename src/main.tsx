@@ -1,4 +1,3 @@
-import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
@@ -28,4 +27,6 @@ const view = q.includes('orbitals')
   : q.includes('core') ? <CoreLab /> : <App />;
 
 const root = ReactDOM.createRoot(rootElement);
-root.render(<React.StrictMode>{view}</React.StrictMode>);
+// Arwes (@arwes/react) requires React's development double-invoke wrapper to be removed:
+// that wrapper's double mount/unmount breaks its animator + frame-assembler lifecycle.
+root.render(<>{view}</>);
