@@ -1,597 +1,444 @@
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { useFrame, useLoader } from '@react-three/fiber';
-import { TextureLoader, Mesh, AdditiveBlending, DoubleSide, Group, BufferAttribute, Vector3, PlaneGeometry, MeshPhongMaterial, DirectionalLight } from 'three';
-import { Points, PointMaterial, Text } from '@react-three/drei';
-import * as random from 'maath/random/dist/maath-random.esm';
+import {
+  TextureLoader, Texture, Color, Mesh, LineSegments, AdditiveBlending, DoubleSide, FrontSide, BackSide, Group,
+  BufferAttribute, BufferGeometry, Vector3, PlaneGeometry, ShaderMaterial, Points as ThreePoints,
+} from 'three';
+import { Text } from '@react-three/drei';
 import { HandTrackingState, RegionName } from '../types';
 import { SoundService } from '../services/soundService';
-import { HolographicMaterial } from '../materials/HolographicMaterial';
+import { sunDirection, regionForDegrees, fibonacciSphere, orbitalNode } from './holoGlobe';
 
 interface HolographicEarthProps {
   handTrackingRef: React.MutableRefObject<HandTrackingState>;
   setRegion: (region: RegionName) => void;
 }
 
-const DEG = Math.PI / 180;
+// ── Holographic globe — monochromatic cyan ───────────────────────────────────
+// A genuinely HOLOGRAPHIC earth (matched to youtu.be/yXpkIrR81w8 @0:46): glowing
+// cyan continent outlines + a cyan particle atmosphere over a translucent dark
+// body, framed by counter-rotating cyan arc-rings and a single tilted dotted
+// orbital with a travelling node. No photo texture, no off-palette gold/magenta —
+// one cyan palette consistent with the rest of the dashboard. The land texture is
+// sampled ONLY as a land/ocean mask inside the shader, then re-coloured cyan.
 
-// Unit direction to the sun in the globe's (world) frame, from real wall-clock time, so
-// the day/night terminator on the globe tracks the operator's actual system clock. The
-// subsolar point: longitude follows UTC (solar noon at 0° at 12:00 UTC), latitude is the
-// seasonal declination from the day-of-year.
-function sunDirection(date: Date): Vector3 {
-  const start = Date.UTC(date.getUTCFullYear(), 0, 0);
-  const dayOfYear = Math.floor((date.getTime() - start) / 86400000);
-  const decl = -23.44 * Math.cos((360 / 365) * (dayOfYear + 10) * DEG);
-  const utcHours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
-  const sunLon = -15 * (utcHours - 12);
-  const latR = decl * DEG, lonR = sunLon * DEG;
-  return new Vector3(
-    Math.cos(latR) * Math.cos(lonR),
-    Math.sin(latR),
-    -Math.cos(latR) * Math.sin(lonR),
-  ).normalize();
+const CYAN = '#00F0FF';
+const EARTH_TEX = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg';
+
+// Glowing cyan continents from a land/ocean mask, brighter on the sun-facing
+// hemisphere (live system clock) with a faint latitude shimmer + a fresnel rim.
+function makeContinentMaterial(map: Texture): ShaderMaterial {
+  return new ShaderMaterial({
+    transparent: true,
+    blending: AdditiveBlending,
+    depthWrite: false,
+    side: FrontSide,
+    toneMapped: false,
+    uniforms: {
+      map: { value: map },
+      uColor: { value: new Color(CYAN) },
+      uSunDir: { value: new Vector3(1, 0, 0) },
+      uOpacity: { value: 1 },
+      uTime: { value: 0 },
+    },
+    vertexShader: /* glsl */`
+      varying vec2 vUv;
+      varying vec3 vViewNormal;
+      varying vec3 vWorldNormal;
+      varying vec3 vViewDir;
+      void main() {
+        vUv = uv;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        vViewNormal = normalize(normalMatrix * normal);
+        vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+        vViewDir = normalize(-mvPos.xyz);
+        gl_Position = projectionMatrix * mvPos;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform sampler2D map;
+      uniform vec3 uColor;
+      uniform vec3 uSunDir;
+      uniform float uOpacity;
+      uniform float uTime;
+      varying vec2 vUv;
+      varying vec3 vViewNormal;
+      varying vec3 vWorldNormal;
+      varying vec3 vViewDir;
+      void main() {
+        vec3 t = texture2D(map, vUv).rgb;
+        // land sits warm/green over the blue oceans → r,g dominate b on continents
+        float land = smoothstep(0.02, 0.17, (t.r + t.g) * 0.5 - t.b * 0.85 + 0.02);
+        float fres = pow(1.0 - max(dot(normalize(vViewNormal), normalize(vViewDir)), 0.0), 2.2);
+        float day = clamp(dot(normalize(vWorldNormal), normalize(uSunDir)) * 0.5 + 0.5, 0.16, 1.0);
+        float scan = 0.86 + 0.14 * sin(vUv.y * 190.0 + uTime * 1.4);
+        float intensity = land * (0.45 + 0.8 * day) * scan + fres * 0.7;
+        float alpha = clamp(land * (0.5 + 0.5 * day) + fres * 0.42, 0.0, 1.0) * uOpacity;
+        gl_FragColor = vec4(uColor * intensity, alpha);
+      }`,
+  });
 }
 
-// Day/night shader injection for the Earth's phong material: keeps the lit hemisphere
-// sun-shaded while the night hemisphere reveals city lights from the night-lights texture.
-interface EarthShader {
-  uniforms: { [name: string]: { value: unknown } };
-  vertexShader: string;
-  fragmentShader: string;
+// Latitude/longitude wireframe sphere as line segments (cyan grid lines).
+function makeLatLonGeometry(latBands: number, lonBands: number, radius: number): BufferGeometry {
+  const pts: number[] = [];
+  const seg = 64;
+  for (let i = 1; i < latBands; i++) {
+    const phi = (i / latBands) * Math.PI;            // 0..π
+    const y = Math.cos(phi) * radius, rr = Math.sin(phi) * radius;
+    for (let s = 0; s < seg; s++) {
+      const a0 = (s / seg) * Math.PI * 2, a1 = ((s + 1) / seg) * Math.PI * 2;
+      pts.push(Math.cos(a0) * rr, y, Math.sin(a0) * rr, Math.cos(a1) * rr, y, Math.sin(a1) * rr);
+    }
+  }
+  for (let j = 0; j < lonBands; j++) {
+    const theta = (j / lonBands) * Math.PI * 2;
+    for (let s = 0; s < seg; s++) {
+      const p0 = (s / seg) * Math.PI, p1 = ((s + 1) / seg) * Math.PI;
+      const y0 = Math.cos(p0) * radius, r0 = Math.sin(p0) * radius;
+      const y1 = Math.cos(p1) * radius, r1 = Math.sin(p1) * radius;
+      pts.push(Math.cos(theta) * r0, y0, Math.sin(theta) * r0, Math.cos(theta) * r1, y1, Math.sin(theta) * r1);
+    }
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new BufferAttribute(new Float32Array(pts), 3));
+  return g;
 }
 
-// --- Tactical Terrain Component (Iron Man HUD Style) ---
-const TerrainModel: React.FC<{ 
-    expansionRef: React.MutableRefObject<number>;
-}> = ({ expansionRef }) => {
-    const groupRef = useRef<Group>(null);
-    const spinRef = useRef<Group>(null);
-    const meshRef = useRef<Mesh>(null);
-    const fillMeshRef = useRef<Mesh>(null);
-    const markersRef = useRef<Group>(null);
-    const ringRef = useRef<Mesh>(null);
+// Dotted orbital path (a tilted ring of fine cyan points the node rides around).
+function makeOrbitGeometry(count: number, radius: number): BufferGeometry {
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * Math.PI * 2;
+    pos[i * 3] = Math.cos(a) * radius;
+    pos[i * 3 + 1] = 0;
+    pos[i * 3 + 2] = Math.sin(a) * radius;
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new BufferAttribute(pos, 3));
+  return g;
+}
 
-    const [terrainData, setTerrainData] = useState<{
-        geometry: PlaneGeometry;
-        maxHeights: Float32Array;
-    } | null>(null);
+// ── Tactical Terrain (Iron Man HUD Style) — revealed as the operator zooms in ──
+const TerrainModel: React.FC<{ expansionRef: React.MutableRefObject<number> }> = ({ expansionRef }) => {
+  const groupRef = useRef<Group>(null);
+  const spinRef = useRef<Group>(null);
+  const meshRef = useRef<Mesh>(null);
+  const fillMeshRef = useRef<Mesh>(null);
+  const markersRef = useRef<Group>(null);
+  const ringRef = useRef<Mesh>(null);
 
-    // 1. Generate Height Map Data (Procedural Terrain)
-    useEffect(() => {
-        // CHANGED: Increased size from 6 to 12
-        const width = 12;
-        const depth = 12;
-        const segments = 64; // Increased segments for smoother large map
-        
-        const geom = new PlaneGeometry(width, depth, segments, segments);
-        
-        // Safety check for attributes
-        if (!geom.attributes.position) {
-            console.error("PlaneGeometry attributes missing");
-            return;
+  const [terrainData, setTerrainData] = useState<{ geometry: PlaneGeometry; maxHeights: Float32Array } | null>(null);
+
+  useEffect(() => {
+    const width = 12, depth = 12, segments = 64;
+    const geom = new PlaneGeometry(width, depth, segments, segments);
+    if (!geom.attributes.position) return;
+    const count = geom.attributes.position.count;
+    const posArray = geom.attributes.position.array;
+    const colorArray = new Float32Array(count * 3);
+    const getElevation = (x: number, y: number) => {
+      let z = Math.sin(x * 0.4) * Math.cos(y * 0.4) * 1.5;
+      z += Math.sin(x * 1.5 + y * 0.8) * 0.5;
+      z += Math.cos(x * 2.0) * 0.2;
+      return Math.max(-0.5, z);
+    };
+    const maxHeights = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      const x = posArray[i * 3];
+      const y = posArray[i * 3 + 1];
+      const h = getElevation(x, y);
+      maxHeights[i] = h > 0 ? h : h * 0.2;
+      const intensity = 0.2 + (h + 1) / 3;
+      colorArray[i * 3] = 0;
+      colorArray[i * 3 + 1] = intensity * 0.85;
+      colorArray[i * 3 + 2] = intensity * 1.0;
+    }
+    geom.setAttribute('color', new BufferAttribute(colorArray, 3));
+    setTerrainData({ geometry: geom, maxHeights });
+    return () => { geom.dispose(); };
+  }, []);
+
+  const markers = useMemo(() => {
+    const items = [];
+    const placeNames = ['SECTOR 7', 'ALPHA BASE', 'NORTH RIDGE', 'OMEGA POINT', 'ECHO STATION', 'DELTA FORCE', 'GRID 9', 'ZERO NULL', 'CYBER DOCK', 'NEON CITY', 'LUNA OUTPOST', 'SOLAR ARRAY'];
+    for (let i = 0; i < 12; i++) {
+      const x = (Math.random() - 0.5) * 10.0;
+      const z = (Math.random() - 0.5) * 10.0;
+      items.push({ position: new Vector3(x, 0, z), label: `TGT-${i}`, name: placeNames[Math.floor(Math.random() * placeNames.length)] });
+    }
+    return items;
+  }, []);
+
+  useFrame((state) => {
+    if (!groupRef.current || !meshRef.current || !fillMeshRef.current || !terrainData) return;
+    const exp = expansionRef.current;
+    const { maxHeights } = terrainData;
+    let progress = (exp - 0.5) / 0.5;
+    progress = Math.max(0, Math.min(1, progress));
+    if (progress > 0.99) progress = 1.0;
+    groupRef.current.visible = progress > 0.01;
+    if (!groupRef.current.visible) return;
+    if (spinRef.current) spinRef.current.rotation.z = -state.clock.elapsedTime * 0.05;
+    if (meshRef.current.geometry && meshRef.current.geometry.attributes.position) {
+      const positionAttribute = meshRef.current.geometry.attributes.position;
+      const positions = positionAttribute.array as Float32Array;
+      for (let i = 0; i < positions.length / 3; i++) {
+        const targetH = maxHeights[i] * 0.8 * progress;
+        const x = positions[i * 3];
+        const wave = Math.sin(x * 2 + state.clock.elapsedTime * 2) * 0.1 * progress;
+        positions[i * 3 + 2] = targetH + wave;
+      }
+      positionAttribute.needsUpdate = true;
+    }
+    if (markersRef.current) {
+      markersRef.current.children.forEach((child, idx) => {
+        const m = markers[idx];
+        if (!m) return;
+        const currentHeight = 0.5 + progress * 1.5;
+        child.position.set(m.position.x, m.position.z, currentHeight);
+        const head = child.children[1] as Group;
+        if (head) {
+          head.lookAt(state.camera.position);
+          const outerRing = head.children[0];
+          if (outerRing) outerRing.rotation.z -= 0.02;
+          const centerDot = head.children[2];
+          if (centerDot) centerDot.scale.setScalar(1 + Math.sin(state.clock.elapsedTime * 8 + idx) * 0.2);
         }
+      });
+    }
+    if (ringRef.current) {
+      ringRef.current.scale.setScalar(1 + (state.clock.elapsedTime % 2) * 0.5);
+      (ringRef.current.material as { opacity: number }).opacity = 0.5 * (1 - (state.clock.elapsedTime % 2) / 2);
+    }
+  });
 
-        const count = geom.attributes.position.count;
-        const posArray = geom.attributes.position.array;
-        
-        // Generate colors based on height for the wireframe
-        const colorArray = new Float32Array(count * 3);
+  if (!terrainData) return null;
 
-        // Simple FBM-like noise function for terrain shape
-        const getElevation = (x: number, y: number) => {
-            // Main ridge (Frequency adjusted for larger map)
-            let z = Math.sin(x * 0.4) * Math.cos(y * 0.4) * 1.5; 
-            // Detail noise
-            z += Math.sin(x * 1.5 + y * 0.8) * 0.5;
-            z += Math.cos(x * 2.0) * 0.2;
-            // Valley flattening
-            return Math.max(-0.5, z); 
-        };
-
-        // Pre-calculate max heights
-        const maxHeights = new Float32Array(count);
-
-        for (let i = 0; i < count; i++) {
-             const x = posArray[i * 3];
-             const y = posArray[i * 3 + 1]; // PlaneGeometry is XY, we rotate it later
-             
-             // Calculate target height
-             const h = getElevation(x, y);
-             maxHeights[i] = h > 0 ? h : h * 0.2; // Flatten valleys
-
-             // Color logic: Cyan for peaks, darker blue for lowlands
-             const intensity = 0.2 + (h + 1) / 3;
-             colorArray[i*3] = 0;   // R
-             colorArray[i*3+1] = intensity * 0.8; // G
-             colorArray[i*3+2] = intensity * 1.0; // B
-        }
-        
-        geom.setAttribute('color', new BufferAttribute(colorArray, 3));
-
-        setTerrainData({ geometry: geom, maxHeights });
-        
-        return () => {
-            geom.dispose();
-        };
-    }, []);
-
-    // 2. Target Markers (Floating points above peaks)
-    const markers = useMemo(() => {
-        const items = [];
-        const placeNames = ["SECTOR 7", "ALPHA BASE", "NORTH RIDGE", "OMEGA POINT", "ECHO STATION", "DELTA FORCE", "GRID 9", "ZERO NULL", "CYBER DOCK", "NEON CITY", "LUNA OUTPOST", "SOLAR ARRAY"];
-        for(let i=0; i<12; i++) { // Increased marker count slightly
-            // CHANGED: Increased spread range to match 12x12 grid (was 4.5)
-            const x = (Math.random() - 0.5) * 10.0;
-            const z = (Math.random() - 0.5) * 10.0;
-            items.push({ 
-                position: new Vector3(x, 0, z), 
-                label: `TGT-${i}`,
-                name: placeNames[Math.floor(Math.random() * placeNames.length)]
-            });
-        }
-        return items;
-    }, []);
-
-    useFrame((state) => {
-        if (!groupRef.current || !meshRef.current || !fillMeshRef.current || !terrainData) return;
-        
-        const exp = expansionRef.current;
-        const { maxHeights } = terrainData;
-        
-        // --- TRANSITION LOGIC ---
-        // CHANGED: Terrain starts appearing at 0.5 (50%), Fully formed at 1.0
-        let progress = (exp - 0.5) / 0.5;
-        progress = Math.max(0, Math.min(1, progress));
-        
-        // Snap to avoid jitter at max
-        if (progress > 0.99) progress = 1.0;
-
-        groupRef.current.visible = progress > 0.01;
-        if (!groupRef.current.visible) return;
-
-        if (spinRef.current) {
-            spinRef.current.rotation.z = -state.clock.elapsedTime * 0.05;
-        }
-
-        // --- ANIMATE GEOMETRY ---
-        if (meshRef.current.geometry && meshRef.current.geometry.attributes.position) {
-            const positionAttribute = meshRef.current.geometry.attributes.position;
-            const positions = positionAttribute.array as Float32Array;
-            
-            for (let i = 0; i < positions.length / 3; i++) {
-                // CHANGED: Reduced height multiplier from 2.0 to 0.8 for flatter look
-                const targetH = maxHeights[i] * 0.8 * progress; 
-                
-                const x = positions[i*3];
-                const wave = Math.sin(x * 2 + state.clock.elapsedTime * 2) * 0.1 * progress;
-                
-                const finalH = targetH + wave;
-
-                positions[i*3 + 2] = finalH;
-            }
-            positionAttribute.needsUpdate = true;
-        }
-
-        // --- ANIMATE MARKERS ---
-        if (markersRef.current) {
-             markersRef.current.children.forEach((child, idx) => {
-                 const m = markers[idx];
-                 if (!m) return;
-                 
-                 const currentHeight = 0.5 + progress * 1.5;
-                 
-                 child.position.set(m.position.x, m.position.z, currentHeight);
-                 
-                 const head = child.children[1] as Group;
-                 if (head) {
-                     head.lookAt(state.camera.position);
-                     const outerRing = head.children[0]; 
-                     if (outerRing) {
-                         outerRing.rotation.z -= 0.02;
-                     }
-                     const centerDot = head.children[2];
-                     if (centerDot) {
-                         const scale = 1 + Math.sin(state.clock.elapsedTime * 8 + idx) * 0.2;
-                         centerDot.scale.setScalar(scale);
-                     }
-                 }
-             });
-        }
-
-        // Radar Ring Animation
-        if (ringRef.current) {
-            ringRef.current.scale.setScalar(1 + (state.clock.elapsedTime % 2) * 0.5);
-            (ringRef.current.material as any).opacity = 0.5 * (1 - (state.clock.elapsedTime % 2) / 2);
-        }
-    });
-
-    if (!terrainData) return null;
-
-    return (
-        <group ref={groupRef} visible={false}>
-             {/* Slanted Tactical View */}
-             <group rotation={[-Math.PI / 2.5, 0, 0]} position={[0, -1, 0]}> 
-                
-                <group ref={spinRef}>
-                    {/* Base Grid (Static floor) */}
-                    <gridHelper 
-                        args={[30, 30, 0x001133, 0x000510]} 
-                        position={[0, 0, 0.1]} 
-                        rotation={[Math.PI/2, 0, 0]}
-                    />
-
-                    {/* Wireframe Terrain */}
-                    <mesh ref={meshRef} geometry={terrainData.geometry}>
-                        <meshBasicMaterial 
-                            vertexColors
-                            wireframe
-                            transparent 
-                            opacity={0.6} 
-                            blending={AdditiveBlending}
-                        />
+  return (
+    <group ref={groupRef} visible={false}>
+      <group rotation={[-Math.PI / 2.5, 0, 0]} position={[0, -1, 0]}>
+        <group ref={spinRef}>
+          <gridHelper args={[30, 30, 0x0a3a55, 0x041a28]} position={[0, 0, 0.1]} rotation={[Math.PI / 2, 0, 0]} />
+          <mesh ref={meshRef} geometry={terrainData.geometry}>
+            <meshBasicMaterial vertexColors wireframe transparent opacity={0.6} blending={AdditiveBlending} />
+          </mesh>
+          <mesh ref={fillMeshRef} geometry={terrainData.geometry}>
+            <meshBasicMaterial color="#000000" transparent opacity={0.8} side={DoubleSide} />
+          </mesh>
+          <group ref={markersRef}>
+            {markers.map((m, i) => (
+              <group key={i} position={[m.position.x, m.position.z, 0]}>
+                <mesh position={[0, 0, -1.5]} rotation={[Math.PI / 2, 0, 0]}>
+                  <cylinderGeometry args={[0.005, 0.02, 3, 4]} />
+                  <meshBasicMaterial color={CYAN} transparent opacity={0.3} blending={AdditiveBlending} depthWrite={false} />
+                </mesh>
+                <group>
+                  <mesh rotation={[0, 0, Math.random() * Math.PI]}>
+                    <ringGeometry args={[0.15, 0.16, 32, 1, 0, Math.PI * 1.5]} />
+                    <meshBasicMaterial color={CYAN} transparent opacity={0.6} blending={AdditiveBlending} side={DoubleSide} depthWrite={false} />
+                  </mesh>
+                  <mesh rotation={[0, 0, Math.PI / 4]}>
+                    <ringGeometry args={[0.08, 0.09, 4]} />
+                    <meshBasicMaterial color={CYAN} transparent opacity={0.8} blending={AdditiveBlending} side={DoubleSide} depthWrite={false} />
+                  </mesh>
+                  <mesh>
+                    <circleGeometry args={[0.03, 16]} />
+                    <meshBasicMaterial color={CYAN} transparent opacity={0.95} blending={AdditiveBlending} depthWrite={false} />
+                  </mesh>
+                  <group position={[0.25, 0.05, 0]}>
+                    <mesh position={[-0.1, -0.05, 0]} rotation={[0, 0, Math.PI / 4]}>
+                      <planeGeometry args={[0.1, 0.01]} />
+                      <meshBasicMaterial color={CYAN} opacity={0.5} transparent blending={AdditiveBlending} />
                     </mesh>
-
-                    {/* Fill Terrain */}
-                    <mesh ref={fillMeshRef} geometry={terrainData.geometry}>
-                        <meshBasicMaterial 
-                            color="#000000" 
-                            transparent 
-                            opacity={0.8}
-                            side={DoubleSide}
-                        />
+                    <mesh position={[0.3, 0, 0]}>
+                      <planeGeometry args={[0.8, 0.16]} />
+                      <meshBasicMaterial color="#000510" transparent opacity={0.8} />
                     </mesh>
-
-                    {/* Floating Targets */}
-                    <group ref={markersRef}>
-                        {markers.map((m, i) => (
-                            <group key={i} position={[m.position.x, m.position.z, 0]}>
-                                {/* Tether */}
-                                <mesh position={[0, 0, -1.5]} rotation={[Math.PI/2, 0, 0]}>
-                                    <cylinderGeometry args={[0.005, 0.02, 3, 4]} /> 
-                                    <meshBasicMaterial 
-                                        color="#00F0FF" 
-                                        transparent 
-                                        opacity={0.3} 
-                                        blending={AdditiveBlending} 
-                                        depthWrite={false} 
-                                    />
-                                </mesh>
-
-                                {/* Head */}
-                                <group>
-                                    <mesh rotation={[0,0, Math.random() * Math.PI]}>
-                                        <ringGeometry args={[0.15, 0.16, 32, 1, 0, Math.PI * 1.5]} />
-                                        <meshBasicMaterial color="#00F0FF" transparent opacity={0.6} blending={AdditiveBlending} side={DoubleSide} depthWrite={false} />
-                                    </mesh>
-                                    
-                                    <mesh rotation={[0,0,Math.PI/4]}>
-                                        <ringGeometry args={[0.08, 0.09, 4]} />
-                                        <meshBasicMaterial color="#00F0FF" transparent opacity={0.8} blending={AdditiveBlending} side={DoubleSide} depthWrite={false} />
-                                    </mesh>
-
-                                    <mesh>
-                                        <circleGeometry args={[0.03, 16]} />
-                                        <meshBasicMaterial color="#FF2A2A" transparent opacity={0.9} blending={AdditiveBlending} depthWrite={false} />
-                                    </mesh>
-
-                                    <group position={[0.25, 0.05, 0]}>
-                                        <mesh position={[-0.1, -0.05, 0]} rotation={[0,0,Math.PI/4]}>
-                                            <planeGeometry args={[0.1, 0.01]} />
-                                            <meshBasicMaterial color="#00F0FF" opacity={0.5} transparent blending={AdditiveBlending} />
-                                        </mesh>
-                                        
-                                        <mesh position={[0.3, 0, 0]}>
-                                            <planeGeometry args={[0.8, 0.16]} />
-                                            <meshBasicMaterial color="#000510" transparent opacity={0.8} />
-                                        </mesh>
-                                        
-                                        <Text
-                                            position={[0.3, 0, 0.01]}
-                                            fontSize={0.08}
-                                            color="#00F0FF"
-                                            anchorX="center"
-                                            anchorY="middle"
-                                        >
-                                            {m.name}
-                                        </Text>
-                                    </group>
-                                </group>
-                            </group>
-                        ))}
-                    </group>
-
-                    {/* Radar Ring */}
-                    <mesh ref={ringRef} position={[0,0,0.2]}>
-                        <ringGeometry args={[1.5, 1.55, 64]} />
-                        <meshBasicMaterial color="#00F0FF" transparent opacity={0.5} blending={AdditiveBlending} side={DoubleSide} />
-                    </mesh>
+                    <Text position={[0.3, 0, 0.01]} fontSize={0.08} color={CYAN} anchorX="center" anchorY="middle">{m.name}</Text>
+                  </group>
                 </group>
-             </group>
+              </group>
+            ))}
+          </group>
+          <mesh ref={ringRef} position={[0, 0, 0.2]}>
+            <ringGeometry args={[1.5, 1.55, 64]} />
+            <meshBasicMaterial color={CYAN} transparent opacity={0.5} blending={AdditiveBlending} side={DoubleSide} />
+          </mesh>
         </group>
-    );
+      </group>
+    </group>
+  );
 };
 
+const ARC_RINGS = [
+  { r: 1.32, tube: 0.006, arc: Math.PI * 1.35, tilt: 0.0, spin: 0.05 },
+  { r: 1.5, tube: 0.005, arc: Math.PI * 0.85, tilt: 0.5, spin: -0.035 },
+  { r: 1.68, tube: 0.004, arc: Math.PI * 1.15, tilt: -0.4, spin: 0.025 },
+];
 
 const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, setRegion }) => {
-  const earthGroupRef = useRef<Group>(null);
-  const earthRef = useRef<Mesh>(null);
-  const holoShellRef = useRef<Mesh>(null);
-  const cloudsRef = useRef<Mesh>(null);
-  const wireframeRef = useRef<Mesh>(null);
-  const ringRef = useRef<Mesh>(null);
-  const particlesRef = useRef<any>(null);
-  
+  const earthGroupRef = useRef<Group>(null);   // whole assembly (faded on zoom)
+  const spinRef = useRef<Group>(null);          // globe body + continents + grid (spins)
+  const gridRef = useRef<LineSegments>(null);
+  const atmosRef = useRef<ThreePoints>(null);
+  const ringsRef = useRef<Group>(null);
+  const orbitRef = useRef<Group>(null);
+  const nodeRef = useRef<Mesh>(null);
+
   const smoothExpansionRef = useRef(0);
   const wasTerrainModeRef = useRef(false);
 
-  // Day/night: sun light + shader uniform tracked from the live system clock.
-  const earthMatRef = useRef<MeshPhongMaterial>(null);
-  const sunLightRef = useRef<DirectionalLight>(null);
-  const sunUniformRef = useRef<{ value: Vector3 } | null>(null);
+  const continentMatRef = useRef<ShaderMaterial | null>(null);
   const sunDirRef = useRef<Vector3>(sunDirection(new Date()));
   const sunFrame = useRef(0);
 
-  // Load Color, Normal, and Specular maps for realistic texture
-  const [colorMap, normalMap, specularMap, nightMap] = useLoader(TextureLoader, [
-    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg',
-    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_normal_2048.jpg',
-    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg',
-    'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_lights_2048.png'
-  ]);
-  
-  const satelliteData = useMemo(() => {
-     try {
-         return random.inSphere(new Float32Array(1500), { radius: 2.2 }) as Float32Array;
-     } catch (e) {
-         return new Float32Array(1500);
-     }
-  }, []);
+  // Continents are sampled from the earth land texture but recoloured pure cyan in-shader.
+  const colorMap = useLoader(TextureLoader, EARTH_TEX);
+  const continentMat = useMemo(() => makeContinentMaterial(colorMap), [colorMap]);
+  useEffect(() => { continentMatRef.current = continentMat; return () => continentMat.dispose(); }, [continentMat]);
 
-  // Inject day/night into the Earth's phong material: city lights emerge on the night
-  // hemisphere (sun-direction masked), the lit hemisphere stays sun-shaded.
-  useEffect(() => {
-    const mat = earthMatRef.current;
-    if (!mat) return;
-    mat.onBeforeCompile = (shader: EarthShader) => {
-      shader.uniforms.uSunDir = { value: sunDirRef.current };
-      shader.uniforms.uNightTex = { value: nightMap };
-      shader.uniforms.uNightStrength = { value: 2.4 };
-      sunUniformRef.current = shader.uniforms.uSunDir as { value: Vector3 };
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vWorldNrmDN;')
-        .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\n  vWorldNrmDN = normalize(mat3(modelMatrix) * objectNormal);');
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uSunDir;\nuniform sampler2D uNightTex;\nuniform float uNightStrength;\nvarying vec3 vWorldNrmDN;')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  float dnDot = dot(normalize(vWorldNrmDN), normalize(uSunDir));\n  float nightAmt = smoothstep(0.12, -0.22, dnDot);\n  totalEmissiveRadiance += texture2D(uNightTex, vMapUv).rgb * nightAmt * uNightStrength;');
-    };
-    mat.needsUpdate = true;
-  }, [nightMap]);
+  const gridGeo = useMemo(() => makeLatLonGeometry(12, 18, 1.01), []);
+  const atmosGeo = useMemo(() => {
+    const g = new BufferGeometry();
+    g.setAttribute('position', new BufferAttribute(fibonacciSphere(2200, 1.06, 0.05), 3));
+    return g;
+  }, []);
+  const orbitGeo = useMemo(() => makeOrbitGeometry(160, 1.46), []);
+  useEffect(() => () => { gridGeo.dispose(); atmosGeo.dispose(); orbitGeo.dispose(); }, [gridGeo, atmosGeo, orbitGeo]);
 
   useFrame((state, delta) => {
-    if (!earthRef.current || !earthGroupRef.current) return;
+    if (!spinRef.current || !earthGroupRef.current) return;
 
-    // Advance the day/night terminator from the live system clock (throttled recompute).
+    // Live day/night: advance the subsolar point from the system clock (throttled).
     sunFrame.current = (sunFrame.current + 1) % 90;
     if (sunFrame.current === 0) sunDirRef.current = sunDirection(new Date());
-    if (sunUniformRef.current) sunUniformRef.current.value.copy(sunDirRef.current);
-    if (sunLightRef.current) sunLightRef.current.position.copy(sunDirRef.current).multiplyScalar(10);
+    if (continentMatRef.current) {
+      continentMatRef.current.uniforms.uSunDir.value.copy(sunDirRef.current);
+      continentMatRef.current.uniforms.uTime.value = state.clock.elapsedTime;
+    }
 
     const leftHand = handTrackingRef.current.leftHand;
     const rightHand = handTrackingRef.current.rightHand;
-    let targetExpansion = 0;
 
-    // 1. 360 Rotation & Scrolling Control (Right Hand)
-    let currentSpeedX = 0.0005; // Default ambient spin
-    let currentSpeedY = 0;
-    
+    // Right hand spins the globe; default is a slow ambient drift.
+    let speedX = 0.0009;
     if (rightHand) {
-        const { x, y } = rightHand.rotationControl;
-        
-        // X-Axis Control (Spinning Left/Right)
-        if (Math.abs(x) > 0.1) {
-            currentSpeedX = x * 0.05;
-        }
-        
-        // Y-Axis Control (Tilting/Scrolling Up/Down)
-        // We apply this to the entire group for a tumbling effect
-        if (Math.abs(y) > 0.1) {
-            currentSpeedY = y * 0.05;
-        }
+      const { x, y } = rightHand.rotationControl;
+      if (Math.abs(x) > 0.1) speedX = x * 0.05;
+      if (Math.abs(y) > 0.1) earthGroupRef.current.rotation.x += y * 0.04;
     }
-    
-    // Apply Spin (Y-axis) to individual components to maintain opposing wireframe rotation
-    earthRef.current.rotation.y += currentSpeedX;
-    if (cloudsRef.current) cloudsRef.current.rotation.y += currentSpeedX * 1.1;
-    // Wireframe rotates counter to earth for tech effect
-    if (wireframeRef.current) wireframeRef.current.rotation.y -= (currentSpeedX * 0.5);
-    
-    // Apply Tilt (X-axis) to the container group
-    earthGroupRef.current.rotation.x += currentSpeedY;
+    spinRef.current.rotation.y += speedX;
+    if (gridRef.current) gridRef.current.rotation.y -= speedX * 0.4;     // counter-rotating grid
 
-
-    // 2. Expansion/Zoom Control (Left Hand)
+    // Left hand expands → tactical-terrain transition (unchanged choreography).
+    let targetExpansion = 0;
     if (leftHand) {
       targetExpansion = leftHand.expansionFactor;
-
       const movementDelta = Math.abs(targetExpansion - smoothExpansionRef.current);
-      if (movementDelta > 0.002) {
-          SoundService.playServo(movementDelta);
-      }
+      if (movementDelta > 0.002) SoundService.playServo(movementDelta);
     }
-
     smoothExpansionRef.current += (targetExpansion - smoothExpansionRef.current) * 0.08;
     const exp = smoothExpansionRef.current;
 
-    // --- VISIBILITY & TRANSITION CONTROL ---
-    
-    // CHANGED: Earth starts fading earlier (0.4) to separate from Terrain (0.5+)
-    // Fade out range: 0.4 to 0.6
     let earthOpacity = 1;
-    if (exp > 0.4) {
-        earthOpacity = 1 - ((exp - 0.4) / 0.2); 
-        earthOpacity = Math.max(0, Math.min(1, earthOpacity));
-    }
-    
+    if (exp > 0.4) earthOpacity = Math.max(0, Math.min(1, 1 - (exp - 0.4) / 0.2));
     earthGroupRef.current.visible = earthOpacity > 0.01;
+    if (continentMatRef.current) continentMatRef.current.uniforms.uOpacity.value = earthOpacity;
 
-    if (earthGroupRef.current.visible) {
-        if (earthRef.current.material) (earthRef.current.material as any).opacity = 0.9 * earthOpacity;
-        if (cloudsRef.current?.material) (cloudsRef.current.material as any).opacity = 0.15 * earthOpacity;
-        if (wireframeRef.current?.material) (wireframeRef.current.material as any).opacity = 0.2 * earthOpacity;
-        if (ringRef.current?.material) (ringRef.current.material as any).opacity = 0.1 * earthOpacity;
-        if (particlesRef.current) particlesRef.current.visible = earthOpacity > 0.5;
-    }
-
-    // CHANGED: Adjusted sound trigger to match new 50% threshold
     if (exp > 0.55) {
-        if (!wasTerrainModeRef.current) {
-            SoundService.playMapSwitch();
-            wasTerrainModeRef.current = true;
-        }
+      if (!wasTerrainModeRef.current) { SoundService.playMapSwitch(); wasTerrainModeRef.current = true; }
     } else {
-        wasTerrainModeRef.current = false;
+      wasTerrainModeRef.current = false;
     }
 
-    // --- Earth Animations (Only if visible) ---
     if (earthGroupRef.current.visible) {
-        const baseScale = 1.5;
-        const coreScale = baseScale * (1 - Math.max(0, exp - 0.3) * 0.5);
-        earthRef.current.scale.set(coreScale, coreScale, coreScale);
-        // Keep the additive holographic Fresnel shell hugging the textured globe.
-        if (holoShellRef.current) holoShellRef.current.scale.setScalar(coreScale * 1.03);
+      const t = state.clock.elapsedTime;
+      // counter-rotating arc-rings frame the globe
+      if (ringsRef.current) {
+        ringsRef.current.children.forEach((child, i) => {
+          const cfg = ARC_RINGS[i];
+          if (cfg) child.rotation.z += cfg.spin * delta * 4;
+        });
+        ringsRef.current.rotation.x = 0.32 + Math.sin(t * 0.15) * 0.05;
+      }
+      // satellite node rides the tilted dotted orbital
+      if (orbitRef.current) orbitRef.current.rotation.y += delta * 0.05;
+      if (nodeRef.current) {
+        const [nx, ny, nz] = orbitalNode(t * 0.55, 1.46, 1.46, 0.62);
+        nodeRef.current.position.set(nx, ny, nz);
+      }
+      if (atmosRef.current) atmosRef.current.rotation.y += delta * 0.02;
 
-        const cloudScale = baseScale * 1.02 + (exp * 1.0); 
-        if (cloudsRef.current) {
-            cloudsRef.current.scale.set(cloudScale, cloudScale, cloudScale);
-            // Cloud rotation handled above in shared block
-            cloudsRef.current.rotation.y += (exp * 0.01);
-        }
-
-        const wireScale = baseScale * 1.2 + (exp * 2.0);
-        if (wireframeRef.current) {
-            wireframeRef.current.scale.set(wireScale, wireScale, wireScale);
-             // Wireframe rotation handled above in shared block
-             wireframeRef.current.rotation.y -= (exp * 0.02);
-        }
-
-        if (ringRef.current) {
-            ringRef.current.scale.set(1 + exp, 1 + exp, 1 + exp);
-            ringRef.current.rotation.z -= currentSpeedX * 1.5;
-            ringRef.current.rotation.x = (Math.PI / 2) + (Math.sin(state.clock.elapsedTime * 0.2) * 0.1) + (exp * 0.5);
-        }
-
-        if (particlesRef.current) {
-            particlesRef.current.rotation.y += 0.001;
-            particlesRef.current.scale.set(1 + exp * 1.5, 1 + exp * 1.5, 1 + exp * 1.5);
-        }
-
-        const rotationY = earthRef.current.rotation.y % (Math.PI * 2);
-        const normalizedRotation = rotationY < 0 ? rotationY + Math.PI * 2 : rotationY;
-        const degrees = (normalizedRotation * 180) / Math.PI;
-        
-        if (degrees > 30 && degrees < 100) setRegion(RegionName.AMERICAS);
-        else if (degrees >= 100 && degrees < 190) setRegion(RegionName.PACIFIC);
-        else if (degrees >= 190 && degrees < 280) setRegion(RegionName.ASIA);
-        else if (degrees >= 280 && degrees < 330) setRegion(RegionName.AFRICA);
-        else setRegion(RegionName.EUROPE);
+      const deg = (spinRef.current.rotation.y * 180) / Math.PI;
+      setRegion(regionForDegrees(deg));
     }
   });
 
   return (
-    // Post-processing (bloom + chromatic aberration + grain + vignette) is owned by the
-    // App-level globe Canvas composer so the whole scene shares one pipeline — see App.tsx.
     <group position={[0, 0, 0]}>
-        {/* EARTH GROUP */}
-        <group ref={earthGroupRef}>
-            <mesh ref={earthRef}>
-                <sphereGeometry args={[1, 64, 64]} />
-                <meshPhongMaterial
-                    ref={earthMatRef}
-                    map={colorMap}
-                    normalMap={normalMap}
-                    specularMap={specularMap}
-                    color="#2b6fb0"
-                    emissive="#001133"
-                    emissiveMap={colorMap} // faint continent self-glow; day/night added via shader
-                    emissiveIntensity={0.3}
-                    specular="#223a55"
-                    shininess={18}
-                    transparent={true}
-                    opacity={0.95}
-                    blending={AdditiveBlending}
-                />
-            </mesh>
-
-            {/* Additive holographic Fresnel shell — gold Stark-HUD rim glow + animated
-                scanlines layered over the textured globe (textured Earth preserved). */}
-            <mesh ref={holoShellRef}>
-                <sphereGeometry args={[1, 64, 64]} />
-                <HolographicMaterial
-                    hologramColor="#C9A84C"
-                    fresnelOpacity={0.6}
-                    fresnelAmount={0.5}
-                    scanlineSize={10}
-                    signalSpeed={0.4}
-                    hologramOpacity={0.95}
-                />
-            </mesh>
-
-            <mesh ref={cloudsRef}>
-                <sphereGeometry args={[1.01, 64, 64]} />
-                <meshBasicMaterial 
-                    map={colorMap}
-                    color="#00F0FF"
-                    transparent
-                    opacity={0.2}
-                    blending={AdditiveBlending}
-                />
-            </mesh>
-
-            <mesh ref={wireframeRef}>
-                <icosahedronGeometry args={[1, 2]} />
-                <meshBasicMaterial 
-                    color="#002FA7" 
-                    wireframe 
-                    transparent 
-                    opacity={0.2} 
-                    blending={AdditiveBlending}
-                />
-            </mesh>
-
-            <group ref={particlesRef} rotation={[0,0,Math.PI/4]}>
-                <Points positions={satelliteData} stride={3} frustumCulled={false}>
-                    <PointMaterial
-                        transparent
-                        color="#C9A84C"
-                        size={0.02}
-                        sizeAttenuation={true}
-                        depthWrite={false}
-                        blending={AdditiveBlending}
-                    />
-                </Points>
-            </group>
-
-            <mesh ref={ringRef} rotation={[Math.PI / 2.3, 0, 0]}>
-                <ringGeometry args={[2.0, 2.4, 128]} />
-                <meshBasicMaterial 
-                    color="#00F0FF" 
-                    side={DoubleSide} 
-                    transparent 
-                    opacity={0.1} 
-                    blending={AdditiveBlending}
-                />
-            </mesh>
+      <group ref={earthGroupRef} scale={1.4}>
+        {/* spinning globe: translucent body + cyan continents + lat/lon grid */}
+        <group ref={spinRef}>
+          {/* dark translucent body — occludes the far hemisphere so continents read as a solid hologram */}
+          <mesh renderOrder={0}>
+            <sphereGeometry args={[0.99, 64, 64]} />
+            <meshBasicMaterial color="#04161e" transparent opacity={0.5} side={FrontSide} />
+          </mesh>
+          {/* inner back-shell for subtle depth */}
+          <mesh>
+            <sphereGeometry args={[0.985, 48, 48]} />
+            <meshBasicMaterial color="#0a3550" transparent opacity={0.12} side={BackSide} blending={AdditiveBlending} depthWrite={false} />
+          </mesh>
+          {/* glowing cyan continents */}
+          <mesh renderOrder={1} material={continentMat}>
+            <sphereGeometry args={[1.0, 96, 96]} />
+          </mesh>
+          {/* lat/long wireframe */}
+          <lineSegments ref={gridRef} geometry={gridGeo} renderOrder={1}>
+            <lineBasicMaterial color={CYAN} transparent opacity={0.12} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </lineSegments>
         </group>
-        
-        {/* TERRAIN MODEL OVERLAY */}
-        <TerrainModel expansionRef={smoothExpansionRef} />
-        
-        {/* Warm directional sun — its position is driven by the live system clock so the
-            globe carries a real day/night terminator (city lights bloom on the night side). */}
-        <directionalLight ref={sunLightRef} color="#fff4e0" intensity={2.4} />
-        <ambientLight intensity={0.12} color="#002FA7" />
-        <pointLight position={[10, 10, 10]} intensity={2} color="#00F0FF" />
-        <pointLight position={[-10, -10, -5]} intensity={1} color="#FF00FF" />
+
+        {/* cyan particle atmosphere */}
+        <points ref={atmosRef} geometry={atmosGeo}>
+          <pointsMaterial color={CYAN} size={0.012} sizeAttenuation transparent opacity={0.55} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+        </points>
+
+        {/* counter-rotating cyan arc-rings */}
+        <group ref={ringsRef}>
+          {ARC_RINGS.map((cfg, i) => (
+            <mesh key={i} rotation={[cfg.tilt, 0, 0]}>
+              <torusGeometry args={[cfg.r, cfg.tube, 8, 180, cfg.arc]} />
+              <meshBasicMaterial color={CYAN} transparent opacity={0.45} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+            </mesh>
+          ))}
+          {/* equator hoop */}
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[1.18, 0.004, 8, 220]} />
+            <meshBasicMaterial color={CYAN} transparent opacity={0.3} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </mesh>
+        </group>
+
+        {/* tilted dotted orbital + travelling node */}
+        <group ref={orbitRef} rotation={[0.62, 0, 0]}>
+          <points geometry={orbitGeo}>
+            <pointsMaterial color={CYAN} size={0.02} sizeAttenuation transparent opacity={0.7} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+          </points>
+        </group>
+        <mesh ref={nodeRef}>
+          <sphereGeometry args={[0.03, 16, 16]} />
+          <meshBasicMaterial color="#BDF6FF" toneMapped={false} />
+        </mesh>
+
+        {/* cyan technical callout */}
+        <Text position={[-1.75, 0.55, 0]} fontSize={0.12} color={CYAN} anchorX="left" anchorY="middle" outlineWidth={0} fillOpacity={0.85}>
+          ORBITAL SCAN
+        </Text>
+      </group>
+
+      <TerrainModel expansionRef={smoothExpansionRef} />
+
+      <ambientLight intensity={0.4} color={CYAN} />
     </group>
   );
 };
