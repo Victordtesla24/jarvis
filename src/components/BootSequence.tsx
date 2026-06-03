@@ -4,6 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, ChromaticAberration, Vignette } from '@react-three/postprocessing';
 import { KernelSize } from 'postprocessing';
 import { bootSheet, types } from '../theatre/project';
+import { starfieldGeometry, makeMoteMaterial } from './relativity/AtomicOrbitals';
 
 // ── BootSequence ─────────────────────────────────────────────────────────────
 // A 14-second cinematic JARVIS power-on, storyboard-matched to the reference reel
@@ -55,6 +56,29 @@ function radialTexture(): THREE.CanvasTexture {
     g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
   }
   const t = new THREE.CanvasTexture(c); t.needsUpdate = true; return t;
+}
+
+// ── deep twinkling cyan starfield the camera flies THROUGH ───────────────────
+// A surrounding shell of soft round motes (same material as the dashboard's
+// reactor dust, so the boot and live HUD share one visual language). The
+// fly-through dollies the camera into it for genuine warp-depth; it fades in as
+// the reticle assembles and dims into the ignition white-flash.
+function StarField() {
+  const grp = useRef<THREE.Group>(null);
+  const geo = useMemo(() => starfieldGeometry({ count: 1500, inner: 2.4, outer: 9 }), []);
+  const mat = useMemo(() => makeMoteMaterial({ sizeBase: 0.07, color: '#9FE9FF', bright: 1.2 }), []);
+  useEffect(() => () => { geo.dispose(); mat.dispose(); }, [geo, mat]);
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    const u = mat.userData.u;
+    u.uTime.value = t;
+    u.uDrift.value = 0.05;
+    if (grp.current) grp.current.rotation.y += 0.0004;
+    const inP = easeOutCubic(seg(t, 0.2, 2.2));
+    const out = 1 - easeOutExpo(seg(t, P.igniteStart, P.igniteEnd + 0.6));   // swallowed by the flash
+    mat.opacity = 0.55 * inP * out;
+  });
+  return <group ref={grp}><points geometry={geo} material={mat} /></group>;
 }
 
 // ── concentric HUD reticle that assembles, spins, then warps past the lens ───
@@ -289,7 +313,9 @@ const BootSequence: React.FC<BootSequenceProps> = ({ onComplete }) => {
         // resolve from glitchy cyan/white to stable blue across 8.5→10.5
         const resolve = clamp01((t - 8.5) / 2);
         const split = (1 - resolve) * 6;
-        titleRef.current.style.color = resolve > 0.85 ? '#2D64A5' : '#EAFBFF';
+        // resolve to a glowing ICE-CYAN hologram (was a dull off-palette blue) so the
+        // settled title belongs to the dashboard's monochromatic-cyan language.
+        titleRef.current.style.color = resolve > 0.85 ? '#CFF6FF' : '#EAFBFF';
         titleRef.current.style.textShadow =
           `${-split}px 0 rgba(255,40,60,${0.6 * (1 - resolve)}), ${split}px 0 rgba(0,210,255,${0.6 * (1 - resolve)}), 0 0 ${18 + 30 * resolve}px rgba(96,213,247,${0.55 + 0.3 * resolve})`;
       }
@@ -332,6 +358,7 @@ const BootSequence: React.FC<BootSequenceProps> = ({ onComplete }) => {
           <fog attach="fog" args={['#020A19', 4, 13]} />
           <Suspense fallback={null}>
             <CameraRig />
+            <StarField />
             <Reticle />
             <Plexus />
             <BloomDriven />
