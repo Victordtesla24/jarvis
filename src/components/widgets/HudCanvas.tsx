@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useRef } from 'react';
 import { HandTrackingState } from '../../types';
 import { AgentState } from '../../services/agentState';
+import { Telemetry, TelemetrySnapshot } from '../../services/telemetryBus';
+import { GitBus, GitSnapshot } from '../../services/gitBus';
 import { deriveSignals, agent, HandSignals } from './shared';
 
 // React context carrying the live hand-tracking ref down to every instrument,
@@ -10,11 +12,13 @@ export const useHands = () => useContext(HandCtx);
 
 export interface DrawCtx {
   ctx: CanvasRenderingContext2D;
-  t: number;        // seconds since mount
-  dt: number;       // seconds since last frame (clamped)
+  t: number;            // seconds since mount
+  dt: number;           // seconds since last frame (clamped)
   w: number; h: number;
-  sig: HandSignals; // live gesture signals
-  a: AgentState;    // live agent state
+  sig: HandSignals;     // live gesture signals
+  a: AgentState;        // live agent state
+  tel: TelemetrySnapshot; // live machine telemetry (battery/cpu/mem/net/fps/…)
+  git: GitSnapshot;     // live version-control telemetry (repos/risk/snapshots) — daemon-fed
 }
 export type DrawFn = (d: DrawCtx) => void;
 
@@ -38,6 +42,8 @@ const HudCanvas: React.FC<HudCanvasProps> = ({ title, code, draw, className, hei
   drawRef.current = draw;
 
   useEffect(() => {
+    Telemetry.start(); // idempotent — begins live machine-telemetry sampling once
+    GitBus.start();    // idempotent — opens the live version-control link to the daemon
     const loop = (now: number) => {
       const canvas = canvasRef.current;
       const ctx = canvas?.getContext('2d');
@@ -55,7 +61,7 @@ const HudCanvas: React.FC<HudCanvasProps> = ({ title, code, draw, className, hei
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, cssW, cssH);
         const sig = handRef ? deriveSignals(handRef.current) : deriveSignals({ leftHand: null, rightHand: null });
-        try { drawRef.current({ ctx, t, dt, w: cssW, h: cssH, sig, a: agent() }); } catch { /* keep the deck alive */ }
+        try { drawRef.current({ ctx, t, dt, w: cssW, h: cssH, sig, a: agent(), tel: Telemetry.get(), git: GitBus.get() }); } catch { /* keep the deck alive */ }
       }
       raf.current = requestAnimationFrame(loop);
     };

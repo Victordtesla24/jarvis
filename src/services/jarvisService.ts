@@ -81,6 +81,9 @@ export const JarvisService = {
         const reader = resp.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        // Live token-rate (tokens/sec) — a real AI-agent telemetry signal surfaced on the
+        // AgentBus so the dashboard (AGENT CORTEX / NEURAL LATTICE) pulses with throughput.
+        const tokenStamps: number[] = [];
 
         // Parse the SSE stream: blocks separated by blank lines, each with
         // an `event:` and a `data:` line.
@@ -114,10 +117,18 @@ export const JarvisService = {
               case 'reasoning':
                 handlers.onReasoning?.(payload.text ?? '');
                 break;
-              case 'token':
-                if (AgentBus.get().activity !== 'speaking') AgentBus.set({ activity: 'speaking' });
+              case 'token': {
+                const nowMs = Date.now();
+                tokenStamps.push(nowMs);
+                while (tokenStamps.length && nowMs - tokenStamps[0] > 1000) tokenStamps.shift();
+                AgentBus.set(
+                  AgentBus.get().activity !== 'speaking'
+                    ? { activity: 'speaking', tps: tokenStamps.length }
+                    : { tps: tokenStamps.length },
+                );
                 handlers.onToken?.(payload.text ?? '');
                 break;
+              }
               case 'ui':
                 // The agent manifesting itself on its own body, in real time.
                 AgentBus.applyDirective(payload);
@@ -127,7 +138,7 @@ export const JarvisService = {
                 handlers.onError?.(payload.message ?? 'Unknown fault in reasoning core.');
                 break;
               case 'done':
-                AgentBus.set({ activity: 'idle' });
+                AgentBus.set({ activity: 'idle', tps: 0 });
                 handlers.onDone?.();
                 break;
             }

@@ -47,9 +47,6 @@ vi.mock('./components/relativity/HudBackdrop', () => ({
 vi.mock('./components/JarvisConsole', () => ({
   default: () => <div data-testid="jarvis-console" />,
 }));
-vi.mock('./components/GestureController', () => ({
-  default: () => <div data-testid="gesture-controller" />,
-}));
 vi.mock('./components/widgets/GestureDeck', () => ({
   default: () => <div data-testid="gesture-deck" />,
 }));

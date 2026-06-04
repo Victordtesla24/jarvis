@@ -15,6 +15,13 @@ export default defineConfig({
         target: process.env.JARVIS_BRAIN_URL || 'http://localhost:8000',
         changeOrigin: true,
       },
+      // Forward version-control telemetry (+ SSE stream) to the host-side git daemon,
+      // which watches every repo and snapshots dirty work (scripts/git-daemon.mjs).
+      '/gitd': {
+        target: process.env.JARVIS_GIT_DAEMON_URL || 'http://127.0.0.1:7878',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/gitd/, ''),
+      },
     },
   },
   plugins: [react()],

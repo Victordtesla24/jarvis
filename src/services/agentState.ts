@@ -17,6 +17,7 @@ export interface AgentState {
   highlight: string | null;// subsystem code the agent is focused on
   label: string;           // short status caption shown on the HUD
   alertPulse: number;      // bumped to fire a one-shot alert flash
+  tps: number;             // live token-rate (tokens/sec) while transmitting — real AI telemetry
 }
 
 const state: AgentState = {
@@ -26,6 +27,7 @@ const state: AgentState = {
   highlight: null,
   label: 'STANDBY',
   alertPulse: 0,
+  tps: 0,
 };
 
 const listeners = new Set<() => void>();

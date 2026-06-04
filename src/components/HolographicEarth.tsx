@@ -6,7 +6,6 @@ import {
 } from 'three';
 import { Text } from '@react-three/drei';
 import { HandTrackingState, RegionName } from '../types';
-import { SoundService } from '../services/soundService';
 import { sunDirection, regionForDegrees, fibonacciSphere, orbitalNode } from './holoGlobe';
 
 interface HolographicEarthProps {
@@ -334,8 +333,6 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
     let targetExpansion = 0;
     if (leftHand) {
       targetExpansion = leftHand.expansionFactor;
-      const movementDelta = Math.abs(targetExpansion - smoothExpansionRef.current);
-      if (movementDelta > 0.002) SoundService.playServo(movementDelta);
     }
     smoothExpansionRef.current += (targetExpansion - smoothExpansionRef.current) * 0.08;
     const exp = smoothExpansionRef.current;
@@ -346,7 +343,7 @@ const HolographicEarth: React.FC<HolographicEarthProps> = ({ handTrackingRef, se
     if (continentMatRef.current) continentMatRef.current.uniforms.uOpacity.value = earthOpacity;
 
     if (exp > 0.55) {
-      if (!wasTerrainModeRef.current) { SoundService.playMapSwitch(); wasTerrainModeRef.current = true; }
+      wasTerrainModeRef.current = true;
     } else {
       wasTerrainModeRef.current = false;
     }

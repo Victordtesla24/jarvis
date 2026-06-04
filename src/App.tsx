@@ -11,18 +11,21 @@ import HUDOverlay from './components/HUDOverlay';
 import BootSequence from './components/BootSequence';
 import JarvisConsole from './components/JarvisConsole';
 import GestureDeck from './components/widgets/GestureDeck';
-import GestureController from './components/GestureController';
+import PointerParallax from './components/PointerParallax';
 import RelativityHUD from './components/relativity/RelativityHUD';
 import HoloGlass from './components/relativity/HoloGlass';
 import LoginButton from './components/LoginButton';
 import { HandTrackingState, RegionName } from './types';
 
-// The dashboard boots silent and camera-free: the 3D scene runs its cinematic idle drift with
-// hand-tracking refs null. Gesture control is strictly opt-in — only when the operator engages
-// the GESTURES toggle does GestureController request the webcam and drive handTrackingRef. The
-// J.A.R.V.I.S. console talks to the always-on Docker reasoning core over /api/jarvis.
+// The dashboard is silent and camera-free by design. The hand-tracking ref is a permanent
+// fake (both hands null) — gesture/camera control is disabled and MediaPipe is not shipped;
+// the 3D scene runs its cinematic idle drift, and operator interactivity comes from pointer
+// parallax (a non-camera pathway). The J.A.R.V.I.S. console talks to the always-on Docker
+// reasoning core over /api/jarvis.
 
 const App: React.FC = () => {
+  // Fake hand-tracking ref, permanently null — keeps every gesture-aware consumer on its
+  // idle-drift path while the dashboard stays strictly camera-free (no webcam, no MediaPipe).
   const handTrackingRef = useRef<HandTrackingState>({
     leftHand: null,
     rightHand: null
@@ -32,7 +35,6 @@ const App: React.FC = () => {
   const [booted, setBooted] = useState(false);
   const [bootStarted, setBootStarted] = useState(false);
   const [globeMode, setGlobeMode] = useState(false);
-  const [gesturesOn, setGesturesOn] = useState(false);
   const [instrumentsMode, setInstrumentsMode] = useState(true);
 
   // Stable chromatic-aberration offset for the globe post-processing pipeline.
@@ -74,17 +76,6 @@ const App: React.FC = () => {
     <div className="relative w-full h-screen bg-black overflow-hidden">
       {/* Top-right control cluster */}
       <div className="absolute top-4 right-4 z-50 flex gap-2 pointer-events-auto">
-        <button
-          onClick={() => setGesturesOn(g => !g)}
-          className={`px-4 py-2 bg-transparent border font-display font-bold tracking-[0.2em] text-xs transition-all duration-300 cursor-pointer ${
-            gesturesOn
-              ? 'border-holo-cyan text-holo-cyan bg-holo-cyan/10'
-              : 'border-holo-cyan/40 text-holo-cyan/70 hover:bg-holo-cyan/10'
-          }`}
-          style={{ backdropFilter: 'blur(4px)' }}
-        >
-          {gesturesOn ? 'GESTURES ◉' : 'GESTURES ◌'}
-        </button>
         {!globeMode && (
           <button
             onClick={() => setInstrumentsMode(m => !m)}
@@ -107,11 +98,9 @@ const App: React.FC = () => {
         </button>
       </div>
 
-      {/* Opt-in gesture control: engages webcam + MediaPipe only while active. */}
-      {gesturesOn && <GestureController handTrackingRef={handTrackingRef} />}
-
-      {/* 2. Background layer — flat FUI backdrop (default) or 3D holo-globe */}
-      <div className="absolute inset-0 z-10 pointer-events-none">
+      {/* 2. Background layer — flat FUI backdrop (default) or 3D holo-globe.
+          Far parallax layer: drifts gently WITH the cursor for depth separation. */}
+      <PointerParallax className="absolute inset-0 z-10 pointer-events-none" strength={5}>
         {globeMode ? (
           <Canvas camera={{ position: [0, 0, 4], fov: 55 }} gl={{ alpha: true, antialias: false }} dpr={[1, 1.5]}>
             <Suspense fallback={null}>
@@ -144,20 +133,26 @@ const App: React.FC = () => {
         ) : (
           <HudBackdrop />
         )}
-      </div>
+      </PointerParallax>
 
-      {/* 2b. 3D reactor-core centrepiece (reactor view) — gesture/drag controlled */}
+      {/* 2b. 3D reactor-core centrepiece (reactor view) — pointer/drag controlled */}
       {!globeMode && (
         <div className="absolute inset-0 z-[12]" style={{ pointerEvents: 'auto' }}>
           <ReactorCore3D handTrackingRef={handTrackingRef} scale={0.4} />
         </div>
       )}
 
-      {/* 2c. Gesture-driven, AI-modulated instrument deck (reactor view) */}
+      {/* 2c. AI-modulated instrument deck (reactor view) */}
       {!globeMode && instrumentsMode && <GestureDeck handTrackingRef={handTrackingRef} />}
 
-      {/* 3a. HUD Relativity design-baseline panel layer (reactor view) */}
-      {!globeMode && <RelativityHUD currentRegion={currentRegion} minimal={instrumentsMode} />}
+      {/* 3a. HUD Relativity design-baseline panel layer (reactor view).
+          Near parallax layer: panels shift AGAINST the cursor (opposite the backdrop) so the
+          composition gains real holographic depth as the operator moves the mouse. */}
+      {!globeMode && (
+        <PointerParallax className="absolute inset-0 z-[15] pointer-events-none" strength={6} invert>
+          <RelativityHUD currentRegion={currentRegion} minimal={instrumentsMode} />
+        </PointerParallax>
+      )}
 
       {/* 3a-glass. Curved holographic-glass post layer (CRT curv / Plane Curvature). */}
       <HoloGlass />

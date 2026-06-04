@@ -36,6 +36,14 @@ mcp-debug.log
 # Reference-video analysis working dir (raw mp4 + sampled frames; report copied to docs/)
 .video-analysis
 
+# Local reference screenshots (scratch, not source — see strategic-git-plan Phase 0.1)
+/*.jpeg
+/*.jpg
+/*.png
+
+# Claude Code per-task worktrees (parent .claude is already ignored; explicit belt-and-suspenders)
+.claude/worktrees/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

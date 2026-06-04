@@ -4,7 +4,6 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { useSpring as useSpring3, animated as animated3 } from '@react-spring/three';
 import { useSpring as useSpringWeb, animated as animatedWeb } from '@react-spring/web';
 import { HandTrackingState, RegionName } from '../types';
-import { SoundService } from '../services/soundService';
 import gsap from 'gsap';
 import { Animator, AnimatorGeneralProvider, FrameCorners, useFrameAssembler } from '@arwes/react';
 
@@ -344,10 +343,8 @@ const HUDOverlay: React.FC<HUDOverlayProps> = ({ handTrackingRef, currentRegion 
         const isPinching = hands.rightHand.isPinching;
 
         if (isPinching && !wasPinchingRef.current) {
-            SoundService.playLock();
             setShowIntelPanel(true);
         } else if (!isPinching && wasPinchingRef.current) {
-            SoundService.playRelease();
             setShowIntelPanel(false);
         }
         wasPinchingRef.current = isPinching;
