@@ -108,5 +108,5 @@ git config core.hooksPath .githooks          # enable the shared pre-push hook
 - **GIT-20 COMMIT STREAM** — scrolling uncommitted-lines history + a sync conduit (flowing
   dashes ∝ unpushed work) + an autosave-heartbeat bar.
 
-They render only the daemon is reachable; otherwise they show an honest `VC LINK DOWN`.
+They render live only when the daemon is reachable; otherwise they show an honest `VC LINK DOWN`.
 Placement: far-left console-free rail in `GestureDeck.tsx`, height-gated like the rest of the deck.

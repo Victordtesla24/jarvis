@@ -3,7 +3,7 @@
 # pushes BEFORE they leave the laptop. Version-controlled + team-wide via core.hooksPath.
 # This is the convenience layer; the real gate is the GitHub ruleset on `main`. Bypassable
 # with --no-verify (deliberately — emergencies happen), so it is not the last line of defence.
-protected_regex='^(main|master|develop|release/.*)$'
+protected_regex='^(main|master|develop|release/.*|prod|production)$'
 zero='0000000000000000000000000000000000000000'
 
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -16,12 +16,16 @@ while read -r local_ref local_sha remote_ref remote_sha; do
         exit 1
     fi
 
-    # 2. wrong-branch guard: local name must match the remote name it's going to
-    if [ "$local_ref" != "(delete)" ] && [ "$remote_sha" != "$zero" ] \
-       && [ -n "$local_branch" ] && [ "$local_branch" != "$remote_branch" ]; then
-        echo "BLOCKED (pre-push): local '$local_branch' -> remote '$remote_branch' (name mismatch)." >&2
-        exit 1
-    fi
+    # 2. wrong-branch guard: a branch push must target a remote of the SAME name. Fires even
+    #    for a brand-new remote branch (the typo case). Only applies to refs/heads/* pushes —
+    #    explicit refspecs (HEAD:x) and tag pushes are intentional and skipped.
+    case "$local_ref" in
+        refs/heads/*)
+            if [ -n "$local_branch" ] && [ "$local_branch" != "$remote_branch" ]; then
+                echo "BLOCKED (pre-push): local '$local_branch' -> remote '$remote_branch' (name mismatch)." >&2
+                exit 1
+            fi ;;
+    esac
 
     # 3. non-fast-forward (force) push guard
     if [ "$remote_sha" != "$zero" ] && [ "$local_ref" != "(delete)" ]; then

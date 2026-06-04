@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$SCRIPT_DIR/git-guard.sh"
 [ -f "$SRC" ] || { echo "ERROR: $SRC not found." >&2; exit 1; }
 
-DENY='["Bash(git push --force:*)","Bash(git push --force-with-lease:*)","Bash(git push -f:*)","Bash(git reset --hard:*)","Bash(git clean -f:*)","Bash(git clean -fd:*)","Bash(git checkout -- .:*)","Bash(git checkout --force:*)","Bash(git stash drop:*)","Bash(git stash clear:*)","Bash(git branch -D:*)","Bash(git push:* main)","Bash(git push:* master)"]'
+DENY='["Bash(git push --force:*)","Bash(git push --force-with-lease:*)","Bash(git push -f:*)","Bash(git push --mirror:*)","Bash(git push --prune:*)","Bash(git push --delete:*)","Bash(git reset --hard:*)","Bash(git clean -f:*)","Bash(git clean -fd:*)","Bash(git clean --force:*)","Bash(git checkout -- .:*)","Bash(git checkout --force:*)","Bash(git restore .:*)","Bash(git stash drop:*)","Bash(git stash clear:*)","Bash(git branch -D:*)","Bash(git reflog expire:*)","Bash(git update-ref -d:*)","Bash(git push:* main)","Bash(git push:* master)","Bash(git push:* develop)","Bash(git push:* prod)","Bash(git push:* production)"]'
 ASK='["Bash(git commit:*)","Bash(git push:*)"]'
 
 patch_settings() { # $1 = settings.json path, $2 = hook command path

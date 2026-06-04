@@ -25,7 +25,7 @@ case "${1:-}" in
   *)
     REF="$1"; SHA="$(git rev-parse --verify "$REF" 2>/dev/null || true)"
     [ -n "$SHA" ] || { echo "No such snapshot: $REF" >&2; list; exit 1; }
-    BR="jarvis-restore/$(date +%s)"
+    BR="jarvis-restore/$(date +%s)-${SHA:0:7}"   # unique even on same-second restores
     git branch "$BR" "$SHA"
     echo "Parked snapshot on branch '$BR' (your working tree is untouched)."
     echo "Inspect:  git switch $BR        (or)  git checkout $BR -- <path/to/file>"

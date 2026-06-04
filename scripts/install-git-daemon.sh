@@ -38,6 +38,10 @@ else
   echo "Keeping existing config → $CONFIG"
 fi
 
+# XML-escape interpolated paths so a '&', '<' or '>' in a path can't malform the plist.
+xesc() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+NODE_X="$(xesc "$NODE_BIN")"; DAEMON_X="$(xesc "$DAEMON")"; HOME_X="$(xesc "$HOME")"; STATE_X="$(xesc "$STATE_DIR")"
+
 cat > "$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -46,19 +50,19 @@ cat > "$PLIST" <<PLIST
   <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$NODE_BIN</string>
-    <string>$DAEMON</string>
+    <string>$NODE_X</string>
+    <string>$DAEMON_X</string>
   </array>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>WorkingDirectory</key><string>$HOME</string>
+  <key>WorkingDirectory</key><string>$HOME_X</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>HOME</key><string>$HOME</string>
+    <key>HOME</key><string>$HOME_X</string>
     <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
   </dict>
-  <key>StandardOutPath</key><string>$STATE_DIR/launchd.out.log</string>
-  <key>StandardErrorPath</key><string>$STATE_DIR/launchd.err.log</string>
+  <key>StandardOutPath</key><string>$STATE_X/launchd.out.log</string>
+  <key>StandardErrorPath</key><string>$STATE_X/launchd.err.log</string>
 </dict>
 </plist>
 PLIST

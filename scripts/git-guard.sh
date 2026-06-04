@@ -22,18 +22,34 @@ except Exception: print("")' 2>/dev/null && return; fi
 CMD="$(extract)"
 [ -n "$CMD" ] || exit 0
 
+# Strip quoted substrings so destructive phrases inside arguments (e.g. a commit message
+# `-m "fix git reset --hard bug"`) don't trip the guards — only real command tokens remain.
+SCAN="$(printf '%s' "$CMD" | sed -e "s/'[^']*'//g" -e 's/"[^"]*"//g')"
+
 block() { echo "BLOCKED by git-guard: $1" >&2; exit 2; }
+m() { printf '%s' "$SCAN" | grep -Eq "$1"; }
 
-printf '%s' "$CMD" | grep -Eq 'git[[:space:]].*push[[:space:]].*(--force([^-]|$)|--force-with-lease|-f([[:space:]]|$))' \
-  && block "force-push is forbidden — open a PR (override deliberately by hand if truly needed)"
-printf '%s' "$CMD" | grep -Eq 'git[[:space:]].*reset[[:space:]]+--hard'            && block "git reset --hard destroys uncommitted work"
-printf '%s' "$CMD" | grep -Eq 'git[[:space:]].*clean[[:space:]]+-[a-zA-Z]*[fd]'    && block "git clean deletes untracked files irreversibly"
-printf '%s' "$CMD" | grep -Eq 'git[[:space:]].*checkout[[:space:]]+--[[:space:]]+\.|git[[:space:]].*checkout[[:space:]]+--force' && block "checkout -- . discards local changes"
-printf '%s' "$CMD" | grep -Eq 'git[[:space:]].*stash[[:space:]]+(drop|clear)'      && block "stash drop/clear is irreversible — park work on a branch instead"
-printf '%s' "$CMD" | grep -Eq 'git[[:space:]].*branch[[:space:]]+-D'               && block "force-deleting a branch can orphan commits — use -d or park it first"
+# ── destructive / history- and work-erasing forms ────────────────────────────
+# Push forms — detect the subcommand first, then scan flags on the full string (so a
+# single space between `push` and `-f`/`+ref` isn't consumed by the subcommand match).
+if m 'git[[:space:]].*push([[:space:]]|$)'; then
+  m '(--force|--force-with-lease|[[:space:]]-[A-Za-z]*f)' && block "force-push is forbidden — open a PR"
+  m '[[:space:]]\+[^[:space:]]'                           && block "force-push via +refspec is forbidden — open a PR"
+  m '(--mirror|--prune|--delete([[:space:]]|$)|[[:space:]]-d([[:space:]]|$))' && block "push --mirror/--prune/--delete can erase remote refs"
+fi
+# Discard-working-tree forms (checkout/restore of '.') — same two-step.
+if m 'git[[:space:]].*(checkout|restore)([[:space:]]|$)'; then
+  m '(--force|[[:space:]]--[[:space:]]+\.|[[:space:]]\.([[:space:]]|$))' && block "discarding local changes (checkout/restore .) is irreversible"
+fi
+m 'git[[:space:]].*reset[[:space:]].*--hard'   && block "git reset --hard destroys uncommitted work"
+m 'git[[:space:]].*clean[[:space:]].*(--force|-[A-Za-z]*[fd])' && block "git clean deletes untracked files irreversibly"
+m 'git[[:space:]].*stash[[:space:]].*(drop|clear)' && block "stash drop/clear is irreversible — park work on a branch instead"
+m 'git[[:space:]].*branch[[:space:]].*-D'      && block "force-deleting a branch can orphan commits — use -d or park it first"
+m 'git[[:space:]].*reflog[[:space:]].*(expire|delete)' && block "reflog expire/delete removes your recovery safety net"
+m 'git[[:space:]].*update-ref[[:space:]].*-d'  && block "update-ref -d can orphan commits"
 
-# Branch guard: never commit/push on a protected branch — branch first.
-if printf '%s' "$CMD" | grep -Eq 'git[[:space:]].*(commit|push)([[:space:]]|$)'; then
+# ── branch guard: never commit/push on a protected branch — branch first ──────
+if m 'git[[:space:]].*(commit|push)([[:space:]]|$)'; then
   BR="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
   case "$BR" in
     main|master|develop|release/*|prod|production)
