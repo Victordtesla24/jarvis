@@ -1,0 +1,38 @@
+#!/bin/sh
+# .githooks/pre-push — abort direct/force pushes to protected branches and wrong-branch
+# pushes BEFORE they leave the laptop. Version-controlled + team-wide via core.hooksPath.
+# This is the convenience layer; the real gate is the GitHub ruleset on `main`. Bypassable
+# with --no-verify (deliberately — emergencies happen), so it is not the last line of defence.
+protected_regex='^(main|master|develop|release/.*|prod|production)$'
+zero='0000000000000000000000000000000000000000'
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    remote_branch=${remote_ref#refs/heads/}
+    local_branch=${local_ref#refs/heads/}
+
+    # 1. never push directly to a protected branch — open a PR instead
+    if printf '%s' "$remote_branch" | grep -Eq "$protected_regex"; then
+        echo "BLOCKED (pre-push): direct push to protected branch '$remote_branch'. Open a PR." >&2
+        exit 1
+    fi
+
+    # 2. wrong-branch guard: a branch push must target a remote of the SAME name. Fires even
+    #    for a brand-new remote branch (the typo case). Only applies to refs/heads/* pushes —
+    #    explicit refspecs (HEAD:x) and tag pushes are intentional and skipped.
+    case "$local_ref" in
+        refs/heads/*)
+            if [ -n "$local_branch" ] && [ "$local_branch" != "$remote_branch" ]; then
+                echo "BLOCKED (pre-push): local '$local_branch' -> remote '$remote_branch' (name mismatch)." >&2
+                exit 1
+            fi ;;
+    esac
+
+    # 3. non-fast-forward (force) push guard
+    if [ "$remote_sha" != "$zero" ] && [ "$local_ref" != "(delete)" ]; then
+        if ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+            echo "BLOCKED (pre-push): non-fast-forward (force) push to '$remote_branch'." >&2
+            exit 1
+        fi
+    fi
+done
+exit 0

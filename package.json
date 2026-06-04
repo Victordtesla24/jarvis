@@ -1,0 +1,51 @@
+{
+  "name": "j.a.r.v.i.s.-holographic-interface",
+  "private": true,
+  "version": "1.0.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "gitd": "node scripts/git-daemon.mjs",
+    "gitd:install": "bash scripts/install-git-daemon.sh",
+    "gitd:uninstall": "bash scripts/uninstall-git-daemon.sh"
+  },
+  "dependencies": {
+    "@arwes/react": "^1.0.0-alpha.23",
+    "@emotion/react": "^11.14.0",
+    "@react-spring/three": "^9.7.5",
+    "@react-spring/web": "^9.7.5",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "8.16.6",
+    "@react-three/postprocessing": "2.16.2",
+    "@theatre/core": "^0.7.2",
+    "@theatre/r3f": "^0.7.2",
+    "gsap": "^3.15.0",
+    "maath": "^0.10.8",
+    "postprocessing": "6.35.4",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "three": "0.164.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@theatre/studio": "^0.7.2",
+    "@types/node": "^22.14.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.5.0",
+    "baseline-browser-mapping": "^2.10.33",
+    "jsdom": "^29.1.1",
+    "playwright": "^1.60.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0",
+    "vitest": "^4.1.7"
+  }
+}
